@@ -3,7 +3,7 @@
     <button class="dc-back" @click="router.back()"><ArrowLeft :size="16"/>返回</button>
     <section v-if="data" class="detail-head dc-card">
       <div class="head-main"><div class="head-tags"><span class="dc-chip">{{data.layerCode}}</span><span class="status">● {{data.status==='ONLINE'?'在用':data.status}}</span></div><h1>{{data.bizName}}</h1><code class="dc-tech">{{data.tableName}}</code><p>{{data.catalogCode}} · {{data.assetId}}</p></div>
-      <div class="head-actions"><el-button @click="copyName"><Copy :size="15"/>复制表名</el-button><el-button><GitFork :size="15"/>查看关系</el-button><el-button type="primary"><Sparkles :size="15"/>问这张表</el-button></div>
+      <div class="head-actions"><el-button @click="copyName"><Copy :size="15"/>复制表名</el-button><el-button @click="router.push(`/relations/${data.assetId}`)"><GitFork :size="15"/>查看关系</el-button><el-button type="primary" @click="router.push({name:'agent',query:{asset:data.assetId}})"><Sparkles :size="15"/>问这张表</el-button></div>
     </section>
 
     <section v-if="data" class="meta-strip dc-card">
