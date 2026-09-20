@@ -72,7 +72,8 @@ def main() -> None:
                 row_count=R.randint(5_000, 500_000_000), data_updated_at=datetime.now(UTC).replace(tzinfo=None)-timedelta(hours=R.randint(1,360)),
                 updated_at=datetime.now(UTC).replace(tzinfo=None)-timedelta(days=R.randint(0,180)),
             )
-            db.add(ds); datasets.append(ds)
+            db.add(ds)
+            datasets.append(ds)
             fields = list(BASE_COLUMNS)
             for extra in range(26):
                 fields.append((f"attr_{extra+1:02d}", f"扩展属性{extra+1:02d}", R.choice(["string", "bigint", "decimal(20,2)", "date"]), f"用于压力测试与复杂检索验证的扩展业务属性 {extra+1:02d}"))
