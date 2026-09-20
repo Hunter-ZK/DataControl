@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>DataControl P0</title>
+  <title>DataControl</title>
   <link rel="stylesheet" href="/prototype/styles.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
     <nav>
       <button class="active" data-page="home" onclick="show('home',this)">⌂ 首页</button>
       <button>▦ 资产目录</button>
-      <button>⌕ 资产检索</button>
+      <button data-page="searchPage" onclick="submitSearch($('#searchPageQ')?.value || $('#q').value || '贷款余额')">⌕ 资产检索</button>
       <button>⌘ 关系指引</button>
       <button>▣ 标准编码库</button>
       <button>◎ 词根索引</button>
@@ -40,94 +40,74 @@
         <div class="search big-search">
           <span>⌕</span>
           <input id="q" autocomplete="off" placeholder="搜索资产，例如：贷款余额、region_code、dwd_loan_snapshot">
-          <button onclick="doSearch()">搜索</button>
+          <button onclick="submitSearch()">搜索</button>
         </div>
         <div class="search-hints">
           <span>热门：</span><button class="hint">贷款余额</button><button class="hint">企业风险</button><button class="hint">region_code</button><button class="hint">监管报送</button>
         </div>
         <div id="searchDock" class="search-dock hidden-dock">
-          <div class="search-dock-head"><b>检索结果</b><span id="resultMeta">0 条结果</span></div>
+          <div class="search-dock-head"><b>联想结果</b><span id="resultMeta">0 条结果</span></div>
           <div id="results" class="results"></div>
+          <button id="viewAllResults" class="view-all hidden" onclick="submitSearch()">查看全部搜索结果 →</button>
         </div>
       </div>
 
       <div class="module-launchers">
-        <button class="module-card">
-          <span class="module-icon">▦</span><b>资产目录</b><small>按业务目录浏览数据集与字段</small>
-        </button>
-        <button class="module-card">
-          <span class="module-icon">▣</span><b>标准码值</b><small>查询码表、数据标准及引用关系</small>
-        </button>
-        <button class="module-card">
-          <span class="module-icon">◎</span><b>词根索引</b><small>查看字段命名词根与规范用法</small>
-        </button>
-        <button class="module-card">
-          <span class="module-icon">◈</span><b>指标与制度</b><small>查询指标定义、口径与制度依据</small>
-        </button>
-        <button class="module-card agent-entry">
-          <span class="module-icon">✦</span><b>智能问数</b><small>自然语言提问并生成可信 SQL</small>
-        </button>
+        <button class="module-card"><span class="module-icon">▦</span><b>资产目录</b><small>按业务目录浏览数据集与字段</small></button>
+        <button class="module-card"><span class="module-icon">▣</span><b>标准码值</b><small>查询码表、数据标准及引用关系</small></button>
+        <button class="module-card"><span class="module-icon">◎</span><b>词根索引</b><small>查看字段命名词根与规范用法</small></button>
+        <button class="module-card"><span class="module-icon">◈</span><b>指标与制度</b><small>查询指标定义、口径与制度依据</small></button>
+        <button class="module-card agent-entry"><span class="module-icon">✦</span><b>智能问数</b><small>自然语言提问并生成可信 SQL</small></button>
       </div>
     </section>
 
     <section class="home-secondary">
-      <div class="section-title">
-        <div><small>YOUR SPACE</small><h2>继续最近的工作</h2></div>
-        <button class="text-link" onclick="show('overview',document.querySelector('[data-page=overview]'))">查看数据概览 →</button>
-      </div>
+      <div class="section-title"><div><small>YOUR SPACE</small><h2>继续最近的工作</h2></div><button class="text-link" onclick="show('overview',document.querySelector('[data-page=overview]'))">查看数据概览 →</button></div>
       <div id="recent" class="recent recent-cards"></div>
     </section>
   </main>
 
-  <main id="overview" class="hidden">
-    <section class="page-head">
-      <div><small>DATA OVERVIEW</small><h1>数据资产概览</h1><p>独立查看资产规模、业务分布与近期变化，不干扰首页的检索入口。</p></div>
+  <main id="searchPage" class="hidden search-page">
+    <section class="search-page-head">
+      <div><small>ASSET SEARCH</small><h1>资产检索</h1><p>从数据集、字段、指标与标准资产中定位目标，并继续进入详情或关系分析。</p></div>
+      <div class="search-page-box"><span>⌕</span><input id="searchPageQ" placeholder="搜索业务名称、表名、字段名、指标…"><button onclick="submitSearch($('#searchPageQ').value)">搜索</button></div>
     </section>
-    <section class="stats overview-stats">
-      <article><small>数据集</small><strong>180</strong><em>ODS · DWD · DWS · ADS · DIM</em></article>
-      <article><small>字段</small><strong>2,401</strong><em>技术与业务定义</em></article>
-      <article><small>业务指标</small><strong>12</strong><em>确定性口径定义</em></article>
-      <article><small>检索文档</small><strong>2,593</strong><em>资产 / 字段 / 指标</em></article>
-    </section>
-    <div class="grid">
-      <section class="panel span2">
-        <div class="section-title"><div><small>BUSINESS CATALOG</small><h2>按业务目录浏览</h2></div><a>查看全部 →</a></div>
-        <div class="catalogs">
-          <div><b>贷款统计</b><span>23 个数据集</span><p>余额、合同、授信、普惠与不良贷款</p></div>
-          <div><b>存款统计</b><span>23 个数据集</span><p>账户、余额与结构性存款</p></div>
-          <div><b>企业信息</b><span>22 个数据集</span><p>工商、股东、司法与风险信息</p></div>
-          <div><b>监管报送</b><span>22 个数据集</span><p>监管指标、机构统计与报送汇总</p></div>
-        </div>
+    <div class="search-layout">
+      <aside class="search-facets">
+        <div class="facet-title">结果范围</div>
+        <button class="active">全部 <span id="facetAll">0</span></button>
+        <button>数据集 <span id="facetTable">0</span></button>
+        <button>字段 <span id="facetColumn">0</span></button>
+        <button>指标 <span id="facetMetric">0</span></button>
+        <div class="facet-sep"></div>
+        <div class="facet-title">快捷筛选</div>
+        <label><input type="checkbox"> 仅在用资产</label>
+        <label><input type="checkbox"> 最近 30 日更新</label>
+        <label><input type="checkbox"> 常用资产</label>
+      </aside>
+      <section class="search-results-panel">
+        <div class="search-results-toolbar"><div><b id="searchSummary">请输入关键词开始检索</b><span>综合相关度</span></div><button>高级筛选</button></div>
+        <div id="fullResults" class="full-results"><div class="search-empty">从首页搜索或在上方输入关键词。</div></div>
       </section>
-      <section class="panel">
-        <div class="section-title"><div><small>ACTIVITY</small><h2>资产状态</h2></div></div>
-        <div class="overview-list"><span><b>166</b> 在线资产</span><span><b>9</b> 不建议使用</span><span><b>5</b> 已下线</span><span><b>14</b> 近 7 日更新</span></div>
-      </section>
+      <aside class="search-side-panel">
+        <small>SEARCH TIPS</small><h3>更快找到资产</h3>
+        <p>支持中文业务名称、技术表名、字段名和指标名称。技术标识可输入片段。</p>
+        <hr><small>RECENT SEARCH</small><button onclick="submitSearch('贷款余额')">贷款余额</button><button onclick="submitSearch('region_code')">region_code</button><button onclick="submitSearch('企业风险')">企业风险</button>
+      </aside>
     </div>
   </main>
 
+  <main id="overview" class="hidden">
+    <section class="page-head"><div><small>DATA OVERVIEW</small><h1>数据资产概览</h1><p>独立查看资产规模、业务分布与近期变化，不干扰首页的检索入口。</p></div></section>
+    <section class="stats overview-stats"><article><small>数据集</small><strong>180</strong><em>ODS · DWD · DWS · ADS · DIM</em></article><article><small>字段</small><strong>2,401</strong><em>技术与业务定义</em></article><article><small>业务指标</small><strong>12</strong><em>确定性口径定义</em></article><article><small>检索文档</small><strong>2,593</strong><em>资产 / 字段 / 指标</em></article></section>
+    <div class="grid"><section class="panel span2"><div class="section-title"><div><small>BUSINESS CATALOG</small><h2>按业务目录浏览</h2></div><a>查看全部 →</a></div><div class="catalogs"><div><b>贷款统计</b><span>23 个数据集</span><p>余额、合同、授信、普惠与不良贷款</p></div><div><b>存款统计</b><span>23 个数据集</span><p>账户、余额与结构性存款</p></div><div><b>企业信息</b><span>22 个数据集</span><p>工商、股东、司法与风险信息</p></div><div><b>监管报送</b><span>22 个数据集</span><p>监管指标、机构统计与报送汇总</p></div></div></section><section class="panel"><div class="section-title"><div><small>ACTIVITY</small><h2>资产状态</h2></div></div><div class="overview-list"><span><b>166</b> 在线资产</span><span><b>9</b> 不建议使用</span><span><b>5</b> 已下线</span><span><b>14</b> 近 7 日更新</span></div></section></div>
+  </main>
+
   <main id="detail" class="hidden">
-    <button class="back" onclick="show('home',document.querySelector('[data-page=home]'))">← 返回首页</button>
-    <section class="asset-head">
-      <div>
-        <div class="badges"><span class="layer">DWD</span><span class="ok">● 在用</span></div>
-        <h1 id="dName">贷款余额日快照</h1>
-        <div class="technical" id="dTech">stat_prod.dwd_loan_snapshot</div>
-        <div class="path">金融统计 / 贷款统计 · 快照 · 监管报送</div>
-      </div>
-      <div class="actions"><button>☆ 收藏</button><button>查看关系</button><button class="primary">✦ 问这张表</button></div>
-    </section>
-    <section class="meta">
-      <div><small>技术负责人</small><b id="dOwner">—</b></div><div><small>数据更新时间</small><b id="dTime">—</b></div><div><small>更新频率</small><b id="dFreq">—</b></div><div><small>工作空间</small><b>stat_prod</b></div><div><small>资产编号</small><b id="dId">—</b></div>
-    </section>
-    <div class="detail-grid">
-      <section class="panel">
-        <div class="tabs"><button class="active">基本信息</button><button>字段信息</button><button>常用 SQL</button><button>变更记录</button><button>血缘关系</button><button>调度与运行</button></div>
-        <div class="info-block"><small>业务说明</small><h2>资产定义</h2><p id="dDefinition"></p><div class="callout"><b>统计口径</b><p id="dCaliber"></p></div><div class="kv"><div><span>数据粒度</span><b id="dGrain">—</b></div><div><span>数据来源</span><b id="dSource">—</b></div><div><span>调度与运行</span><b id="dSchedule">—</b></div><div><span>使用说明</span><b id="dNotes">—</b></div></div></div>
-        <div class="info-block"><small>STRUCTURE</small><h2>字段预览</h2><table><thead><tr><th>字段</th><th>中文名</th><th>类型</th><th>业务定义</th></tr></thead><tbody id="cols"></tbody></table></div>
-      </section>
-      <aside class="inspector"><small>RELATION OVERVIEW</small><h3>关系概览</h3><div class="flow"><span>ODS<br><b>上游</b></span><i>→</i><span class="current">DWD<br><b>当前资产</b></span><i>→</i><span>DWS<br><b>下游</b></span></div><hr><small>RELATED METRICS</small><a>各项贷款余额</a><a>贷款客户数</a><hr><small>IDENTITY</small><p>稳定 asset_id 用于收藏、审计、关系和 Agent 上下文；表名允许后续重命名。</p></aside>
-    </div>
+    <button class="back" onclick="show('searchPage',document.querySelector('[data-page=searchPage]'))">← 返回检索结果</button>
+    <section class="asset-head"><div><div class="badges"><span class="layer">DWD</span><span class="ok">● 在用</span></div><h1 id="dName">贷款余额日快照</h1><div class="technical" id="dTech">stat_prod.dwd_loan_snapshot</div><div class="path">金融统计 / 贷款统计 · 快照 · 监管报送</div></div><div class="actions"><button>☆ 收藏</button><button>查看关系</button><button class="primary">✦ 问这张表</button></div></section>
+    <section class="meta"><div><small>技术负责人</small><b id="dOwner">—</b></div><div><small>数据更新时间</small><b id="dTime">—</b></div><div><small>更新频率</small><b id="dFreq">—</b></div><div><small>工作空间</small><b>stat_prod</b></div><div><small>资产编号</small><b id="dId">—</b></div></section>
+    <div class="detail-grid"><section class="panel"><div class="tabs"><button class="active">基本信息</button><button>字段信息</button><button>常用 SQL</button><button>变更记录</button><button>血缘关系</button><button>调度与运行</button></div><div class="info-block"><small>业务说明</small><h2>资产定义</h2><p id="dDefinition"></p><div class="callout"><b>统计口径</b><p id="dCaliber"></p></div><div class="kv"><div><span>数据粒度</span><b id="dGrain">—</b></div><div><span>数据来源</span><b id="dSource">—</b></div><div><span>调度与运行</span><b id="dSchedule">—</b></div><div><span>使用说明</span><b id="dNotes">—</b></div></div></div><div class="info-block"><small>STRUCTURE</small><h2>字段预览</h2><table><thead><tr><th>字段</th><th>中文名</th><th>类型</th><th>业务定义</th></tr></thead><tbody id="cols"></tbody></table></div></section><aside class="inspector"><small>RELATION OVERVIEW</small><h3>关系概览</h3><div class="flow"><span>ODS<br><b>上游</b></span><i>→</i><span class="current">DWD<br><b>当前资产</b></span><i>→</i><span>DWS<br><b>下游</b></span></div><hr><small>RELATED METRICS</small><a>各项贷款余额</a><a>贷款客户数</a><hr><small>IDENTITY</small><p>稳定 asset_id 用于收藏、审计、关系和 Agent 上下文；表名允许后续重命名。</p></aside></div>
   </main>
 
   <script src="/prototype/app.js"></script>
