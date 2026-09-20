@@ -3,26 +3,30 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.activity import router as activity_router
+from backend.app.api.agent import router as agent_router
 from backend.app.api.assets import router as assets_router
 from backend.app.api.auth import router as auth_router
 from backend.app.api.details import router as details_router
 from backend.app.api.reference import router as reference_router
+from backend.app.api.relations import router as relations_router
 from backend.app.api.search import router as search_router
 from backend.app.core.config import MODEL_NAME, MODEL_PROVIDER, ROOT
 from backend.app.db.application_models import AuditLog, SearchHistory  # noqa: F401
 
-app = FastAPI(title="DataControl API", version="0.3.0-p2")
+app = FastAPI(title="DataControl API", version="0.4.0-p3")
 app.include_router(auth_router)
 app.include_router(assets_router)
 app.include_router(details_router)
 app.include_router(reference_router)
 app.include_router(search_router)
+app.include_router(relations_router)
+app.include_router(agent_router)
 app.include_router(activity_router)
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "phase": "P2"}
+    return {"status": "ok", "phase": "P3"}
 
 
 @app.get("/api/v1/system/info")
@@ -30,10 +34,11 @@ def system_info():
     return {
         "code": "OK",
         "data": {
-            "phase": "P2",
+            "phase": "P3",
             "modelProvider": MODEL_PROVIDER,
             "modelName": MODEL_NAME,
             "platforms": ["windows", "macos"],
+            "sqlExecutionEnabled": False,
         },
     }
 
