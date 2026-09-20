@@ -6,6 +6,8 @@ import CatalogView from '@/views/CatalogView.vue'
 import DatasetDetailView from '@/views/DatasetDetailView.vue'
 import FieldDetailView from '@/views/FieldDetailView.vue'
 import CodeTableDetailView from '@/views/CodeTableDetailView.vue'
+import DataStandardDetailView from '@/views/DataStandardDetailView.vue'
+import ReferenceDetailView from '@/views/ReferenceDetailView.vue'
 import OverviewView from '@/views/OverviewView.vue'
 import ReferenceListView from '@/views/ReferenceListView.vue'
 import ProfileView from '@/views/ProfileView.vue'
@@ -26,9 +28,13 @@ const router = createRouter({
         { path: 'code-tables', name: 'codeTables', component: ReferenceListView, props: { kind: 'code-tables' }, meta: { title: '标准码值' } },
         { path: 'code-tables/:no', name: 'codeTable', component: CodeTableDetailView, meta: { title: '码表详情' } },
         { path: 'standards', name: 'standards', component: ReferenceListView, props: { kind: 'data-standards' }, meta: { title: '数据标准' } },
+        { path: 'standards/:no', name: 'standard', component: DataStandardDetailView, meta: { title: '数据标准详情' } },
         { path: 'word-roots', name: 'wordRoots', component: ReferenceListView, props: { kind: 'word-roots' }, meta: { title: '词根索引' } },
+        { path: 'word-roots/:root', name: 'wordRoot', component: ReferenceDetailView, props: { kind: 'word-roots' }, meta: { title: '词根详情' } },
         { path: 'metrics', name: 'metrics', component: ReferenceListView, props: { kind: 'metrics' }, meta: { title: '指标与制度' } },
+        { path: 'metrics/:code', name: 'metric', component: ReferenceDetailView, props: { kind: 'metrics' }, meta: { title: '指标详情' } },
         { path: 'stat-systems', name: 'statSystems', component: ReferenceListView, props: { kind: 'stat-systems' }, meta: { title: '统计制度' } },
+        { path: 'stat-systems/:code', name: 'statSystem', component: ReferenceDetailView, props: { kind: 'stat-systems' }, meta: { title: '统计制度详情' } },
         { path: 'profile', name: 'profile', component: ProfileView, meta: { title: '个人中心' } },
       ],
     },

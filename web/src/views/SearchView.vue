@@ -60,7 +60,12 @@ function count(k:string){ return k==='ALL'?rows.value.length:rows.value.filter(x
 function label(v:string){ return ({TABLE:'数据集',COLUMN:'字段',METRIC:'指标',CODE_TABLE:'码表'} as Record<string,string>)[v]||v }
 async function runSearch(){ const value=q.value.trim(); if(!value)return; loading.value=true; try{rows.value=await assetApi.search(value) as any[]; await activityApi.recordSearch(value); await router.replace({query:{...route.query,q:value}})}finally{loading.value=false} }
 function quick(v:string){q.value=v;runSearch()}
-function open(item:any){ if(item.asset_type==='TABLE') router.push(`/datasets/${item.asset_id}`); else if(item.asset_type==='CODE_TABLE') router.push('/code-tables'); else if(item.asset_type==='METRIC') router.push('/metrics') }
+function open(item:any){
+  if(item.asset_type==='TABLE') router.push(`/datasets/${item.asset_id}`)
+  else if(item.asset_type==='COLUMN') router.push(`/fields/${item.asset_id}`)
+  else if(item.asset_type==='CODE_TABLE') router.push(`/code-tables/${item.technical_name}`)
+  else if(item.asset_type==='METRIC') router.push(`/metrics/${item.technical_name}`)
+}
 watch(()=>route.query.q,(v)=>{if(typeof v==='string'&&v!==q.value){q.value=v;runSearch()}})
 onMounted(()=>{if(q.value)runSearch()})
 </script>
