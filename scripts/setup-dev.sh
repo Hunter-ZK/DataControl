@@ -17,6 +17,7 @@ VENV_PY=".venv/bin/python"
 "$VENV_PY" -m alembic upgrade head
 "$VENV_PY" samples/generate_demo_data.py
 "$VENV_PY" samples/enrich_p1_data.py
+"$VENV_PY" samples/rebuild_search_index.py
 
 (cd web && npm install)
 echo "Setup complete. Run ./scripts/start-dev.sh"
