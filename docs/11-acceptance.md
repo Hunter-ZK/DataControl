@@ -1,55 +1,76 @@
 # 11 · Acceptance
 
-## P1 automated acceptance
+## P2 automated acceptance
 
-Run the platform-specific verification script.
+Run the platform-specific verification script after setup.
 
 Windows:
-
 ```powershell
+.\scripts\setup-dev.ps1
 .\scripts\verify.ps1
 ```
 
 macOS:
-
 ```bash
+bash scripts/setup-dev.sh
 bash scripts/verify.sh
 ```
 
-The script verifies:
-- Alembic baseline migration
-- deterministic P0/P1 synthetic data generation
-- Ruff static checks
-- backend API/integration tests
+The verification gate covers:
+- Alembic migration
+- deterministic demo/P1 enrichment data
+- Ruff
+- backend pytest
 - search benchmark
-- UI layout contract: one shell grid, bounded centered content, two-column search structure, return controls and responsive breakpoints
+- Vue/TypeScript type-check
+- Vitest
+- Vite production build
 
-The final line must be `P1 VERIFICATION PASSED`.
+The final line must be `P2 VERIFICATION PASSED`.
 
-## P1 functional acceptance
+## Cross-platform CI
 
-1. `/health` returns phase `P1`.
-2. `/docs` exposes dataset, field, reference, auth and activity APIs.
-3. Local demo login succeeds for the generated demo accounts.
-4. Dataset/column/catalog/code table/data standard/word root/metric/statistical-system APIs return seeded data.
-5. Dataset tags, changes, common SQL and upstream/downstream summaries are queryable.
-6. Favorites, views, search history and admin audit records can be read/written through the API boundary.
-7. Search home suggestions lead to a dedicated result page.
-8. Search result layout contains only **filter + result** regions. No independent right-side tips panel or “更好地找到资产” panel exists.
-9. Search, overview and dataset detail pages have explicit return controls and top-bar back navigation.
-10. All primary pages use a common centered `content-container`; cards must not anchor to the left edge on wide screens.
-11. No page-level layout uses `margin-left + calc(width)` to compensate for a fixed sidebar. The outer application uses one CSS Grid shell and every content column uses `minmax(0, 1fr)` / `min-width: 0` to prevent overflow.
-12. Responsive validation must cover at least these viewport widths:
-   - 1920px: centered bounded content, full 224px sidebar, no stretched panels
-   - 1440px: centered bounded content, no horizontal overflow
-   - 1280px: compact layout remains aligned; home cards reflow
-   - 1024px: sidebar collapses to icon rail; search filter becomes an inline filter row above results
-   - 820px: content becomes single-column and remains full-width inside page padding
-   - 560px: cards, stats, metadata and search results become single-column; tables scroll inside their own container only
-13. Long technical names may truncate/wrap inside their own component but must never widen the page.
-14. Windows and macOS setup/start/verify scripts both exist and CI runs Windows/macOS/Linux.
-15. The prototype HTML disables stale-shell caching and CSS/JS URLs use a revision query string so a pull/restart cannot silently display the previous layout.
+Both Python and frontend jobs must pass on:
+- Windows
+- macOS
+- Ubuntu
+
+## P2 functional acceptance
+
+1. `/health` reports phase `P2`.
+2. Home is a search portal, not an asset dashboard.
+3. Main navigation uses the light-ocean product shell and real SVG icons.
+4. Search submission opens `/search?q=...`; search results can open dataset, field, metric and code-table destinations.
+5. Asset catalog supports business-directory filtering and keyword lookup.
+6. Dataset detail contains business definition, field list, common SQL, changes, lineage summary and `调度与运行` within the dataset page.
+7. Field detail is independently routable and linked from the dataset field table.
+8. Code tables and data standards have list/detail navigation; word roots, metrics and statistical systems have detail routes.
+9. Data Overview is a separate page.
+10. Personal Center exposes favorites, recent views and search history after development login.
+11. Browser forward/back and direct routes work through Vue Router; built SPA routes can be served by FastAPI history fallback.
+12. The layout remains centered and usable at 1920, 1440, 1280, 1024, 820 and narrow mobile-like browser widths without page-level horizontal overflow.
+13. Sidebar behaviour: full navigation -> icon rail -> hidden navigation as viewport width decreases.
+14. Technical names never widen the page; tables scroll internally when necessary.
+15. Windows and macOS use the same product capability and validation data.
+
+## Visual acceptance focus
+
+P2 design direction is `Light Ocean × Calm SaaS × Data Tool`:
+- very light ocean/blue-grey navigation
+- white reading surfaces
+- blue reserved for actions/selection/links rather than large saturated panels
+- restrained shadows and gradients
+- consistent radius, spacing and type hierarchy
+- low-contrast chrome so asset content remains the visual focus
+- professional vector icons instead of prototype Unicode glyphs
 
 ## Deferred acceptance
 
-The following are not P1 gates: full Vue production UI, relation graph/path explorer, real dsh/Agent3 conversation, production SSO/LDAP, metadata ingestion/governance, or SQL execution.
+Not P2 gates:
+- full relationship graph/path/impact explorer
+- production advanced search ranking/facet service
+- real dsh + Agent3 conversation
+- SQL execution
+- production SSO/LDAP
+- admin/operations console
+- metadata ingestion/governance

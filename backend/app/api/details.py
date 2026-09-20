@@ -10,6 +10,21 @@ from backend.app.db.models import ChangeLog, Column, CommonSql, CommonSqlDataset
 router = APIRouter(prefix="/api/v1", tags=["asset-details"])
 
 
+def _column_payload(x: Column) -> dict:
+    return {
+        "assetId": x.asset_id,
+        "datasetId": x.dataset_id,
+        "columnName": x.column_name,
+        "cnName": x.cn_name,
+        "dataType": x.data_type,
+        "ordinalNo": x.ordinal_no,
+        "bizDefinition": x.biz_definition,
+        "unit": x.unit,
+        "codeTableNo": x.code_table_no,
+        "standardNo": x.standard_no,
+    }
+
+
 @router.get("/columns")
 def columns(
     dataset_id: str | None = None,
@@ -24,24 +39,15 @@ def columns(
         like = f"%{keyword}%"
         stmt = stmt.where(or_(Column.column_name.like(like), Column.cn_name.like(like), Column.biz_definition.like(like)))
     rows = db.execute(stmt.order_by(Column.dataset_id, Column.ordinal_no).limit(limit)).scalars().all()
-    return {
-        "code": "OK",
-        "data": [
-            {
-                "assetId": x.asset_id,
-                "datasetId": x.dataset_id,
-                "columnName": x.column_name,
-                "cnName": x.cn_name,
-                "dataType": x.data_type,
-                "ordinalNo": x.ordinal_no,
-                "bizDefinition": x.biz_definition,
-                "unit": x.unit,
-                "codeTableNo": x.code_table_no,
-                "standardNo": x.standard_no,
-            }
-            for x in rows
-        ],
-    }
+    return {"code": "OK", "data": [_column_payload(x) for x in rows]}
+
+
+@router.get("/columns/{asset_id}")
+def column_detail(asset_id: str, db: Session = Depends(get_db)):
+    row = db.get(Column, asset_id)
+    if row is None:
+        raise HTTPException(404, "Column not found")
+    return {"code": "OK", "data": _column_payload(row)}
 
 
 @router.get("/tables/{asset_id}/tags")
