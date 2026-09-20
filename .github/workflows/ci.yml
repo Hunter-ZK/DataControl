@@ -18,6 +18,7 @@ jobs:
       - run: python -m alembic upgrade head
       - run: python samples/generate_demo_data.py
       - run: python samples/enrich_p1_data.py
+      - run: python samples/rebuild_search_index.py
       - run: python -m ruff check .
       - run: python -m pytest -q
       - run: python scripts/search_benchmark.py
