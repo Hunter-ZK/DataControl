@@ -42,7 +42,7 @@
         <div v-if="pathResult && !pathResult.found" class="dc-empty compact">在限定层级内未找到路径。</div>
         <div v-else-if="pathResult?.found" class="path-result">
           <span>{{pathResult.hopCount}} 跳</span>
-          <template v-for="(node,index) in pathResult.nodes" :key="node.assetId"><RouterLink :to="`/datasets/${node.assetId}`">{{node.name}}</RouterLink><ArrowRight v-if="index<pathResult.nodes.length-1" :size="14"/></template>
+          <template v-for="(node,index) in pathResult.nodes" :key="node.assetId"><RouterLink :to="`/datasets/${node.assetId}`">{{node.name}}</RouterLink><ArrowRight v-if="Number(index)<pathResult.nodes.length-1" :size="14"/></template>
         </div>
       </section>
     </div>
