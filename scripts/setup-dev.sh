@@ -21,6 +21,8 @@ fi
 VENV_PY=".venv/bin/python"
 "$VENV_PY" -m pip install -U pip
 "$VENV_PY" -m pip install -e '.[dev]'
+"$VENV_PY" -m alembic upgrade head
 "$VENV_PY" samples/generate_demo_data.py
+"$VENV_PY" samples/enrich_p1_data.py
 
 echo "Setup complete. Run ./scripts/start-dev.sh"
