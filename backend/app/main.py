@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -61,9 +61,7 @@ def ui():
 
 @app.get("/{full_path:path}", include_in_schema=False)
 def spa_fallback(full_path: str):
-    """Serve Vue history-mode routes from the built frontend.
-
-    API, OpenAPI and static asset routes are registered above this fallback and
-    therefore keep their normal FastAPI behaviour.
-    """
+    """Serve Vue history-mode routes without masking unknown API paths."""
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="API route not found")
     return _spa_response(full_path)

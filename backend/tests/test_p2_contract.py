@@ -25,5 +25,6 @@ def test_p2_system_phase_and_field_detail_contract():
     assert detail.json()["data"]["columnName"] == field["columnName"]
 
 
-def test_unknown_field_returns_404():
+def test_unknown_field_and_unknown_api_return_404():
     assert client.get("/api/v1/columns/FD_DOES_NOT_EXIST").status_code == 404
+    assert client.get("/api/v1/not-a-real-route").status_code == 404
