@@ -45,5 +45,9 @@ const router = createRouter({
   ],
 })
 
+router.beforeEach((to) => {
+  if (to.name === 'search' && to.query.mode === 'ai') return { name: 'agent' }
+  if (to.name === 'search' && to.query.mode === 'relation') return { name: 'relations' }
+})
 router.afterEach((to) => { document.title = `${String(to.meta.title || 'DataControl')} · DataControl` })
 export default router
