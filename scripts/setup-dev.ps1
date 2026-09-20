@@ -7,6 +7,7 @@ if (-not (Test-Path .venv)) { python -m venv .venv }
 .\.venv\Scripts\python.exe -m alembic upgrade head
 .\.venv\Scripts\python.exe samples\generate_demo_data.py
 .\.venv\Scripts\python.exe samples\enrich_p1_data.py
+.\.venv\Scripts\python.exe samples\rebuild_search_index.py
 Push-Location web
 try { npm install } finally { Pop-Location }
 Write-Host "Setup complete. Run .\scripts\start-dev.ps1"
