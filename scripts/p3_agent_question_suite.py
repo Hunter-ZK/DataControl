@@ -78,7 +78,7 @@ def main() -> None:
     selected = cases if args.all else cases[: max(1, args.limit)]
 
     results: list[dict[str, Any]] = []
-    with httpx.Client(timeout=180.0) as client:
+    with httpx.Client(timeout=180.0, trust_env=False) as client:
         status = unwrap(client.get(f"{BASE_URL}/agent/status"))
         if not status.get("ready"):
             raise SystemExit(f"Agent is not ready: {status.get('reason')}")
