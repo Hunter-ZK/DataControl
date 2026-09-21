@@ -76,7 +76,8 @@ class EmbeddedAgentGateway:
         source_migrated = bool(manifest.get("sourceMigrated"))
         bridge_implemented = bool(manifest.get("sessionBridgeImplemented"))
         local_accepted = bool(
-            acceptance.get("mcpToolObserved")
+            acceptance.get("sessionResumed")
+            and acceptance.get("mcpToolObserved")
             and acceptance.get("validateSqlObserved")
             and acceptance.get("sqlGenerated")
             and acceptance.get("sqlExecuted") is False
