@@ -1,6 +1,13 @@
 name: ci
 on: [push, pull_request]
 
+# P3 touches three cross-platform matrices and normally emits both a push and a
+# PR run. Cancel stale runs for the same event/branch so the final acceptance
+# head is validated promptly instead of waiting behind obsolete commits.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   python-cross-platform:
     strategy:
