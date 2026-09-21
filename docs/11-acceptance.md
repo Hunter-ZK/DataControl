@@ -33,29 +33,31 @@ The repository implementation must satisfy all of these before user acceptance b
 6. Portal Python 3.13 and DataAgent Python 3.14 are isolated inside one repository.
 7. Windows/macOS/Linux setup, start and verification flows are explicit and fail early when dependencies are missing.
 8. The pinned dsh package exposes the `headless` task surface on every CI platform.
-9. `dataagent` and `dataagent-headless` profiles compose the repository patch, Agent3 MCP, DataAgent preset and Guard plugin.
-10. Agent Gateway consumes dsh JSON events and never returns `thinking` events.
-11. Session continuation is supported through dsh `sessionId`.
-12. SQL execution remains unavailable through the product contract.
-13. Portal facts are read by Agent3 only through the read-only HTTP metadata provider.
+9. The browser `dataagent` profile uses the restricted `dataagent-query` preset, while `dataagent-headless` uses a direct restricted host composition because dsh Headless does not compose the Agent Preset roster.
+10. Headless exposes Agent3 MCP plus embedded DataAgent Skills, pins Skill discovery to `agent/.dsh/skills`, forces native tool presentation, and explicitly disables general shell/filesystem/job/subagent/workflow/web mutation surfaces.
+11. Both dsh profiles load the local Guard plugin and use the DeepSeek provider configuration without retired local-LLM settings.
+12. Agent Gateway consumes dsh JSON events and never returns `thinking` events.
+13. Session continuation is supported through dsh `sessionId`.
+14. SQL execution remains unavailable through the product contract.
+15. Portal facts are read by Agent3 only through the read-only HTTP metadata provider.
 
 ## P3 real-model acceptance
 
 This gate is local because model credentials must not be stored in GitHub CI.
 
-With `DEEPSEEK_API_KEY` set before startup, execute `scripts/p3_agent_acceptance.py`. A passing run must prove:
+With `DEEPSEEK_API_KEY` set before startup, execute `scripts/p3_agent_acceptance.py` with the Portal virtual-environment Python. A passing run must prove:
 
+- unified search, suggestions, relationship graph, path and impact endpoints work against the seeded local environment;
 - Portal -> Agent Gateway -> dsh -> MCP -> Agent3 Core succeeds with a real model;
 - at least one Agent3 MCP tool call is observed;
-- generated SQL is captured;
-- `validate_sql` is observed;
-- `sqlExecuted` remains `false`;
-- `hiddenReasoningExposed` remains `false`;
+- generated SQL is captured and `validate_sql` is observed;
+- a second dsh process successfully resumes the first persisted `sessionId`;
+- `sqlExecuted` remains `false` and `hiddenReasoningExposed` remains `false` across original and resumed turns;
 - a destructive request does not execute SQL.
 
-The script writes `.local/p3-agent-acceptance.json`. `/api/v1/agent/status` may report the runtime as usable before this record exists when all runtime dependencies are healthy, but `realModelAccepted` and `integrated` remain false until the local real-model gate passes.
+The script writes `.local/p3-agent-acceptance.json`. `/api/v1/agent/status` may report the runtime as usable before this record exists when all runtime dependencies are healthy, but machine-local `realModelAccepted` / `integrated` only become true after the evidence includes successful session resumption plus the SQL/safety invariants.
 
-The committed `agent/runtime-manifest.json` remains conservative (`integrated: false`) until explicit user acceptance and PR merge approval. Machine-local acceptance evidence is never committed.
+The committed `agent/runtime-manifest.json` remains conservative (`integrated: false`, `realModelAccepted: false`). Machine-local acceptance evidence and model credentials are never committed.
 
 ## P3 merge gate
 
