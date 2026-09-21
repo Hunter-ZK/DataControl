@@ -6,13 +6,20 @@ DSH_HOME="${DSH_HOME:-$REPO_ROOT/.local/dsh-home}"
 export DSH_HOME DSH_TELEMETRY_MODE=DISABLED
 DSH_DIR="$AGENT_ROOT/dsh"
 GUARD_DIR="$AGENT_ROOT/guard-plugin"
-DSH_BIN="$DSH_DIR/node_modules/.bin/dsh"
+DSH_BIN_DIR="$DSH_DIR/node_modules/.bin"
+DSH_BIN="$DSH_BIN_DIR/dsh"
+PNPM_BIN="$DSH_BIN_DIR/pnpm"
 PATCH="$AGENT_ROOT/dsh/profile/cordis.patch.yml"
 
 if [ ! -x "$DSH_BIN" ]; then
   echo "DeepSeek Harness is not installed. Run scripts/setup-agent.sh first." >&2
   exit 1
 fi
+if [ ! -x "$PNPM_BIN" ]; then
+  echo "Pinned pnpm is missing from agent/dsh. Run scripts/setup-agent.sh again." >&2
+  exit 1
+fi
+export PATH="$DSH_BIN_DIR:$PATH"
 mkdir -p "$DSH_HOME"
 
 setup_profile() {
