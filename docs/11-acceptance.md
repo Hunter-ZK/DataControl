@@ -30,7 +30,7 @@ The repository implementation must satisfy all of these before user acceptance b
 3. Portal calls only the local Agent Gateway contract; it does not import Agent3 Core.
 4. DataAgent keeps `dsh/UI/API -> adapters -> Agent3 Core -> domain/ports` dependency direction.
 5. MCP stays an adapter and contains no duplicated business rules.
-6. Portal Python 3.13 and DataAgent Python 3.14 are isolated inside one repository.
+6. Portal and DataAgent run as separate processes/contracts while sharing one repository-local Python environment; supported Python is `>=3.13,<3.15`.
 7. Windows/macOS/Linux setup, start and verification flows are explicit and fail early when dependencies are missing.
 8. The pinned dsh package exposes the `headless` task surface on every CI platform.
 9. The browser `dataagent` profile uses the restricted `dataagent-query` preset, while `dataagent-headless` uses a direct restricted host composition because dsh Headless does not compose the Agent Preset roster.
@@ -40,12 +40,13 @@ The repository implementation must satisfy all of these before user acceptance b
 13. Session continuation is supported through dsh `sessionId`.
 14. SQL execution remains unavailable through the product contract.
 15. Portal facts are read by Agent3 only through the read-only HTTP metadata provider.
+16. Agent package, architecture and tests pass on Python 3.13 across Windows/macOS/Linux, proving the lower supported runtime boundary.
 
 ## P3 real-model acceptance
 
 This gate is local because model credentials must not be stored in GitHub CI.
 
-With `DEEPSEEK_API_KEY` set before startup, execute `scripts/p3_agent_acceptance.py` with the Portal virtual-environment Python. A passing run must prove:
+With `DEEPSEEK_API_KEY` set before startup, execute `scripts/p3_agent_acceptance.py` with the shared DataControl virtual-environment Python. A passing run must prove:
 
 - unified search, suggestions, relationship graph, path and impact endpoints work against the seeded local environment;
 - Portal -> Agent Gateway -> dsh -> MCP -> Agent3 Core succeeds with a real model;
