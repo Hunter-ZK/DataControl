@@ -7,7 +7,9 @@ from pathlib import Path
 import httpx
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE_URL = "http://127.0.0.1:8000/api/v1"
+PORTAL_URL = "http://127.0.0.1:8000"
+BASE_URL = f"{PORTAL_URL}/api/v1"
+EXPECTED_RUNTIME_CONTRACT = "embedded-agent-gateway-v1"
 ACCEPTANCE_FILE = ROOT / ".local" / "p3-agent-acceptance.json"
 
 
@@ -23,6 +25,24 @@ def fail(message: str) -> None:
 
 def main() -> None:
     with httpx.Client(timeout=180.0) as client:
+        # Fail early when port 8000 is owned by a stale uvicorn/reload worker.
+        # Without this contract check an old P3 backend can look healthy while it
+        # still contains the retired integration-gate logic.
+        try:
+            health_response = client.get(f"{PORTAL_URL}/health")
+            health_response.raise_for_status()
+            health = health_response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            fail(f"DataControl Portal is not reachable at {PORTAL_URL}: {exc}")
+        runtime_contract = health.get("runtimeContract") if isinstance(health, dict) else None
+        if runtime_contract != EXPECTED_RUNTIME_CONTRACT:
+            fail(
+                "stale DataControl Portal detected on port 8000: "
+                f"expected runtimeContract={EXPECTED_RUNTIME_CONTRACT!r}, got {runtime_contract!r}. "
+                "Stop the process listening on port 8000, pull the latest P3 branch, "
+                "and restart with .\\scripts\\start-dev.ps1."
+            )
+
         # P3-A: prove the unified search and relationship services on the same
         # seeded environment that the user is about to inspect in the UI.
         search = unwrap(client.get(f"{BASE_URL}/search", params={"q": "行政区划", "limit": 50}))
@@ -54,13 +74,20 @@ def main() -> None:
         if impact.get("impactCount", 0) < 1:
             fail("downstream impact analysis returned no impacted asset")
 
-        # P3-C: the status may be ready before the first real-model acceptance;
-        # readiness here means dsh + profile + API key + MCP are actually usable.
+        # P3-C: readiness means the live local runtime is usable. Committed
+        # integrated/realModelAccepted flags are intentionally not prerequisites.
         status = unwrap(client.get(f"{BASE_URL}/agent/status"))
         if not status.get("ready"):
+            reason = str(status.get("reason") or "unknown blocker")
+            if "integration gate pending" in reason.casefold():
+                fail(
+                    "retired integration-gate response detected. This can only come "
+                    "from stale Portal code on port 8000; stop that process and restart "
+                    "the latest P3 checkout with .\\scripts\\start-dev.ps1."
+                )
             raise SystemExit(
                 "Agent runtime is not ready: "
-                + str(status.get("reason") or "unknown blocker")
+                + reason
                 + "\nStart DataControl with DEEPSEEK_API_KEY set, then retry."
             )
 
@@ -128,6 +155,7 @@ def main() -> None:
 
     record = {
         "acceptedAt": datetime.now(UTC).isoformat(),
+        "runtimeContract": EXPECTED_RUNTIME_CONTRACT,
         "provider": status.get("provider"),
         "model": status.get("model"),
         "unifiedSearchAccepted": True,
