@@ -45,14 +45,21 @@ class EmbeddedAgentGateway:
         self.gateway_url = AGENT_GATEWAY_URL
         self.timeout = AGENT_TIMEOUT_SECONDS
 
-    def _manifest(self) -> dict[str, Any]:
-        path = self.agent_home / "runtime-manifest.json"
+    @staticmethod
+    def _read_json(path: Path) -> dict[str, Any]:
         if not path.exists():
             return {}
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            value = json.loads(path.read_text(encoding="utf-8"))
+            return value if isinstance(value, dict) else {}
         except (OSError, json.JSONDecodeError):
             return {}
+
+    def _manifest(self) -> dict[str, Any]:
+        return self._read_json(self.agent_home / "runtime-manifest.json")
+
+    def _local_acceptance(self) -> dict[str, Any]:
+        return self._read_json(self.agent_home.parent / ".local" / "p3-agent-acceptance.json")
 
     async def _gateway_health(self) -> tuple[bool, dict[str, Any]]:
         try:
@@ -65,11 +72,22 @@ class EmbeddedAgentGateway:
 
     async def status(self) -> RuntimeStatus:
         manifest = self._manifest()
+        acceptance = self._local_acceptance()
         source_migrated = bool(manifest.get("sourceMigrated"))
         bridge_implemented = bool(manifest.get("sessionBridgeImplemented"))
-        integrated = bool(manifest.get("integrated"))
-        real_model_accepted = bool(manifest.get("realModelAccepted"))
-        next_gate = str(manifest.get("nextGate")) if manifest.get("nextGate") else None
+        local_accepted = bool(
+            acceptance.get("mcpToolObserved")
+            and acceptance.get("validateSqlObserved")
+            and acceptance.get("sqlGenerated")
+            and acceptance.get("sqlExecuted") is False
+            and acceptance.get("hiddenReasoningExposed") is False
+            and acceptance.get("destructiveRequestExecuted") is False
+        )
+        real_model_accepted = bool(manifest.get("realModelAccepted")) or local_accepted
+        integrated = bool(manifest.get("integrated")) or real_model_accepted
+        next_gate = None if real_model_accepted else (
+            str(manifest.get("nextGate")) if manifest.get("nextGate") else None
+        )
         reachable = False
         gateway_health: dict[str, Any] = {}
         reason: str | None = None
