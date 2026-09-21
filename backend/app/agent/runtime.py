@@ -63,7 +63,8 @@ class EmbeddedAgentGateway:
 
     async def _gateway_health(self) -> tuple[bool, dict[str, Any]]:
         try:
-            async with httpx.AsyncClient(timeout=1.5) as client:
+            # 8910 is a loopback process boundary. Ignore developer proxy env here.
+            async with httpx.AsyncClient(timeout=1.5, trust_env=False) as client:
                 response = await client.get(f"{self.gateway_url}/health")
                 payload = response.json() if response.content else {}
                 return response.is_success, payload if isinstance(payload, dict) else {}
@@ -131,7 +132,8 @@ class EmbeddedAgentGateway:
         if session_id:
             body["sessionId"] = session_id
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            # 8910 is local-only; do not route it through HTTP(S)_PROXY/ALL_PROXY.
+            async with httpx.AsyncClient(timeout=self.timeout, trust_env=False) as client:
                 response = await client.post(f"{self.gateway_url}/v1/query", json=body)
                 response.raise_for_status()
                 payload = response.json()
