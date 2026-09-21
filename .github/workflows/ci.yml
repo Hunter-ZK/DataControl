@@ -11,8 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
+        with: {python-version: '3.13'}
       - run: python -m pip install -U pip
       - run: python -m pip install -e ".[dev]"
       - run: python -m alembic upgrade head
@@ -23,6 +22,29 @@ jobs:
       - run: python -m pytest -q
       - run: python scripts/search_benchmark.py
 
+  agent-cross-platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.14'}
+      - uses: actions/setup-node@v4
+        with: {node-version: '24'}
+      - run: python -m pip install -U pip
+      - run: python -m pip install -e "./agent[all,dev]"
+      - run: python agent/scripts/check_architecture.py
+      - run: python -m pytest -q agent/tests
+      - name: Install pinned dsh
+        working-directory: agent/dsh
+        run: npm install --no-audit --no-fund
+      - name: Build and test guard plugin
+        working-directory: agent/guard-plugin
+        run: npm install --no-audit --no-fund && npm run build && npm test
+
   frontend-cross-platform:
     strategy:
       fail-fast: false
@@ -30,13 +52,11 @@ jobs:
         os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     defaults:
-      run:
-        working-directory: web
+      run: {working-directory: web}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
+        with: {node-version: '24'}
       - run: npm install
       - run: npm run type-check
       - run: npm run test

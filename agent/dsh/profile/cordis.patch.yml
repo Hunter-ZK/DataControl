@@ -1,0 +1,50 @@
+# Embedded DataControl DataAgent profile for @deepseek-ai/dsh 0.1.6-alpha.2.
+- id: session-log-deepseek
+  disabled: true
+- id: session-telemetry-otel
+  disabled: true
+- id: web-search-deepseek
+  disabled: true
+- id: web-fetch-http
+  disabled: true
+- id: tool-web
+  disabled: true
+- id: llm-deepseek
+  config:
+    apiKeyEnv: DEEPSEEK_API_KEY
+- id: agent-default-model
+  config:
+    provider: deepseek-official
+    model: deepseek-flash
+- insert:
+    - id: mcp-agent3
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: agent3
+        transport: streamable-http
+        url: http://127.0.0.1:8900/mcp
+        toolCallTimeoutMs: 120000
+        failOnStartupError: true
+        reconnect:
+          enabled: true
+          maxAttempts: 20
+- id: permission
+  config:
+    defaultPreset: analyst
+    presets:
+      analyst:
+        sandbox: read-only
+        approval: ask
+        name: 分析师
+      engineer:
+        sandbox: workspace-write
+        approval: ask
+        name: 数据工程师
+- id: agent-presets
+  config:
+    default: dataagent-query
+    roots:
+      - path: ./agent/dsh/presets
+        trust: system
+    includeShippedRoot: false
+    includeUserRoot: false

@@ -1,0 +1,1 @@
+"""Trusted SQL validation."""

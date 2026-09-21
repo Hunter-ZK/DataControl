@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {requiresApproval,sanitizeArguments,touchesProdDb} from './policy.js'
+test('blocks production db shell hints',()=>{assert.equal(touchesProdDb({name:'bash',arguments:{cmd:'psql prod_db'}}),true);assert.equal(touchesProdDb({name:'mcp__agent3__validate_sql',arguments:{sql:'select 1'}}),false)})
+test('approval is narrow and redaction is fail-safe',()=>{assert.equal(requiresApproval({name:'mcp__agent3__submit_ddl'}),true);assert.deepEqual(sanitizeArguments({apiKey:'secret',sql:'select 1'}),{apiKey:'[REDACTED]',sql:{length:8,retained:false}})})
