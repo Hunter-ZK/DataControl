@@ -37,11 +37,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: '3.14'}
+        with: {python-version: '3.13'}
       - uses: actions/setup-node@v4
         with: {node-version: '24'}
       - run: python -m pip install -U pip
       - run: python -m pip install -e "./agent[all,dev]"
+      - run: python -c "import agent3, dataagent_gateway; print('Agent runtime OK')"
       - run: python agent/scripts/check_architecture.py
       - run: python -m pytest -q agent/tests
       - name: Install pinned dsh
