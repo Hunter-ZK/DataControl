@@ -16,9 +16,9 @@ Commit: `f04e266c6fe93e6e89d7e4b5c6e31128082a8c96`
 - semantic fixture and Agent-specific tests.
 
 ## DataControl-specific adaptation
-Agent3 metadata now has a `PortalMetadataProvider` that reads DataControl facts through the Portal HTTP API. It does not import SQLAlchemy models or open the Portal database. Portal remains the authority for asset/metric facts.
+Agent3 metadata uses a `PortalMetadataProvider` that reads DataControl facts through the Portal HTTP API. It does not import SQLAlchemy models or open the Portal database. Portal remains the authority for asset/metric facts.
 
-Portal stays on Python 3.13 while DataAgent keeps Python 3.14. The repository therefore uses `.venv` and `.venv-agent`, with separate CI jobs on Windows, macOS and Ubuntu.
+The migration source historically pinned Python 3.14. DataControl no longer carries that pin forward: the embedded Agent package supports `>=3.13,<3.15`, CI verifies the Agent on Python 3.13 across Windows/macOS/Ubuntu, and local Portal/Agent processes share `.venv`. Process isolation is preserved by the Gateway/MCP contracts rather than by duplicate Python virtual environments.
 
 ## Gate status
-`agent/runtime-manifest.json` has `sourceMigrated=true` but `integrated=false`. This is intentional. The next gate is to establish a supported DataControl-to-dsh session bridge and verify one real model request through dsh -> MCP -> Agent3 Core without SQL execution. Until then the product UI reports the Agent as not ready rather than fabricating success.
+Source migration and the supported dsh session bridge are implemented. `agent/runtime-manifest.json` remains `integrated=false` and `realModelAccepted=false` in Git because real-model acceptance is machine-local. A successful `scripts/p3_agent_acceptance.py` run with the user's model key writes `.local/p3-agent-acceptance.json`; SQL execution remains disabled throughout.
