@@ -20,6 +20,22 @@ MCP_TOOL_SUFFIXES = {
     "search_verified_sql", "validate_sql", "explain_sql", "compile_query", "submit_ddl",
 }
 
+_LOOPBACK_NO_PROXY = ("127.0.0.1", "localhost", "::1")
+
+
+def _with_loopback_no_proxy(env: dict[str, str]) -> dict[str, str]:
+    """Preserve external proxy settings while guaranteeing local MCP bypass."""
+    current = env.get("NO_PROXY") or env.get("no_proxy") or ""
+    values = [item.strip() for item in current.split(",") if item.strip()]
+    merged = list(_LOOPBACK_NO_PROXY)
+    for value in values:
+        if value not in merged:
+            merged.append(value)
+    joined = ",".join(merged)
+    env["NO_PROXY"] = joined
+    env["no_proxy"] = joined
+    return env
+
 
 def _tool_suffix(name: str) -> str:
     return name.rsplit("__", 1)[-1]
@@ -241,7 +257,8 @@ class HeadlessHarnessRunner:
 
     async def _mcp_reachable(self) -> bool:
         try:
-            async with httpx.AsyncClient(timeout=1.0) as client:
+            # MCP is always local. Do not let HTTP(S)_PROXY/ALL_PROXY intercept 8900.
+            async with httpx.AsyncClient(timeout=1.0, trust_env=False) as client:
                 await client.get("http://127.0.0.1:8900/mcp")
             return True
         except httpx.HTTPError:
@@ -280,7 +297,9 @@ class HeadlessHarnessRunner:
         health = await self.health()
         if not health["ready"]:
             raise HarnessRunError(str(health["reason"] or "DataAgent runtime is not ready"))
-        env = os.environ.copy(); env["DSH_HOME"] = str(self.dsh_home); env["DSH_TELEMETRY_MODE"] = "DISABLED"
+        env = _with_loopback_no_proxy(os.environ.copy())
+        env["DSH_HOME"] = str(self.dsh_home)
+        env["DSH_TELEMETRY_MODE"] = "DISABLED"
         process = await self._spawn(self._command(question, session_id), env)
         try:
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=self.timeout_seconds)
