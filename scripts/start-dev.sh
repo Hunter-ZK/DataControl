@@ -98,20 +98,21 @@ if [ "$SKIP_AGENT" -eq 0 ]; then
   # are unavailable. This turns a late MCP traceback into a precise startup gate.
   if ! "$PYTHON" - <<'PY'
 import httpx
-urls = [
-    "http://127.0.0.1:8000/api/v1/metrics",
-    "http://127.0.0.1:8000/api/v1/tables?limit=1",
-]
 with httpx.Client(timeout=10.0, trust_env=False) as client:
-    for url in urls:
-        response = client.get(url)
-        response.raise_for_status()
-        payload = response.json()
-        if not isinstance(payload, dict) or "data" not in payload:
-            raise RuntimeError(f"invalid Portal fact contract: {url}")
-metrics = client.get("http://127.0.0.1:8000/api/v1/metrics").json().get("data", [])
-if not isinstance(metrics, list) or not metrics:
-    raise RuntimeError("Portal has no metric semantics; rerun scripts/setup-dev.sh to seed the P3 corpus")
+    metric_response = client.get("http://127.0.0.1:8000/api/v1/metrics")
+    metric_response.raise_for_status()
+    metric_payload = metric_response.json()
+    if not isinstance(metric_payload, dict) or "data" not in metric_payload:
+        raise RuntimeError("invalid Portal metric contract")
+    metrics = metric_payload["data"]
+    if not isinstance(metrics, list) or not metrics:
+        raise RuntimeError("Portal has no metric semantics; rerun scripts/setup-dev.sh to seed the P3 corpus")
+
+    table_response = client.get("http://127.0.0.1:8000/api/v1/tables", params={"limit": 1})
+    table_response.raise_for_status()
+    table_payload = table_response.json()
+    if not isinstance(table_payload, dict) or "data" not in table_payload:
+        raise RuntimeError("invalid Portal table contract")
 PY
   then
     echo "Portal Agent-fact preflight failed. Agent3 requires /api/v1/metrics and /api/v1/tables before MCP can start." >&2
