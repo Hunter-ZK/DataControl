@@ -48,7 +48,7 @@ def test_relation_graph_path_and_impact_contract():
     assert impact.json()["data"]["impactCount"] >= 1
 
 
-def test_agent_source_is_migrated_without_faking_session_bridge_readiness():
+def test_agent_bridge_is_implemented_but_runtime_is_fail_closed_when_not_started():
     status = client.get("/api/v1/agent/status")
     assert status.status_code == 200
     data = status.json()["data"]
@@ -57,9 +57,11 @@ def test_agent_source_is_migrated_without_faking_session_bridge_readiness():
     assert data["mode"] == "embedded-monorepo"
     assert data["source"] == "DataControl/agent"
     assert data["sourceMigrated"] is True
+    assert data["sessionBridgeImplemented"] is True
     assert data["integrated"] is False
+    assert data["realModelAccepted"] is False
     assert data["ready"] is False
-    assert "integration gate pending" in data["reason"]
+    assert "gateway is not reachable" in data["reason"]
 
     query = client.post(
         "/api/v1/agent/query",
