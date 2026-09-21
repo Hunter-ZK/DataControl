@@ -10,10 +10,13 @@ $agentPython=Join-Path $root ".venv-agent\Scripts\python.exe"
 $dshBin=Join-Path $root "agent\dsh\node_modules\.bin\dsh.cmd"
 $headlessProfile=Join-Path $root ".local\dsh-home\profiles\dataagent-headless\package.json"
 $localDir=Join-Path $root ".local"
+$backendOut=Join-Path $localDir "backend.log"
+$backendErr=Join-Path $localDir "backend.err.log"
 $mcpOut=Join-Path $localDir "agent-mcp.log"
 $mcpErr=Join-Path $localDir "agent-mcp.err.log"
 $gatewayOut=Join-Path $localDir "agent-gateway.log"
 $gatewayErr=Join-Path $localDir "agent-gateway.err.log"
+$expectedRuntimeContract="embedded-agent-gateway-v1"
 
 function Get-LogTail([string]$Path) {
   if(Test-Path $Path){ return ((Get-Content $Path -Tail 40) -join [Environment]::NewLine) }
@@ -29,6 +32,28 @@ function Test-TcpPort([int]$Port) {
     return $client.Connected
   } catch { return $false }
   finally { if($client){$client.Dispose()} }
+}
+
+function Assert-PortFree([int]$Port,[string]$Name) {
+  if(-not (Test-TcpPort $Port)){ return }
+  $owners=@()
+  try {
+    $owners=@(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Stop | Select-Object -ExpandProperty OwningProcess -Unique)
+  } catch {}
+  $detail=""
+  if($owners.Count -gt 0){
+    $parts=@()
+    foreach($owner in $owners){
+      try {
+        $proc=Get-Process -Id $owner -ErrorAction Stop
+        $parts += ("PID {0} ({1})" -f $owner,$proc.ProcessName)
+      } catch {
+        $parts += ("PID {0}" -f $owner)
+      }
+    }
+    $detail=" Occupied by " + ($parts -join ",") + "."
+  }
+  throw "$Name cannot start because port $Port is already in use.$detail Stop the stale process first, then rerun .\scripts\start-dev.ps1."
 }
 
 function Wait-ServicePort(
@@ -83,10 +108,26 @@ if(-not $SkipAgent){
   if(-not(Test-Path $headlessProfile)){throw "Headless DataAgent profile is missing. Run .\scripts\setup-agent.ps1 first."}
 }
 
+Assert-PortFree -Port 8000 -Name "DataControl API"
+if(-not $SkipAgent){
+  Assert-PortFree -Port 8900 -Name "Agent3 MCP"
+  Assert-PortFree -Port 8910 -Name "DataAgent Gateway"
+}
+
 $backend=$null;$mcp=$null;$gateway=$null
 try {
-  $backend=Start-Process -FilePath $portalPython -ArgumentList "-m","uvicorn","backend.app.main:app","--reload","--host","127.0.0.1","--port","8000" -WorkingDirectory $root -PassThru
-  Wait-HttpEndpoint -Process $backend -Url "http://127.0.0.1:8000/health" -Name "DataControl API" -ErrorLog (Join-Path $localDir "backend.err.log") -TimeoutSeconds 20
+  Remove-Item $backendOut,$backendErr,$mcpOut,$mcpErr,$gatewayOut,$gatewayErr -Force -ErrorAction SilentlyContinue
+
+  # Deliberately do not use uvicorn --reload here. The reload supervisor can leave
+  # a worker process bound to port 8000 after the parent is stopped, which makes a
+  # later acceptance run talk to stale Portal code.
+  $backend=Start-Process -FilePath $portalPython -ArgumentList "-m","uvicorn","backend.app.main:app","--host","127.0.0.1","--port","8000" -WorkingDirectory $root -RedirectStandardOutput $backendOut -RedirectStandardError $backendErr -PassThru
+  Wait-HttpEndpoint -Process $backend -Url "http://127.0.0.1:8000/health" -Name "DataControl API" -ErrorLog $backendErr -TimeoutSeconds 20
+
+  $portalHealth=Invoke-RestMethod http://127.0.0.1:8000/health -TimeoutSec 2
+  if($portalHealth.runtimeContract -ne $expectedRuntimeContract){
+    throw "DataControl API runtime contract mismatch. Expected '$expectedRuntimeContract' but got '$($portalHealth.runtimeContract)'. A stale Portal process or stale checkout is being used."
+  }
 
   if(-not $SkipAgent){
     $env:AGENT3_MCP_POC_MODE="1"
@@ -94,7 +135,6 @@ try {
     $env:DSH_HOME=(Join-Path $root ".local\dsh-home")
     $env:DSH_TELEMETRY_MODE="DISABLED"
 
-    Remove-Item $mcpOut,$mcpErr,$gatewayOut,$gatewayErr -Force -ErrorAction SilentlyContinue
     $mcp=Start-Process -FilePath $agentPython -ArgumentList "-m","agent3.adapters.mcp.server" -WorkingDirectory (Join-Path $root "agent") -RedirectStandardOutput $mcpOut -RedirectStandardError $mcpErr -PassThru
     Wait-ServicePort -Process $mcp -Port 8900 -Name "Agent3 MCP" -ErrorLog $mcpErr -TimeoutSeconds 30
 
@@ -113,7 +153,7 @@ try {
     Write-Warning "Embedded DataAgent intentionally skipped (-SkipAgent). Intelligent Q&A will be unavailable."
   }
 
-  Write-Host "DataControl API:   READY http://127.0.0.1:8000"
+  Write-Host "DataControl API:   READY http://127.0.0.1:8000 ($expectedRuntimeContract)"
   Write-Host "DataControl Web:         http://127.0.0.1:5173"
   Push-Location web
   try{npm run dev}finally{Pop-Location}
