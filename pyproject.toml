@@ -27,12 +27,14 @@ testpaths = ["backend/tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+# `agent/` has its own architecture/test gate even though Portal and Agent share
+# the same local Python 3.13+ virtual environment.
+extend-exclude = ["agent"]
 
 [tool.ruff.lint]
-# P1 uses FastAPI dependency injection in default arguments by design. Keep the
-# quality gate focused on syntax/runtime defects and import-time failures; P2
-# will add the stricter formatting/style gate when the production Vue/backend
-# package structure is frozen.
+# FastAPI dependency injection in default arguments is intentional. Keep the
+# Portal gate focused on syntax/runtime/import defects; Agent boundaries are
+# verified independently by the Agent CI job.
 select = ["E4", "E7", "E9", "F"]
 ignore = ["E501"]
 

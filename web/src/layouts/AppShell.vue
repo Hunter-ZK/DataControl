@@ -31,10 +31,10 @@
           <span class="crumb">{{ route.meta.title || 'DataControl' }}</span>
         </div>
         <button class="command" @click="goSearch">
-          <Search :size="17" /><span>搜索数据集、字段、指标、码表…</span><kbd>⌘ K</kbd>
+          <Search :size="17" /><span>搜索数据集、字段、指标、标准…</span><kbd>⌘ K</kbd>
         </button>
         <div class="top-actions">
-          <RouterLink to="/search" class="soft-action"><Sparkles :size="17" />智能问数</RouterLink>
+          <RouterLink to="/agent" class="soft-action"><Sparkles :size="17" />智能问数</RouterLink>
           <RouterLink to="/profile" class="avatar">H</RouterLink>
         </div>
       </header>
@@ -54,11 +54,11 @@ const primary = [
   { to: '/', label: '首页', icon: CircleGauge },
   { to: '/catalog', label: '资产目录', icon: Database },
   { to: '/search', label: '资产检索', icon: Search },
-  { to: '/search?mode=relation', label: '关系指引', icon: GitFork },
+  { to: '/relations', label: '关系指引', icon: GitFork },
   { to: '/code-tables', label: '标准码值', icon: Boxes },
   { to: '/word-roots', label: '词根索引', icon: Hash },
   { to: '/metrics', label: '指标与制度', icon: BookOpenCheck },
-  { to: '/search?mode=ai', label: '智能问数', icon: Sparkles },
+  { to: '/agent', label: '智能问数', icon: Sparkles },
 ]
 const secondary = [
   { to: '/overview', label: '数据概览', icon: BarChart3 },

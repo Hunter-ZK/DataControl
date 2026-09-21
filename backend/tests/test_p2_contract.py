@@ -5,14 +5,15 @@ from backend.app.main import app
 client = TestClient(app)
 
 
-def test_p2_system_phase_and_field_detail_contract():
+def test_p3_system_phase_and_field_detail_contract():
     health = client.get("/health")
     assert health.status_code == 200
-    assert health.json()["phase"] == "P2"
+    assert health.json()["phase"] == "P3"
 
     info = client.get("/api/v1/system/info")
     assert info.status_code == 200
-    assert info.json()["data"]["phase"] == "P2"
+    assert info.json()["data"]["phase"] == "P3"
+    assert info.json()["data"]["sqlExecutionEnabled"] is False
 
     tables = client.get("/api/v1/tables?limit=1")
     asset_id = tables.json()["data"][0]["assetId"]

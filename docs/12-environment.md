@@ -1,44 +1,66 @@
 # 12 · Environment
 
 ## Development baseline
-- Python 3.13+ for current development; target compatibility baseline remains Python 3.14.
-- Node is required only when Vue/dsh phases require it.
-- MySQL 8 is the intended deployment database; SQLite demo mode remains available for self-contained local validation.
-- Docker is not required.
 
-## Supported developer operating systems
+- Python `>=3.13,<3.15` for both Portal and embedded DataAgent;
+- Node.js 24+;
+- npm;
+- Windows 10/11 PowerShell or macOS/Linux Bash/Zsh.
 
-### Windows 10/11
-Use PowerShell entry points:
+Portal and Agent run as separate processes and keep HTTP/MCP boundaries, but local development uses one repository-local `.venv`. A separate `.venv-agent` is no longer required.
+
+## Embedded DataAgent baseline
+
+The migrated DataAgent source originally came from a repository that pinned Python 3.14, but DataControl P3 has been adapted and tested against Python 3.13. The package metadata, setup scripts and CI therefore use the DataControl compatibility range `>=3.13,<3.15` rather than inheriting the source repository's historical interpreter pin.
+
+MCP currently pulls `pyjwt[crypto]`, which makes `cryptography` a transitive runtime dependency. `cryptography` 49+ stopped publishing CPython macOS x86_64 wheels. DataControl therefore constrains the Agent runtime to `cryptography>=48.0.1,<49`, the newest compatible line with a universal2 wheel, and setup explicitly requires a binary wheel. This keeps Intel Macs self-contained and avoids requiring local Rust, pkg-config or Homebrew OpenSSL merely to install the Agent.
+
+```text
+DataControl checkout
+├── .venv/          shared Portal + Agent Python environment
+├── web/            Vue dependencies
+├── agent/          embedded DataAgent source/runtime assets
+└── .local/         generated dsh profiles, logs and acceptance evidence
+```
+
+The process boundary remains:
+
+```text
+Portal :8000
+  -> Agent Gateway :8910
+  -> dsh
+  -> Agent3 MCP :8900
+  -> Agent3 Core
+  -> Portal read-only facts
+```
+
+Sharing `.venv` does not relax architecture boundaries; it only removes an unnecessary interpreter/version split.
+
+## Quick start
+
+### Windows
 
 ```powershell
 .\scripts\setup-dev.ps1
-.\scripts\verify.ps1
+$env:DEEPSEEK_API_KEY="..."
 .\scripts\start-dev.ps1
 ```
 
-The virtual environment interpreter is `.venv\Scripts\python.exe`.
-
-### macOS
-Use Bash/Zsh entry points:
+### macOS / Linux
 
 ```bash
 bash scripts/setup-dev.sh
-bash scripts/verify.sh
+export DEEPSEEK_API_KEY="..."
 bash scripts/start-dev.sh
 ```
 
-The virtual environment interpreter is `.venv/bin/python`.
-
-Optionally run `chmod +x scripts/*.sh` once and invoke the scripts directly.
+If only Agent dependencies are missing, `setup-agent` reuses the existing `.venv` and installs the embedded Agent package plus dsh/Guard/profile assets.
 
 ## Portability rules
-1. Runtime Python code must use `pathlib` or other platform-neutral APIs for filesystem paths.
-2. Runtime application code must not depend on PowerShell, cmd.exe, Bash-only commands, drive-letter paths, or Unix-only paths.
-3. Windows `.ps1` and macOS/Linux `.sh` scripts are equivalent developer entry points; business logic stays in Python so the scripts remain thin wrappers.
-4. Text files are UTF-8. Do not rely on Windows legacy code pages for Chinese content.
-5. Local host and application URLs remain `127.0.0.1` and are OS-independent.
-6. Release CI must run backend generation/tests/search verification on Windows and macOS; Ubuntu is retained as an additional portability guard.
 
-## Apple Silicon
-No x86-only runtime dependency is currently required by the P0/P1 foundation. Dependencies added later, especially search/native or dsh/Node packages, must be checked on both Apple Silicon and Windows before adoption.
+- runtime paths use repository-relative or `pathlib`-style resolution;
+- no product code may assume Windows drive letters or POSIX-only paths;
+- PowerShell and Bash wrappers must offer equivalent setup/start/verify behavior;
+- UTF-8 is the repository text baseline;
+- CI remains cross-platform;
+- a dependency requiring platform-specific native binaries must be validated on Windows and macOS before acceptance.

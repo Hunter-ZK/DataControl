@@ -12,6 +12,8 @@ import OverviewView from '@/views/OverviewView.vue'
 import ReferenceListView from '@/views/ReferenceListView.vue'
 import ProfileView from '@/views/ProfileView.vue'
 import LoginView from '@/views/LoginView.vue'
+import RelationView from '@/views/RelationView.vue'
+import AgentView from '@/views/AgentView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -23,6 +25,8 @@ const router = createRouter({
         { path: 'overview', name: 'overview', component: OverviewView, meta: { title: '数据概览' } },
         { path: 'catalog', name: 'catalog', component: CatalogView, meta: { title: '资产目录' } },
         { path: 'search', name: 'search', component: SearchView, meta: { title: '资产检索' } },
+        { path: 'relations/:id?', name: 'relations', component: RelationView, meta: { title: '关系指引' } },
+        { path: 'agent', name: 'agent', component: AgentView, meta: { title: '智能问数' } },
         { path: 'datasets/:id', name: 'dataset', component: DatasetDetailView, meta: { title: '数据集详情' } },
         { path: 'fields/:id', name: 'field', component: FieldDetailView, meta: { title: '字段详情' } },
         { path: 'code-tables', name: 'codeTables', component: ReferenceListView, props: { kind: 'code-tables' }, meta: { title: '标准码值' } },
@@ -41,5 +45,9 @@ const router = createRouter({
   ],
 })
 
+router.beforeEach((to) => {
+  if (to.name === 'search' && to.query.mode === 'ai') return { name: 'agent' }
+  if (to.name === 'search' && to.query.mode === 'relation') return { name: 'relations' }
+})
 router.afterEach((to) => { document.title = `${String(to.meta.title || 'DataControl')} · DataControl` })
 export default router

@@ -1,32 +1,58 @@
-# 01 · Architecture V3
+# 01 · Architecture V4
+
+DataControl is the complete product repository. Portal and DataAgent keep strict module/runtime boundaries, but both are owned and shipped from `Hunter-ZK/DataControl`.
 
 ```text
-Vue 3 / prototype UI
-        |
-        v
-FastAPI portal backend ---- MySQL 8 (production asset/application store)
-        |                  \\ SQLite permitted for self-contained demo/CI
-        |-- embedded search index (P0 choice: SQLite FTS5 trigram)
-        |
-        | ACP stdio
-        v
-       dsh ---- model provider (DeepSeek/Qwen/future internal endpoint)
-        |
-        | MCP HTTP
-        v
-     Agent3 Core
-        |
-        | internal read-only HTTP
-        +----> FastAPI portal backend
+                           DataControl monorepo
+┌───────────────────────────────────────────────────────────────┐
+│                                                               │
+│  Vue 3 Web                                                    │
+│      │                                                        │
+│      v                                                        │
+│  FastAPI Portal ---- asset/application store                  │
+│      │            \\ SQLite demo/CI; MySQL production target  │
+│      │                                                        │
+│      ├── Asset / Search / Standard / Relation / User          │
+│      │                                                        │
+│      └── Agent Gateway                                        │
+│              │                                                │
+│              v                                                │
+│          agent/ local DataAgent runtime                       │
+│              │                                                │
+│              ├── DeepSeek Harness (replaceable Agent Runtime) │
+│              │        │                                       │
+│              │        v MCP                                   │
+│              └── Agent3 Adapter -> Agent3 Core                │
+│                                  ├── Metadata                 │
+│                                  ├── Semantic                 │
+│                                  └── SQL / Policy             │
+│                                                               │
+└───────────────────────────────────────────────────────────────┘
 ```
 
-## Frozen boundaries
-1. Stable asset identity is `asset_id`; names are mutable attributes.
-2. Portal owns asset facts, identity, search, relations, users and audit.
-3. Agent3 owns SQL intelligence and deterministic semantic compilation, not persistence.
-4. dsh owns the agent loop. No custom agent loop in the portal.
-5. Agent3 does not access the database directly.
-6. No SQL execution.
+## Repository boundary
 
-## Search ADR (P0)
-Use an embedded SQLite FTS5 trigram index behind a `SearchEngine` boundary. It has zero extra service dependencies, supports Chinese substring search and technical identifiers, BM25 ranking and highlighting. Advanced typo handling/faceting can be layered in P3 without changing the public search service contract. Re-evaluate external search only if P3 benchmark fails the target scale.
+1. `DataControl` is self-contained. Deployment must not require cloning `DataAgent-dsh` or `Agent3.0`.
+2. `DataAgent-dsh` is the P3 migration baseline for `agent/`, pinned at commit `f04e266c6fe93e6e89d7e4b5c6e31128082a8c96`.
+3. `Agent3.0` is historical/reference material, not the runtime integration target.
+4. Portal and Agent remain separately testable. Sharing a repository does not permit uncontrolled cross-imports.
+
+## Frozen ownership
+
+1. Stable asset identity is `asset_id`; names are mutable attributes.
+2. Portal owns asset facts, identity, search, relations, users, audit and product/session delivery.
+3. DataAgent owns dsh workflow, skills, semantic/SQL intelligence, deterministic validation and Agent3 Core.
+4. dsh owns the open-ended model loop. Portal must not build a second agent loop.
+5. MCP/HTTP/CLI are protocol adapters only; business rules stay in Agent3 Core.
+6. Production SQL execution remains disabled in the DataControl V1/P3 product boundary.
+7. Hidden chain-of-thought is not exposed.
+
+## Portal-Agent seam
+
+The Portal talks only to the local Agent Gateway contract. The concrete dsh/MCP internals remain behind `agent/`. This prevents the Web/Portal from depending on dsh protocol details and allows the Agent runtime to evolve without rewriting product pages.
+
+During P3 migration the Agent Gateway reports not-ready until the embedded Agent source, startup scripts, tests and end-to-end runtime all pass. A disabled capability is preferred to a fake integration.
+
+## Search ADR
+
+Use the embedded SQLite FTS5 trigram index behind the `SearchEngine` boundary for the current target scale. P3 adds unified asset indexing, suggestions and facets without coupling the Portal to an external search service.

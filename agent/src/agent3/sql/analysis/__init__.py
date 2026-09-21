@@ -1,0 +1,1 @@
+"""SQLGlot analysis adapter."""

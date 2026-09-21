@@ -1,18 +1,52 @@
-# 10 · Phase plan
+# 10 · Delivery plan
 
-## P0 Foundation — complete
-Python architecture, stable identity, deterministic synthetic data, search spike, Agent boundary, initial design baseline and runnable verification.
+## P0 — foundation
+Repository, backend skeleton, synthetic assets, search spike, cross-platform scripts and CI. **Complete.**
 
-## P1 Backend service layer — complete
-Read-only asset/domain APIs, auth/application data, audit, schema migration, Windows/macOS support and responsive validation shell.
+## P1 — asset backend
+Asset/reference/application models, read APIs, local auth boundary, migrations and rich synthetic fixtures. **Complete.**
 
-## P2 Product UI — current candidate
-Formal Vue 3 + TypeScript portal with real routing and deep links, refined light-ocean design system, home/search/catalog/overview, dataset and field details, standards/code tables/word roots/metrics/statistical systems, personal center and development login. Frontend type-check/test/build is part of the cross-platform CI gate.
+## P2 — product portal
+Formal Vue 3 + TypeScript product UI, routed asset pages, responsive shell and cross-platform frontend quality gate. **Complete / frozen on main.**
 
-## P3 Advanced capabilities
-Unified advanced search, relationship graph/path/impact explorer, and real dsh + Agent3 intelligent Q&A through read-only MCP tools. No SQL execution.
+## P3 — intelligence and relations
+P3 implementation is complete as a release candidate on `feature/p3-intelligence-relations`; real-model/user acceptance remains before merge.
 
-## P4 Operations and release
-Administration, production authentication/security hardening, analytics, system status, full E2E/performance gates and release packaging.
+### P3-A · Search and relationship intelligence — complete
+- unified asset index across datasets, fields and reference assets;
+- suggestions, facets and highlighting;
+- multi-level upstream/downstream graph;
+- directed path finder;
+- downstream impact analysis;
+- routed relationship workspace and dataset-detail navigation.
 
-Each phase is delivered as one user-verifiable package. The next phase starts only after the user accepts the current phase.
+### P3-B · Embedded DataAgent migration — complete
+- pinned `Hunter-ZK/DataAgent-dsh@f04e266c6fe93e6e89d7e4b5c6e31128082a8c96` migration baseline;
+- Agent3 Core/adapters, dsh assets, Skills, Guard and semantic assets live in `DataControl/agent`;
+- Portal and Agent remain separate process/runtime boundaries inside one monorepo;
+- Portal and DataAgent share one repository-local Python environment with supported range `>=3.13,<3.15`;
+- Windows/macOS/Linux setup/start/verify and CI do not clone another repository;
+- Agent architecture/security gates are preserved.
+
+### P3-C · Intelligent Q&A product integration — implementation complete
+- local Embedded Agent Gateway on port 8910;
+- dsh `dataagent-headless` session bridge using the actual Harness headless JSON event contract;
+- resumable session identity;
+- dsh Agent Loop -> Agent3 MCP -> Agent3 Core -> Portal read-only facts;
+- trusted SQL generation/validation and evidence presentation;
+- Agent3 MCP tool activity projected to the UI;
+- hidden reasoning discarded at the Gateway;
+- no production SQL execution;
+- real-model E2E acceptance script with destructive-request safety check.
+
+### P3 release gate — pending local/user acceptance only
+1. set a user-owned `DEEPSEEK_API_KEY` before `start-dev`;
+2. run `scripts/p3_agent_acceptance.py` against the running product;
+3. verify the resulting `.local/p3-agent-acceptance.json` and UI status;
+4. complete product acceptance;
+5. merge PR #4 only after explicit user approval.
+
+No ACP contract is used. P3 is built against DeepSeek Harness's headless task surface and Agent3's streamable-HTTP MCP adapter.
+
+## P4 — production hardening
+Enterprise SSO/LDAP, production MySQL deployment, permissions/security hardening, audit/observability, caching, operational deployment and performance gates.

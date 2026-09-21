@@ -1,92 +1,137 @@
-# DataControl / DataPortal
+# DataControl
 
-DataControl is a read-only data asset service portal for locating, understanding and tracing datasets, fields, metrics, standards and code values.
+DataControl is a self-contained data-asset service portal and DataAgent product. The repository owns the Vue product UI, FastAPI Portal, unified search, relationship analysis and the embedded DataAgent subsystem under `agent/`.
 
-## Current phase: P2 product UI candidate
+## Current phase
+P2 is frozen on `main`. PR #4 on `feature/p3-intelligence-relations` remains a draft while the project completes the first post-P3 hardening increment, **Next-P0: trusted core**.
 
-P0/P1 are merged into `main`. P2 replaces the validation prototype with a formal Vue product frontend while keeping the Python/FastAPI backend and stable-asset model.
+The branch already contains the P3 code path for unified search, relationship analysis and intelligent Q&A. `Hunter-ZK/DataAgent-dsh@f04e266c6fe93e6e89d7e4b5c6e31128082a8c96` is the pinned migration/provenance baseline only; DataControl does not clone or import that repository at runtime.
 
-### P2 product surface
+Next-P0 tightens the contract before merge: untrusted questions cross into dsh through stdin instead of process arguments; displayed SQL is bound to the exact `validate_sql` evidence call; static validation separates SQL correctness from operation risk and execution permission; the intelligent-Q&A UI renders explicit validation states; CI includes a deterministic stub-model full-chain gate in addition to cross-platform unit/build jobs. Real-model and user product acceptance remain separate gates.
 
-- Vue 3 + TypeScript + Vite + Vue Router + Element Plus
-- light-ocean design system with professional SVG icons and responsive App Shell
-- search-first home portal
-- dedicated asset search page
-- asset catalog
-- Data Overview
-- dataset detail with fields, common SQL, changes, lineage summary and scheduling/runtime metadata
-- field detail
-- code-table list/detail
-- data-standard list/detail
-- word-root list/detail
-- metric list/detail
-- statistical-system list/detail
-- personal center for favorites, recent views and search history
-- development login UI backed by the P1 auth boundary
-- browser history/deep-link routes instead of prototype `show()/hidden` navigation
+## Repository architecture
+```text
+DataControl/
+├── web/                 Vue 3 + TypeScript product UI
+├── backend/             FastAPI Portal: assets/search/relations/auth/agent gateway client
+├── agent/               embedded DataAgent: dsh + Gateway + MCP + Agent3 Core + Skills/Guard
+├── samples/             synthetic data generators
+├── scripts/             setup, verification, deterministic/real-model acceptance and startup helpers
+├── docs/                product and architecture decisions
+└── .github/             Portal/Web/Agent cross-platform CI
+```
 
-P2 intentionally does **not** include the P3 relationship graph/path explorer, advanced search ranking/facets, real dsh + Agent3 conversation, or SQL execution. Metadata ingestion/governance remains outside current portal scope.
+## Runtime boundary
+```text
+Vue
+ -> Portal FastAPI                    :8000
+ -> Embedded Agent Gateway            :8910
+ -> dsh headless session
+ -> Agent3 MCP                        :8900
+ -> Agent3 Core
+ -> Portal read-only HTTP facts
+```
 
-## Prerequisites
+Portal and Agent run as separate processes and stay isolated by HTTP/MCP contracts, but they share the repository-local `.venv`. The supported Python range is `>=3.13,<3.15`; Python 3.14 is not required. Agent3 never imports Portal database models and never opens the Portal database directly. dsh owns the model loop; MCP remains a thin protocol adapter.
 
-- Python 3.13+
-- Node.js 24+
-- npm
+## Current capabilities
+- unified search across datasets, fields, metrics, code tables, standards, word roots and statistical systems;
+- search suggestions, highlighting and facets;
+- multi-hop relationship expansion, directed path lookup and downstream impact analysis;
+- DataAgent source embedded in `DataControl/agent`;
+- dsh browser and `dataagent-headless` profiles;
+- Portal -> Agent Gateway -> dsh -> MCP -> Agent3 Core session path;
+- resumable dsh sessions via `sessionId`;
+- Agent tool activity, evidence, generated SQL and validation shown without exposing hidden reasoning;
+- query/DML/DDL/access-control SQL classified independently from risk, while execution permission remains false;
+- deterministic stub-model full-chain acceptance plus a separate local real-model acceptance script.
 
-Production data targets MySQL 8. Demo and CI use SQLite for self-contained verification.
+## Trusted SQL boundary
+DataControl treats **validity**, **risk** and **execution** as different concepts.
 
-## Windows
+- Generated SQL may be query, DML, DDL or access-control SQL when the static validator understands the statement class.
+- Static validation checks parseability, visible metadata, governed metric semantics and current MaxCompute-specific rules.
+- Mutating or destructive statements carry explicit risk/advisory metadata; they are not made invalid merely because they mutate data.
+- `execution_allowed` remains `false` for every statement class. DataControl does not execute production SQL.
+- DuckDB or other synthetic/desensitized execution is evaluation-only and is not exposed as a production MCP execution tool.
+- A SQL card may claim validation only when the displayed SQL and validation result are bound to the same `validate_sql` call.
 
+The current validator improves CTE/alias handling but is not yet a complete MaxCompute semantic compiler. Partition metadata, `MAX_PT` policy and broader statement-specific rules remain later semantic-model work.
+
+## Safety boundary
+- the user-facing asset portal is read-only;
+- MCP is a thin adapter, not business Core;
+- dsh owns the open-ended agent loop;
+- untrusted user questions are sent to headless dsh via stdin rather than embedded in its process command arguments;
+- SQL generation/validation are allowed, production SQL execution is not;
+- hidden model reasoning is discarded at the Gateway and never returned to Portal/UI;
+- dsh telemetry, session upload and web tools remain disabled in the current DataAgent profile;
+- the Guard plugin is defense in depth, not the sole security boundary.
+
+## Development quick start
+The normal setup uses one Python environment for Portal and Agent. Use Python 3.13 or 3.14.
+
+### Windows
 ```powershell
 .\scripts\setup-dev.ps1
-.\scripts\verify.ps1
+$env:DEEPSEEK_API_KEY = "sk-..."   # required only for real Agent queries
 .\scripts\start-dev.ps1
 ```
 
-## macOS
+To stop stale DataControl listeners safely:
 
+```powershell
+.\scripts\stop-dev.ps1
+```
+
+### macOS / Linux
 ```bash
 bash scripts/setup-dev.sh
-bash scripts/verify.sh
+export DEEPSEEK_API_KEY="sk-..."    # required only for real Agent queries
 bash scripts/start-dev.sh
 ```
 
-Development URLs:
-- Product UI: http://127.0.0.1:5173
-- API/OpenAPI: http://127.0.0.1:8000/docs
-- Health: http://127.0.0.1:8000/health
-
-When `web/dist` exists, FastAPI can also serve the built Vue application and history-mode routes from port 8000.
-
-## Demo accounts
-
-Generated by `samples/enrich_p1_data.py`:
-
-- USER: `demo` / `DataControl123!`
-- ADMIN: `admin` / `DataControlAdmin123!`
-
-Production SSO/LDAP and security hardening remain P4 work.
-
-## Validation data
-
-Quick product data:
+To stop stale DataControl listeners safely:
 
 ```bash
-python samples/generate_demo_data.py
-python samples/enrich_p1_data.py
+bash scripts/stop-dev.sh
 ```
 
-Full-scale stress data:
+If Portal/Web are already installed and only Agent dependencies are missing, run `scripts/setup-agent.sh` or `scripts/setup-agent.ps1`; these scripts reuse `.venv` instead of creating a second Python runtime.
+
+Services:
+- Portal API: `http://127.0.0.1:8000`
+- Vue UI: `http://127.0.0.1:5173`
+- Agent3 MCP: `http://127.0.0.1:8900/mcp`
+- Embedded Agent Gateway: `http://127.0.0.1:8910`
+
+`start-dev` validates the shared Python runtime and automatically bootstraps missing Agent dependencies/profile before starting the services.
+
+## Verification
+Repository-only checks do not require a real model API key:
+
+```powershell
+.\scripts\verify.ps1
+```
+
+or:
 
 ```bash
-python samples/generate_full_scale.py
-python samples/enrich_p1_data.py
+bash scripts/verify.sh
 ```
 
-The full-scale fixture provides roughly 1,361 datasets, 54k fields, 126 metrics, 40 code tables and 55k+ searchable documents, plus lineage and P1 application data.
+CI also runs `scripts/p0_stub_e2e.py` against `scripts/stub_llm.py` to exercise Portal -> Gateway -> dsh -> MCP -> Agent3 without external model credentials.
 
-## Phase boundary
+For the local real-model gate, start DataControl with `DEEPSEEK_API_KEY` set and then run in another terminal:
 
-- P2: formal product frontend and core asset-service UX
-- P3: advanced unified search, relationship explorer, dsh + Agent3 intelligent Q&A
-- P4: administration, security hardening, analytics, full E2E/performance gates and release
+```powershell
+.\.venv\Scripts\python.exe scripts\p3_agent_acceptance.py
+```
+
+or:
+
+```bash
+.venv/bin/python scripts/p3_agent_acceptance.py
+```
+
+A passing run writes local real-model evidence to `.local/p3-agent-acceptance.json`. The evidence is machine-local and is not a substitute for CI or user visual/functional acceptance.
