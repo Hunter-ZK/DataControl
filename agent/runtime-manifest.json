@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "mode": "embedded-monorepo",
   "sourceRepository": "Hunter-ZK/DataAgent-dsh",
   "sourceCommit": "f04e266c6fe93e6e89d7e4b5c6e31128082a8c96",
@@ -8,8 +8,11 @@
   "mcpEmbedded": true,
   "dshAssetsEmbedded": true,
   "portalMetadataAdapter": true,
+  "headlessProfileImplemented": true,
+  "sessionBridgeImplemented": true,
   "pythonRuntime": "3.14",
   "portalPythonRuntime": "3.13",
   "integrated": false,
-  "nextGate": "DataControl-to-dsh session bridge and real model E2E acceptance"
+  "realModelAccepted": false,
+  "nextGate": "Run scripts/p3_agent_acceptance.py with a real DEEPSEEK_API_KEY, then complete user acceptance"
 }
