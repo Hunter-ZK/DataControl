@@ -99,7 +99,28 @@ def metrics(keyword: str | None = None, db: Session = Depends(get_db)):
         like = f"%{keyword}%"
         stmt = stmt.where(or_(Metric.metric_code.like(like), Metric.metric_name.like(like), Metric.aliases.like(like)))
     rows = db.execute(stmt.order_by(Metric.metric_code)).scalars().all()
-    return {"code": "OK", "data": [{"assetId": x.asset_id, "metricCode": x.metric_code, "name": x.metric_name, "aliases": x.aliases, "sourceDatasetId": x.source_dataset_id, "aggregation": x.aggregation, "measureColumn": x.measure_column, "timeField": x.time_field, "timeAdditivity": x.time_additivity, "caliber": x.caliber_desc, "status": x.status} for x in rows]}
+    return {
+        "code": "OK",
+        "data": [
+            {
+                "assetId": x.asset_id,
+                "metricCode": x.metric_code,
+                "name": x.metric_name,
+                "aliases": x.aliases,
+                "definition": x.biz_definition,
+                "sourceDatasetId": x.source_dataset_id,
+                "statSystemCode": x.stat_system_code,
+                "aggregation": x.aggregation,
+                "measureColumn": x.measure_column,
+                "timeField": x.time_field,
+                "timeAdditivity": x.time_additivity,
+                "validDimensions": x.valid_dimensions,
+                "caliber": x.caliber_desc,
+                "status": x.status,
+            }
+            for x in rows
+        ],
+    }
 
 
 @router.get("/stat-systems")
