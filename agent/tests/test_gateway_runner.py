@@ -76,15 +76,18 @@ def test_headless_event_stream_exposes_tools_but_not_hidden_reasoning():
         {"type": "status", "phase": "turn_end", "turn": 1, "reason": "completed"},
         {
             "type": "final",
-            "text": "## 结论\n**已生成**并校验本期贷款余额 SQL。\n```sql\nSELECT 1;\n```",
+            "text": "## 结论\n**已生成**并校验本期贷款余额 SQL。\n\n- 来源表已确认\n- 口径已确认\n\n```sql\nSELECT 1;\n```",
         },
     ]
     result = parse_event_stream(_stream(lines))
 
     assert result["sessionId"] == "session-1"
-    assert "**" not in result["answer"]
-    assert "```" not in result["answer"]
-    assert "##" not in result["answer"]
+    assert result["answer"].startswith("## 结论")
+    assert "**已生成**" in result["answer"]
+    assert "- 来源表已确认" in result["answer"]
+    assert "```sql" not in result["answer"]
+    assert "SELECT 1" not in result["answer"]
+    assert result["summary"] == "结论"
     assert result["sql"].startswith("SELECT region_code")
     assert result["validation"]["valid"] is True
     assert result["validationState"] == "passed"
@@ -93,6 +96,7 @@ def test_headless_event_stream_exposes_tools_but_not_hidden_reasoning():
     assert result["sqlExecuted"] is False
     assert result["hiddenReasoningExposed"] is False
     assert all(item["type"] != "thinking" for item in result["events"])
+    assert "private reasoning" not in result["answer"]
     assert result["evidence"]["metrics"][0]["code"] == "metric_loan_balance"
     assert result["evidence"]["period"]["resolved"] == "LATEST"
     assert result["evidence"]["dimensions"] == ["region_code"]

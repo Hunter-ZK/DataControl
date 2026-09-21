@@ -105,17 +105,25 @@ def _json_or_text(value: Any) -> Any:
         return value
 
 
-def _plain_answer(text: str) -> str:
-    """Remove presentation markdown; SQL/evidence are rendered by dedicated UI blocks."""
-    value = re.sub(r"```(?:sql)?[\s\S]*?```", "", text, flags=re.IGNORECASE)
+def _presentation_answer(text: str) -> str:
+    """Preserve safe presentation markdown while removing duplicate SQL/image payloads.
+
+    SQL and evidence have dedicated product blocks. Markdown structure is retained so
+    the Vue client can render headings, lists, tables, emphasis, quotes and non-SQL
+    code without exposing hidden reasoning or trusting raw HTML.
+    """
+    value = re.sub(r"```sql\s*[\s\S]*?```", "", text, flags=re.IGNORECASE)
     value = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", value)
-    value = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", value)
-    value = re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", value)
-    value = re.sub(r"(?m)^\s*[-*+]\s+", "• ", value)
-    value = re.sub(r"(?m)^\s*\d+[.)]\s+", "• ", value)
-    value = value.replace("**", "").replace("__", "").replace("`", "")
     value = re.sub(r"\n{3,}", "\n\n", value).strip()
     return value
+
+
+def _answer_summary(answer: str) -> str:
+    first = answer.split("\n", 1)[0].strip()
+    first = re.sub(r"^\s{0,3}#{1,6}\s*", "", first)
+    first = re.sub(r"^\s*>\s*", "", first)
+    first = re.sub(r"[*_`~]", "", first).strip()
+    return first[:500]
 
 
 def _dedupe_dicts(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
@@ -290,14 +298,14 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
         validation = None
         validation_call_id = None
 
-    answer = _plain_answer(final_text)
+    answer = _presentation_answer(final_text)
     if not answer:
         answer = "已完成分析。请查看下方指标、资产、SQL 与校验结果。"
 
     return {
         "sessionId": session_id,
         "answer": answer,
-        "summary": answer.split("\n", 1)[0][:500],
+        "summary": _answer_summary(answer),
         "stopReason": stop_reason,
         "events": events,
         "sql": sql,
