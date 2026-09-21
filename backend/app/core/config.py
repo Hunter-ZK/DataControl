@@ -12,9 +12,10 @@ SEARCH_DB = Path(os.getenv("DATACONTROL_SEARCH_DB", str(DATA_DIR / "search.db"))
 MODEL_PROVIDER = os.getenv("DATACONTROL_MODEL_PROVIDER", "deepseek")
 MODEL_NAME = os.getenv("DATACONTROL_MODEL_NAME", "deepseek-chat")
 
-# P3 external-agent boundary. The portal owns UI/session delivery only; dsh owns
-# the model loop and Agent3 remains a separate capability service exposed through MCP.
-DSH_COMMAND = os.getenv("DATACONTROL_DSH_COMMAND", "npx @deepseek-ai/dsh --profile acp")
-AGENT3_MCP_URL = os.getenv("DATACONTROL_AGENT3_MCP_URL", "")
-AGENT_WORKSPACE = Path(os.getenv("DATACONTROL_AGENT_WORKSPACE", str(ROOT))).resolve()
+# P3 monorepo boundary. The DataAgent implementation is owned by this repository
+# under DataControl/agent. DataAgent-dsh is a migration source/baseline only; a
+# deployed DataControl instance must never depend on cloning or importing another
+# Git repository at runtime.
+AGENT_HOME = Path(os.getenv("DATACONTROL_AGENT_HOME", str(ROOT / "agent"))).resolve()
+AGENT_GATEWAY_URL = os.getenv("DATACONTROL_AGENT_GATEWAY_URL", "http://127.0.0.1:8910").rstrip("/")
 AGENT_TIMEOUT_SECONDS = float(os.getenv("DATACONTROL_AGENT_TIMEOUT_SECONDS", "120"))
