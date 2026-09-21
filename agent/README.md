@@ -10,7 +10,7 @@
 - `dsh`: pinned DeepSeek Harness package manifest, restricted preset and profile patch
 - `guard-plugin`: fail-closed approval / audit / production-DB defense-in-depth bundle
 - `semantic_models`: deterministic public semantic fixture for unit tests
-- `tests`: independent Python 3.14 Agent gates
+- `tests`: independent Agent gates executed on the shared Python 3.13 baseline
 
 ## Runtime boundary
 ```text
@@ -23,15 +23,15 @@ Vue
  -> Portal read-only HTTP facts
 ```
 
-The Portal retains Python 3.13. The embedded Agent retains its validated Python 3.14 baseline in `.venv-agent`; the two environments are isolated inside the same repository.
+Portal and Agent run as separate processes and remain isolated by HTTP/MCP contracts, but they use the same repository-local `.venv`. The supported P3 Python range is `>=3.13,<3.15`; no separate `.venv-agent` or Python 3.14-only installation is required.
 
 The gateway launches one dsh headless task per Portal request and uses the dsh JSON event stream for session identity, tool activity, final answer and stop reason. `thinking` events and intermediate model text are intentionally discarded. Only Agent3 MCP tool activity is projected back to the product.
 
-`dataagent-headless` is bootstrapped from the shipped dsh `headless` profile and receives the same DataAgent patch, MCP connection, local Guard plugin, model provider and restricted DataAgent preset as the browser profile.
+`dataagent-headless` is bootstrapped from the shipped dsh `headless` profile and receives the DataAgent patch, MCP connection, local Guard plugin, model provider and restricted DataAgent skill surface.
 
 Production SQL execution remains disabled. DuckDB exists only behind the evaluation `ExecutionBackend` and is not registered as an MCP tool.
 
 ## P3 gate
-`runtime-manifest.json` records that source migration and the session bridge are implemented. Repository/CI checks can fully verify the architecture without a model key. The manifest stays `integrated: false` until a user-owned real `DEEPSEEK_API_KEY` completes `scripts/p3_agent_acceptance.py` and product acceptance.
+`runtime-manifest.json` records that source migration and the session bridge are implemented. Repository/CI checks can verify the architecture without a model key. The manifest stays `integrated: false` until a user-owned real `DEEPSEEK_API_KEY` completes `scripts/p3_agent_acceptance.py` and product acceptance.
 
 A successful local acceptance writes `.local/p3-agent-acceptance.json`; Portal status treats that local evidence as the real-model gate for the current machine without committing credentials or machine-specific evidence to Git.
