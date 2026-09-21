@@ -12,9 +12,17 @@ command -v npm >/dev/null 2>&1 || { echo "npm is required." >&2; exit 1; }
 mkdir -p .local
 
 if [ "$SKIP_AGENT" -eq 0 ]; then
-  [ -x .venv-agent/bin/python ] || { echo "Embedded DataAgent environment is missing. Run ./scripts/setup-agent.sh first (Python 3.14 required). Use --skip-agent only when intentionally starting Portal/Web without intelligent Q&A." >&2; exit 1; }
-  [ -x agent/dsh/node_modules/.bin/dsh ] || { echo "Embedded DataAgent dsh dependencies are missing. Run ./scripts/setup-agent.sh first." >&2; exit 1; }
-  [ -f .local/dsh-home/profiles/dataagent-headless/package.json ] || { echo "Headless DataAgent profile is missing. Run ./scripts/setup-agent.sh first." >&2; exit 1; }
+  if [ ! -x .venv-agent/bin/python ] || [ ! -x agent/dsh/node_modules/.bin/dsh ] || [ ! -f .local/dsh-home/profiles/dataagent-headless/package.json ]; then
+    echo "Embedded DataAgent setup is incomplete; bootstrapping it now..."
+    if ! bash ./scripts/setup-agent.sh; then
+      echo "Embedded DataAgent bootstrap failed. Fix the Python 3.14/Node diagnostics above and rerun ./scripts/start-dev.sh." >&2
+      exit 1
+    fi
+  fi
+  .venv-agent/bin/python -c 'import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 14) else 1)' >/dev/null 2>&1 || {
+    echo "Embedded DataAgent environment is not Python 3.14. Re-run ./scripts/setup-agent.sh." >&2
+    exit 1
+  }
 fi
 
 assert_port_free() {
