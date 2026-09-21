@@ -23,8 +23,8 @@ P3 implementation is complete as a release candidate on `feature/p3-intelligence
 ### P3-B · Embedded DataAgent migration — complete
 - pinned `Hunter-ZK/DataAgent-dsh@f04e266c6fe93e6e89d7e4b5c6e31128082a8c96` migration baseline;
 - Agent3 Core/adapters, dsh assets, Skills, Guard and semantic assets live in `DataControl/agent`;
-- Portal and Agent remain separate runtime boundaries inside one monorepo;
-- Portal stays Python 3.13 and DataAgent stays Python 3.14 in isolated virtual environments;
+- Portal and Agent remain separate process/runtime boundaries inside one monorepo;
+- Portal and DataAgent share one repository-local Python environment with supported range `>=3.13,<3.15`;
 - Windows/macOS/Linux setup/start/verify and CI do not clone another repository;
 - Agent architecture/security gates are preserved.
 
@@ -43,7 +43,7 @@ P3 implementation is complete as a release candidate on `feature/p3-intelligence
 1. set a user-owned `DEEPSEEK_API_KEY` before `start-dev`;
 2. run `scripts/p3_agent_acceptance.py` against the running product;
 3. verify the resulting `.local/p3-agent-acceptance.json` and UI status;
-4. complete Windows/macOS product acceptance;
+4. complete product acceptance;
 5. merge PR #4 only after explicit user approval.
 
 No ACP contract is used. P3 is built against DeepSeek Harness's headless task surface and Agent3's streamable-HTTP MCP adapter.
