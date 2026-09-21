@@ -24,11 +24,16 @@ def _search_phrase(value: str) -> str:
 
 
 class PortalMetadataProvider:
-    """Read-only MetadataProvider backed by the local DataControl Portal API."""
+    """Read-only MetadataProvider backed by the local DataControl Portal API.
+
+    The Portal endpoint is a loopback-only product boundary. Local HTTP calls must
+    never inherit HTTP(S)_PROXY/ALL_PROXY from the developer shell, otherwise a
+    desktop proxy can turn a healthy 127.0.0.1 request into a misleading 502.
+    """
 
     def __init__(self, base_url: str, *, client: httpx.Client | None = None) -> None:
         self.base_url = base_url.rstrip("/")
-        self._client = client or httpx.Client(timeout=10.0)
+        self._client = client or httpx.Client(timeout=10.0, trust_env=False)
 
     def _get(self, path: str, *, params: dict[str, Any] | None = None) -> Any:
         try:
