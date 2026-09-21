@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,24 @@ def _tool_suffix(name: str) -> str:
     return name.rsplit("__", 1)[-1]
 
 
+def _extract_sql_from_text(text: str) -> str | None:
+    stripped = text.strip()
+    fenced = re.search(r"```(?:sql)?\s*(.+?)```", stripped, flags=re.IGNORECASE | re.DOTALL)
+    if fenced:
+        candidate = fenced.group(1).strip()
+        if re.match(r"^(SELECT|WITH)\b", candidate, flags=re.IGNORECASE):
+            return candidate
+    match = re.search(r"\b(SELECT|WITH)\b[\s\S]*", stripped, flags=re.IGNORECASE)
+    if not match:
+        return None
+    candidate = match.group(0).strip()
+    # MCP textual projections sometimes append prose after a SQL semicolon. Keep
+    # the first complete statement when one exists; validation still owns syntax.
+    if ";" in candidate:
+        candidate = candidate.split(";", 1)[0].strip() + ";"
+    return candidate
+
+
 def _extract_sql(value: Any) -> str | None:
     if isinstance(value, dict):
         for key in ("sql", "generated_sql", "generatedSql"):
@@ -46,6 +65,8 @@ def _extract_sql(value: Any) -> str | None:
             found = _extract_sql(item)
             if found:
                 return found
+    elif isinstance(value, str):
+        return _extract_sql_from_text(value)
     return None
 
 
