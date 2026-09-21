@@ -66,6 +66,45 @@ jobs:
         shell: bash
         run: DSH_HOME="$RUNNER_TEMP/datacontrol-dsh-home" bash agent/scripts/setup_dataagent.sh
 
+  # One deterministic full-chain gate is intentionally separate from the unit
+  # matrix. It proves Portal -> Gateway -> dsh -> MCP -> Agent3 behavior without
+  # a paid/remote model and keeps real-model acceptance as a distinct local gate.
+  agent-stub-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.13'}
+      - uses: actions/setup-node@v4
+        with: {node-version: '24'}
+      - run: python -m pip install -U pip
+      - name: Install Portal and Agent test runtimes
+        run: |
+          python -m pip install -e ".[dev]"
+          python -m pip install -e "./agent[all,dev]"
+      - name: Build deterministic Portal corpus
+        run: |
+          python -m alembic upgrade head
+          python samples/generate_demo_data.py
+          python samples/enrich_p1_data.py
+          python samples/enrich_p3_reference.py
+          python samples/rebuild_search_index.py
+      - name: Install pinned dsh
+        working-directory: agent/dsh
+        run: npm install --no-audit --no-fund
+      - name: Build guard plugin
+        working-directory: agent/guard-plugin
+        run: npm install --no-audit --no-fund && npm run build
+      - name: Bootstrap restricted headless profile
+        shell: bash
+        env:
+          DSH_HOME: ${{ runner.temp }}/datacontrol-dsh-home
+        run: bash agent/scripts/setup_dataagent.sh
+      - name: Run deterministic Portal-to-Agent3 stub acceptance
+        env:
+          DSH_HOME: ${{ runner.temp }}/datacontrol-dsh-home
+        run: python scripts/p0_stub_e2e.py
+
   frontend-cross-platform:
     strategy:
       fail-fast: false
