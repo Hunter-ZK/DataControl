@@ -11,6 +11,8 @@ command -v npm >/dev/null 2>&1 || { echo "Node.js 24+ / npm is required." >&2; e
 .venv/bin/python samples/generate_demo_data.py
 .venv/bin/python samples/enrich_p1_data.py
 .venv/bin/python samples/rebuild_search_index.py
+.venv/bin/python samples/generate_p3_question_bank.py
 (cd web && npm install)
 if command -v "${PYTHON314_BIN:-python3.14}" >/dev/null 2>&1; then bash scripts/setup-agent.sh; else echo "WARNING: Python 3.14 not found; Portal/Web are ready but embedded DataAgent setup was skipped. Install Python 3.14 and run scripts/setup-agent.sh." >&2; fi
-echo "Setup complete. Run ./scripts/start-dev.sh"
+echo "Setup complete. P3 question bank: .local/p3-question-bank.json"
+echo "Run ./scripts/start-dev.sh"
