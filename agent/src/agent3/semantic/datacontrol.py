@@ -21,8 +21,17 @@ def _tokens(value: Any) -> tuple[str, ...]:
     return tuple(x.strip() for x in _SPLIT.split(str(value)) if x.strip())
 
 
-def load_portal_semantics(base_url: str, metadata: PortalMetadataProvider, *, client: httpx.Client | None = None) -> SemanticRegistry:
-    http = client or httpx.Client(timeout=10.0)
+def load_portal_semantics(
+    base_url: str,
+    metadata: PortalMetadataProvider,
+    *,
+    client: httpx.Client | None = None,
+) -> SemanticRegistry:
+    # This is always a local Portal call in DataControl. Do not inherit shell
+    # proxy settings for 127.0.0.1/localhost; desktop proxies can otherwise
+    # return 502 for an otherwise healthy Portal.
+    owned_client = client is None
+    http = client or httpx.Client(timeout=10.0, trust_env=False)
     try:
         response = http.get(f"{base_url.rstrip('/')}/metrics")
         response.raise_for_status()
@@ -30,6 +39,10 @@ def load_portal_semantics(base_url: str, metadata: PortalMetadataProvider, *, cl
         rows: Any = payload.get("data", []) if isinstance(payload, dict) else []
     except (httpx.HTTPError, ValueError, AttributeError) as exc:
         raise PortalMetadataError(f"Portal metric request failed: {exc}") from exc
+    finally:
+        if owned_client:
+            http.close()
+
     authz = AuthzContext.system(purpose="portal-semantic-load")
     metrics: list[MetricDefinition] = []
     for row in rows if isinstance(rows, list) else []:
@@ -44,7 +57,11 @@ def load_portal_semantics(base_url: str, metadata: PortalMetadataProvider, *, cl
         if table is None:
             continue
         raw_additivity = str(row.get("timeAdditivity") or "additive").casefold()
-        additivity = Additivity.NON_ADDITIVE if "non" in raw_additivity or "不可加" in raw_additivity else Additivity.ADDITIVE
+        additivity = (
+            Additivity.NON_ADDITIVE
+            if "non" in raw_additivity or "不可加" in raw_additivity
+            else Additivity.ADDITIVE
+        )
         metrics.append(
             MetricDefinition(
                 id=str(code),
