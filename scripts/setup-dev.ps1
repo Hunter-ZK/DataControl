@@ -7,6 +7,7 @@ if(-not(Test-Path .venv)){python -m venv .venv}
 .\.venv\Scripts\python.exe -m alembic upgrade head
 .\.venv\Scripts\python.exe samples\generate_demo_data.py
 .\.venv\Scripts\python.exe samples\enrich_p1_data.py
+.\.venv\Scripts\python.exe samples\enrich_p3_reference.py
 .\.venv\Scripts\python.exe samples\rebuild_search_index.py
 .\.venv\Scripts\python.exe samples\generate_p3_question_bank.py
 Push-Location web
