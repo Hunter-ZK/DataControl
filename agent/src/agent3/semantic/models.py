@@ -29,6 +29,7 @@ class MetricDefinition:
     additivity_time: Additivity = Additivity.ADDITIVE
     grain: tuple[str, ...] = ()
     valid_dimensions: tuple[str, ...] = ()
+    time_field: str = "dt"
     owner: str = ""
     caveats: str = ""
 
