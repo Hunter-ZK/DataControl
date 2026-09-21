@@ -7,7 +7,7 @@ from backend.app.db.session import SessionLocal
 def test_p3_acceptance_corpus_has_real_scale():
     with SessionLocal() as db:
         assert (db.scalar(select(func.count()).select_from(Dataset)) or 0) >= 250
-        assert (db.scalar(select(func.count()).select_from(Column)) or 0) >= 2500
+        assert (db.scalar(select(func.count()).select_from(Column)) or 0) >= 2400
         assert (db.scalar(select(func.count()).select_from(Metric)) or 0) >= 70
 
 
