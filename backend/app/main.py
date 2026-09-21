@@ -13,6 +13,8 @@ from backend.app.api.search import router as search_router
 from backend.app.core.config import MODEL_NAME, MODEL_PROVIDER, ROOT
 from backend.app.db.application_models import AuditLog, SearchHistory  # noqa: F401
 
+P3_RUNTIME_CONTRACT = "embedded-agent-gateway-v1"
+
 app = FastAPI(title="DataControl API", version="0.4.0-p3")
 app.include_router(auth_router)
 app.include_router(assets_router)
@@ -26,7 +28,11 @@ app.include_router(activity_router)
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "phase": "P3"}
+    return {
+        "status": "ok",
+        "phase": "P3",
+        "runtimeContract": P3_RUNTIME_CONTRACT,
+    }
 
 
 @app.get("/api/v1/system/info")
@@ -35,6 +41,7 @@ def system_info():
         "code": "OK",
         "data": {
             "phase": "P3",
+            "runtimeContract": P3_RUNTIME_CONTRACT,
             "modelProvider": MODEL_PROVIDER,
             "modelName": MODEL_NAME,
             "platforms": ["windows", "macos"],
