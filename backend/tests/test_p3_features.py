@@ -5,6 +5,14 @@ from backend.app.main import app
 client = TestClient(app)
 
 
+def test_p3_runtime_contract_is_exposed_for_local_acceptance():
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["phase"] == "P3"
+    assert data["runtimeContract"] == "embedded-agent-gateway-v1"
+
+
 def test_unified_search_returns_facets_and_reference_assets():
     response = client.get("/api/v1/search", params={"q": "行政区划", "limit": 50})
     assert response.status_code == 200
