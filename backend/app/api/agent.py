@@ -5,7 +5,7 @@ from dataclasses import asdict
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from backend.app.agent.runtime import AgentRuntimeError, DshAcpRuntime
+from backend.app.agent.runtime import AgentRuntimeError, EmbeddedAgentGateway
 
 router = APIRouter(prefix="/api/v1/agent", tags=["agent"])
 
@@ -15,8 +15,8 @@ class AgentQuery(BaseModel):
 
 
 @router.get("/status")
-def agent_status():
-    status = DshAcpRuntime().status()
+async def agent_status():
+    status = await EmbeddedAgentGateway().status()
     return {
         "code": "OK",
         "data": {
@@ -29,15 +29,18 @@ def agent_status():
 
 @router.post("/query")
 async def agent_query(body: AgentQuery):
-    runtime = DshAcpRuntime()
-    if not runtime.status().ready:
-        status = runtime.status()
+    runtime = EmbeddedAgentGateway()
+    status = await runtime.status()
+    if not status.ready:
         raise HTTPException(
             503,
             detail={
                 "message": "Intelligent Q&A runtime is not ready",
                 "reason": status.reason,
-                "agent3McpConfigured": status.agent3McpConfigured,
+                "mode": status.mode,
+                "source": status.source,
+                "integrated": status.integrated,
+                "serviceReachable": status.serviceReachable,
             },
         )
     try:
