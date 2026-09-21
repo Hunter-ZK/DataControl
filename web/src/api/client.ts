@@ -87,22 +87,23 @@ export interface RelationGraph {
 
 export interface AgentStatus {
   ready: boolean
-  dshExecutable?: string | null
-  command: string
-  agent3McpConfigured: boolean
-  agent3McpUrl?: string | null
+  mode: string
+  source: string
+  gatewayUrl: string
   provider: string
   model: string
+  integrated: boolean
+  serviceReachable: boolean
   reason?: string | null
   sqlExecutionEnabled: boolean
   hiddenReasoningExposed: boolean
 }
 
 export interface AgentResult {
-  sessionId: string
+  sessionId?: string
   answer: string
   stopReason?: string | null
-  events: Array<Record<string, unknown>>
+  events?: Array<Record<string, unknown>>
   sqlExecuted: boolean
 }
 
