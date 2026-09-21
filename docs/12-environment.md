@@ -1,50 +1,58 @@
 # 12 · Environment
 
-## Current Portal baseline
+## Development baseline
 
-- Python 3.13+
-- Node.js 24+
-- npm
-- Windows 10/11 PowerShell or macOS Bash/Zsh
+- Python `>=3.13,<3.15` for both Portal and embedded DataAgent;
+- Node.js 24+;
+- npm;
+- Windows 10/11 PowerShell or macOS/Linux Bash/Zsh.
 
-Portal backend and Vue frontend are verified in CI on Windows, macOS and Ubuntu.
+Portal and Agent run as separate processes and keep HTTP/MCP boundaries, but local development uses one repository-local `.venv`. A separate `.venv-agent` is no longer required.
 
 ## Embedded DataAgent baseline
 
-The P3 migration source `Hunter-ZK/DataAgent-dsh` declares Python `>=3.14,<3.15`, plus its own Python and Node dependencies for Agent3 Core, MCP, dsh and the guard plugin.
-
-This version difference is explicit technical work, not something setup scripts may hide. Until P3-B resolves it, the Agent runtime readiness flag remains closed.
-
-The preferred migration outcome is:
+The migrated DataAgent source originally came from a repository that pinned Python 3.14, but DataControl P3 has been adapted and tested against Python 3.13. The package metadata, setup scripts and CI therefore use the DataControl compatibility range `>=3.13,<3.15` rather than inheriting the source repository's historical interpreter pin.
 
 ```text
 DataControl checkout
-├── .venv/          Portal Python environment
+├── .venv/          shared Portal + Agent Python environment
 ├── web/            Vue dependencies
-└── agent/          embedded DataAgent source/runtime assets
+├── agent/          embedded DataAgent source/runtime assets
+└── .local/         generated dsh profiles, logs and acceptance evidence
 ```
 
-If isolated Agent Python 3.14 environment is retained, scripts may create a separate `.venv-agent`; the user must still start everything from the DataControl repository and must not clone `DataAgent-dsh` separately.
+The process boundary remains:
 
-## Current quick start
+```text
+Portal :8000
+  -> Agent Gateway :8910
+  -> dsh
+  -> Agent3 MCP :8900
+  -> Agent3 Core
+  -> Portal read-only facts
+```
+
+Sharing `.venv` does not relax architecture boundaries; it only removes an unnecessary interpreter/version split.
+
+## Quick start
 
 ### Windows
 
 ```powershell
 .\scripts\setup-dev.ps1
-.\scripts\verify.ps1
+$env:DEEPSEEK_API_KEY="..."
 .\scripts\start-dev.ps1
 ```
 
-### macOS
+### macOS / Linux
 
 ```bash
 bash scripts/setup-dev.sh
-bash scripts/verify.sh
+export DEEPSEEK_API_KEY="..."
 bash scripts/start-dev.sh
 ```
 
-Current scripts start Portal + Vue. P3-B will extend the same scripts to Agent components only after the embedded migration gate passes.
+If only Agent dependencies are missing, `setup-agent` reuses the existing `.venv` and installs the embedded Agent package plus dsh/Guard/profile assets.
 
 ## Portability rules
 
