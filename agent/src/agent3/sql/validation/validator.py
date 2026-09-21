@@ -83,8 +83,13 @@ class SQLValidator:
         for required in metric.mandatory_filters:
             if not self._has_filter(where, required):
                 issues.append(ValidationIssue("MISSING_MANDATORY_FILTER", Severity.ERROR, f"指标 {metric.id} 缺少强制过滤 {required.field} {required.op} {required.value}", "按语义模型补充强制过滤", {"metric_id": metric.id, "field": required.field}, IssueAction.BLOCK))
-        if metric.additivity_time is Additivity.NON_ADDITIVE and not self._has_single_equality(where, "dt"):
-            issues.append(ValidationIssue("NON_ADDITIVE_OVER_TIME", Severity.ERROR, f"指标 {metric.id} 为时间非可加快照指标，必须限定单个 dt", "选择单个期末快照日期；不要跨日期 SUM", {"metric_id": metric.id}, IssueAction.BLOCK))
+        if metric.additivity_time is Additivity.NON_ADDITIVE and not self._has_single_period(where, metric.time_field):
+            issues.append(ValidationIssue(
+                "NON_ADDITIVE_OVER_TIME", Severity.ERROR,
+                f"指标 {metric.id} 为时间非可加快照指标，必须限定单个 {metric.time_field}",
+                f"限定单个 {metric.time_field}，或使用 MAX({metric.time_field}) 选择最新快照；不要跨期 SUM",
+                {"metric_id": metric.id, "time_field": metric.time_field}, IssueAction.BLOCK,
+            ))
         return issues
 
     @staticmethod
@@ -104,7 +109,18 @@ class SQLValidator:
         return False
 
     @staticmethod
-    def _has_single_equality(where: exp.Where | None, field: str) -> bool:
+    def _has_single_period(where: exp.Where | None, field: str) -> bool:
+        """Accept a literal snapshot or a scalar MAX(time_field) snapshot selector."""
         if where is None:
             return False
-        return any(isinstance(node.this, exp.Column) and node.this.name.casefold() == field.casefold() and isinstance(node.expression, exp.Literal) for node in where.find_all(exp.EQ))
+        target = field.casefold()
+        for node in where.find_all(exp.EQ):
+            left, right = node.this, node.expression
+            if not isinstance(left, exp.Column) or left.name.casefold() != target:
+                continue
+            if isinstance(right, exp.Literal):
+                return True
+            for agg in right.find_all(exp.Max):
+                if any(c.name.casefold() == target for c in agg.find_all(exp.Column)):
+                    return True
+        return False
