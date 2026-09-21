@@ -4,6 +4,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 SKIP_AGENT=0
 if [ "${1:-}" = "--skip-agent" ]; then SKIP_AGENT=1; fi
+EXPECTED_RUNTIME_CONTRACT="embedded-agent-gateway-v1"
 
 [ -x .venv/bin/python ] || { echo "Portal environment is missing. Run ./scripts/setup-dev.sh first." >&2; exit 1; }
 command -v npm >/dev/null 2>&1 || { echo "npm is required." >&2; exit 1; }
@@ -15,6 +16,26 @@ if [ "$SKIP_AGENT" -eq 0 ]; then
   [ -x agent/dsh/node_modules/.bin/dsh ] || { echo "Embedded DataAgent dsh dependencies are missing. Run ./scripts/setup-agent.sh first." >&2; exit 1; }
   [ -f .local/dsh-home/profiles/dataagent-headless/package.json ] || { echo "Headless DataAgent profile is missing. Run ./scripts/setup-agent.sh first." >&2; exit 1; }
 fi
+
+assert_port_free() {
+  local port="$1" name="$2"
+  if .venv/bin/python - "$port" <<'PY'
+import socket, sys
+port=int(sys.argv[1])
+s=socket.socket()
+try:
+    s.bind(("127.0.0.1", port))
+except OSError:
+    raise SystemExit(1)
+finally:
+    s.close()
+PY
+  then
+    return 0
+  fi
+  echo "$name cannot start because port $port is already in use. Stop the stale process first, then rerun ./scripts/start-dev.sh." >&2
+  exit 1
+}
 
 wait_http() {
   local pid="$1" url="$2" name="$3" errlog="$4" timeout="${5:-25}"
@@ -54,7 +75,14 @@ wait_tcp() {
   return 1
 }
 
-.venv/bin/python -m uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000 >.local/backend.log 2>.local/backend.err.log & BACKEND_PID=$!
+assert_port_free 8000 "DataControl API"
+if [ "$SKIP_AGENT" -eq 0 ]; then
+  assert_port_free 8900 "Agent3 MCP"
+  assert_port_free 8910 "DataAgent Gateway"
+fi
+
+rm -f .local/backend.log .local/backend.err.log .local/agent-mcp.log .local/agent-mcp.err.log .local/agent-gateway.log .local/agent-gateway.err.log
+.venv/bin/python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 >.local/backend.log 2>.local/backend.err.log & BACKEND_PID=$!
 MCP_PID=""; GATEWAY_PID=""
 cleanup(){
   [ -z "$GATEWAY_PID" ] || kill "$GATEWAY_PID" >/dev/null 2>&1 || true
@@ -64,12 +92,21 @@ cleanup(){
 trap cleanup EXIT INT TERM
 wait_http "$BACKEND_PID" http://127.0.0.1:8000/health "DataControl API" .local/backend.err.log 20
 
+portal_health="$(curl -fsS http://127.0.0.1:8000/health)"
+PORTAL_HEALTH="$portal_health" EXPECTED_RUNTIME_CONTRACT="$EXPECTED_RUNTIME_CONTRACT" .venv/bin/python - <<'PY'
+import json, os
+payload=json.loads(os.environ["PORTAL_HEALTH"])
+expected=os.environ["EXPECTED_RUNTIME_CONTRACT"]
+actual=payload.get("runtimeContract")
+if actual != expected:
+    raise SystemExit(f"DataControl API runtime contract mismatch: expected {expected!r}, got {actual!r}. A stale Portal process or stale checkout is being used.")
+PY
+
 if [ "$SKIP_AGENT" -eq 0 ]; then
   export AGENT3_MCP_POC_MODE=1
   export DATACONTROL_PORTAL_URL=http://127.0.0.1:8000/api/v1
   export DSH_HOME="$ROOT/.local/dsh-home"
   export DSH_TELEMETRY_MODE=DISABLED
-  rm -f .local/agent-mcp.log .local/agent-mcp.err.log .local/agent-gateway.log .local/agent-gateway.err.log
   (cd agent && ../.venv-agent/bin/python -m agent3.adapters.mcp.server) >.local/agent-mcp.log 2>.local/agent-mcp.err.log & MCP_PID=$!
   wait_tcp "$MCP_PID" 8900 "Agent3 MCP" .local/agent-mcp.err.log 30
   .venv-agent/bin/python -m uvicorn dataagent_gateway.app:app --host 127.0.0.1 --port 8910 >.local/agent-gateway.log 2>.local/agent-gateway.err.log & GATEWAY_PID=$!
@@ -86,6 +123,6 @@ else
   echo "WARNING: Embedded DataAgent intentionally skipped (--skip-agent). Intelligent Q&A will be unavailable." >&2
 fi
 
-printf '\nDataControl API: READY http://127.0.0.1:8000\nDataControl Web:       http://127.0.0.1:5173\n'
+printf '\nDataControl API: READY http://127.0.0.1:8000 (%s)\nDataControl Web:       http://127.0.0.1:5173\n' "$EXPECTED_RUNTIME_CONTRACT"
 cd web
 npm run dev
