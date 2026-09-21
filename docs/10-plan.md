@@ -1,41 +1,52 @@
 # 10 · Delivery plan
 
 ## P0 — foundation
-Repository, backend skeleton, synthetic assets, search spike, cross-platform scripts and CI.
+Repository, backend skeleton, synthetic assets, search spike, cross-platform scripts and CI. **Complete.**
 
 ## P1 — asset backend
-Asset/reference/application models, read APIs, local auth boundary, migrations and rich synthetic fixtures.
+Asset/reference/application models, read APIs, local auth boundary, migrations and rich synthetic fixtures. **Complete.**
 
 ## P2 — product portal
-Formal Vue 3 + TypeScript product UI, routed asset pages, responsive shell and cross-platform frontend quality gate.
+Formal Vue 3 + TypeScript product UI, routed asset pages, responsive shell and cross-platform frontend quality gate. **Complete / frozen on main.**
 
 ## P3 — intelligence and relations
-P3 is split into three coordinated tracks:
+P3 implementation is complete as a release candidate on `feature/p3-intelligence-relations`; real-model/user acceptance remains before merge.
 
-### P3-A · Search and relationship intelligence
-- unified asset index;
-- suggestions/facets/highlights;
+### P3-A · Search and relationship intelligence — complete
+- unified asset index across datasets, fields and reference assets;
+- suggestions, facets and highlighting;
 - multi-level upstream/downstream graph;
-- path finder;
-- downstream impact analysis.
+- directed path finder;
+- downstream impact analysis;
+- routed relationship workspace and dataset-detail navigation.
 
-### P3-B · Embedded DataAgent migration
-- pin `Hunter-ZK/DataAgent-dsh` source baseline;
-- migrate required Agent3 Core/adapters, dsh profile/preset, Skills, guard and semantic assets into `DataControl/agent`;
-- keep Portal and Agent as separate runtime boundaries inside one monorepo;
-- reconcile Portal Python 3.13 with DataAgent's declared Python 3.14 baseline explicitly;
-- extend Windows/macOS setup/start/verify scripts without cloning another repository;
-- preserve DataAgent architecture/security gates.
+### P3-B · Embedded DataAgent migration — complete
+- pinned `Hunter-ZK/DataAgent-dsh@f04e266c6fe93e6e89d7e4b5c6e31128082a8c96` migration baseline;
+- Agent3 Core/adapters, dsh assets, Skills, Guard and semantic assets live in `DataControl/agent`;
+- Portal and Agent remain separate runtime boundaries inside one monorepo;
+- Portal stays Python 3.13 and DataAgent stays Python 3.14 in isolated virtual environments;
+- Windows/macOS/Linux setup/start/verify and CI do not clone another repository;
+- Agent architecture/security gates are preserved.
 
-### P3-C · Intelligent Q&A product integration
-- Portal Agent Gateway to local embedded Agent service;
-- dsh Agent Loop -> MCP -> Agent3 Core;
+### P3-C · Intelligent Q&A product integration — implementation complete
+- local Embedded Agent Gateway on port 8910;
+- dsh `dataagent-headless` session bridge using the actual Harness headless JSON event contract;
+- resumable session identity;
+- dsh Agent Loop -> Agent3 MCP -> Agent3 Core -> Portal read-only facts;
 - trusted SQL generation/validation and evidence presentation;
+- Agent3 MCP tool activity projected to the UI;
+- hidden reasoning discarded at the Gateway;
 - no production SQL execution;
-- no hidden reasoning display;
-- real end-to-end model/MCP acceptance before enabling the Agent readiness flag.
+- real-model E2E acceptance script with destructive-request safety check.
 
-P3 must not assume ACP or any other Harness protocol that is not present in the migrated DataAgent implementation.
+### P3 release gate — pending local/user acceptance only
+1. set a user-owned `DEEPSEEK_API_KEY` before `start-dev`;
+2. run `scripts/p3_agent_acceptance.py` against the running product;
+3. verify the resulting `.local/p3-agent-acceptance.json` and UI status;
+4. complete Windows/macOS product acceptance;
+5. merge PR #4 only after explicit user approval.
+
+No ACP contract is used. P3 is built against DeepSeek Harness's headless task surface and Agent3's streamable-HTTP MCP adapter.
 
 ## P4 — production hardening
 Enterprise SSO/LDAP, production MySQL deployment, permissions/security hardening, audit/observability, caching, operational deployment and performance gates.
