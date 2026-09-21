@@ -39,13 +39,20 @@ PYTHON="$ROOT/.venv/bin/python"
 }
 
 echo "Embedded DataAgent Python: $PYTHON ($($PYTHON --version 2>&1))"
+
+# MCP currently brings in pyjwt[crypto]. cryptography 49+ no longer publishes
+# a CPython macOS x86_64 wheel, which makes Intel Macs fall back to a Rust/OpenSSL
+# source build. Install the newest wheel-compatible line explicitly and refuse
+# source compilation so setup stays self-contained.
+echo "Installing wheel-compatible cryptography runtime..."
+"$PYTHON" -m pip install --only-binary=:all: 'cryptography>=48.0.1,<49'
 "$PYTHON" -m pip install -e './agent[all]'
 
 (cd agent/dsh && npm install --no-audit --no-fund)
 (cd agent/guard-plugin && npm install --no-audit --no-fund && npm run build && npm test)
 DSH_HOME="$ROOT/.local/dsh-home" bash agent/scripts/setup_dataagent.sh
 
-"$PYTHON" -c 'import agent3, dataagent_gateway' >/dev/null
+"$PYTHON" -c 'import agent3, dataagent_gateway, cryptography; print("Agent Python imports OK; cryptography=" + cryptography.__version__)'
 [ -x agent/dsh/node_modules/.bin/dsh ] || { echo "dsh installation did not produce agent/dsh/node_modules/.bin/dsh" >&2; exit 1; }
 [ -f .local/dsh-home/profiles/dataagent-headless/package.json ] || { echo "DataAgent headless profile bootstrap did not complete." >&2; exit 1; }
 
