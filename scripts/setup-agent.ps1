@@ -26,6 +26,10 @@ try {
   if($LASTEXITCODE -ne 0){throw "Existing .venv must use Python 3.13 or 3.14."}
   Write-Host ("Embedded DataAgent Python: " + (& $python --version))
 
+  Write-Host "Installing wheel-compatible cryptography runtime..."
+  & $python -m pip install --only-binary=:all: "cryptography>=48.0.1,<49"
+  if($LASTEXITCODE -ne 0){throw "Compatible cryptography wheel installation failed"}
+
   & $python -m pip install -e ".\agent[all]"
   if($LASTEXITCODE -ne 0){throw "Agent Python package installation failed"}
 
@@ -35,7 +39,7 @@ try {
   try{npm install --no-audit --no-fund;npm run build;npm test;if($LASTEXITCODE -ne 0){throw "guard plugin verification failed"}}finally{Pop-Location}
 
   & .\agent\scripts\setup_dataagent.ps1 -DshHome (Join-Path $root ".local\dsh-home")
-  & $python -c "import agent3, dataagent_gateway"
+  & $python -c "import agent3, dataagent_gateway, cryptography; print('Agent Python imports OK; cryptography=' + cryptography.__version__)"
   if($LASTEXITCODE -ne 0){throw "Agent imports failed after setup"}
   Write-Host "Embedded DataAgent setup complete (shared .venv + local dsh profile)."
 } finally { Pop-Location }
