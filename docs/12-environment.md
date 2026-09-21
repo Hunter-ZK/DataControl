@@ -13,6 +13,8 @@ Portal and Agent run as separate processes and keep HTTP/MCP boundaries, but loc
 
 The migrated DataAgent source originally came from a repository that pinned Python 3.14, but DataControl P3 has been adapted and tested against Python 3.13. The package metadata, setup scripts and CI therefore use the DataControl compatibility range `>=3.13,<3.15` rather than inheriting the source repository's historical interpreter pin.
 
+MCP currently pulls `pyjwt[crypto]`, which makes `cryptography` a transitive runtime dependency. `cryptography` 49+ stopped publishing CPython macOS x86_64 wheels. DataControl therefore constrains the Agent runtime to `cryptography>=48.0.1,<49`, the newest compatible line with a universal2 wheel, and setup explicitly requires a binary wheel. This keeps Intel Macs self-contained and avoids requiring local Rust, pkg-config or Homebrew OpenSSL merely to install the Agent.
+
 ```text
 DataControl checkout
 ├── .venv/          shared Portal + Agent Python environment
