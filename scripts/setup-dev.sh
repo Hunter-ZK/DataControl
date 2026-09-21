@@ -10,6 +10,7 @@ command -v npm >/dev/null 2>&1 || { echo "Node.js 24+ / npm is required." >&2; e
 .venv/bin/python -m alembic upgrade head
 .venv/bin/python samples/generate_demo_data.py
 .venv/bin/python samples/enrich_p1_data.py
+.venv/bin/python samples/enrich_p3_reference.py
 .venv/bin/python samples/rebuild_search_index.py
 .venv/bin/python samples/generate_p3_question_bank.py
 (cd web && npm install)
