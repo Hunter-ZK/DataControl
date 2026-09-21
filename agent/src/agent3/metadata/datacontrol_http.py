@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import httpx
@@ -12,12 +13,18 @@ class PortalMetadataError(RuntimeError):
     pass
 
 
-class PortalMetadataProvider:
-    """Read-only MetadataProvider backed by the local DataControl Portal API.
+_TIME_WORDS = re.compile(r"(?:本期|当期|当前|现在|最新(?:一期)?|最近一期|期末|本月|当月|上期|上一期|上月)")
+_QUERY_WORDS = re.compile(r"(?:请|帮我|帮忙|查询|查一下|统计|生成|看看|看一下)")
 
-    This adapter preserves the architecture boundary: Agent3 never imports Portal
-    database models and never opens the Portal database directly.
-    """
+
+def _search_phrase(value: str) -> str:
+    cleaned = _QUERY_WORDS.sub("", value)
+    cleaned = _TIME_WORDS.sub("", cleaned)
+    return cleaned.strip(" ，,。；;：:") or value.strip()
+
+
+class PortalMetadataProvider:
+    """Read-only MetadataProvider backed by the local DataControl Portal API."""
 
     def __init__(self, base_url: str, *, client: httpx.Client | None = None) -> None:
         self.base_url = base_url.rstrip("/")
@@ -37,8 +44,9 @@ class PortalMetadataProvider:
     @staticmethod
     def _brief(row: dict[str, Any]) -> TableMetadata:
         return TableMetadata(
-            full_name=str(row.get("tableName") or row.get("assetId") or ""),
-            aliases=tuple(x for x in (row.get("bizName"),) if x),
+            full_name=str(row.get("tableName") or row.get("technicalName") or row.get("assetId") or ""),
+            description=str(row.get("bizDefinition") or row.get("snippet") or ""),
+            aliases=tuple(x for x in (row.get("bizName"), row.get("title")) if x),
         )
 
     @staticmethod
@@ -52,7 +60,13 @@ class PortalMetadataProvider:
             for item in row.get("columns", [])
             if item.get("columnName")
         )
-        description = str(row.get("bizDefinition") or row.get("statCaliber") or "")
+        description = "；".join(
+            x for x in (
+                str(row.get("bizDefinition") or "").strip(),
+                str(row.get("statCaliber") or "").strip(),
+                str(row.get("usageNotes") or "").strip(),
+            ) if x
+        )
         return TableMetadata(
             full_name=str(row.get("tableName") or row.get("assetId") or ""),
             description=description,
@@ -69,13 +83,19 @@ class PortalMetadataProvider:
 
     def search_tables(self, authz: AuthzContext, query: str, *, limit: int = 8) -> tuple[TableMetadata, ...]:
         _ = authz
-        rows = self._get("/tables", params={"keyword": query, "limit": min(max(limit, 1), 200)})
+        phrase = _search_phrase(query)
+        try:
+            result = self._get("/search", params={"q": phrase, "asset_type": "TABLE", "limit": max(limit * 3, 20)})
+            items = result.get("items", []) if isinstance(result, dict) else []
+            rows = [item for item in items if item.get("assetType") == "TABLE"]
+        except PortalMetadataError:
+            rows = []
+        if not rows:
+            rows = self._get("/tables", params={"keyword": phrase, "limit": min(max(limit * 3, 20), 200)})
         return tuple(self._brief(row) for row in rows[:limit])
 
     def get_table(self, authz: AuthzContext, full_name: str) -> TableMetadata | None:
         _ = authz
-        # Stable asset IDs can be resolved directly. Physical names are resolved
-        # through the Portal search API and then dereferenced by stable asset_id.
         if full_name.upper().startswith("DS"):
             candidates = [{"assetId": full_name, "tableName": full_name}]
         else:
