@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "integrated": false,
+  "mode": "embedded-monorepo",
+  "sourceRepository": "Hunter-ZK/DataAgent-dsh",
+  "sourceCommit": "f04e266c6fe93e6e89d7e4b5c6e31128082a8c96",
+  "runtimePath": "agent/",
+  "reason": "P3 DataAgent migration is in progress; do not mark ready until source, scripts, tests, and local end-to-end integration are complete."
+}
