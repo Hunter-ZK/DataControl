@@ -40,14 +40,20 @@ def test_relation_graph_path_and_impact_contract():
     assert impact.json()["data"]["impactCount"] >= 1
 
 
-def test_agent_runtime_is_explicitly_guarded_when_agent3_mcp_is_missing():
+def test_agent_runtime_is_explicitly_guarded_until_embedded_migration_completes():
     status = client.get("/api/v1/agent/status")
     assert status.status_code == 200
     data = status.json()["data"]
     assert data["sqlExecutionEnabled"] is False
     assert data["hiddenReasoningExposed"] is False
-    assert data["agent3McpConfigured"] is False
+    assert data["mode"] == "embedded-monorepo"
+    assert data["source"] == "DataControl/agent"
+    assert data["integrated"] is False
+    assert data["serviceReachable"] is False
     assert data["ready"] is False
 
     query = client.post("/api/v1/agent/query", json={"question": "生成贷款余额 SQL"})
     assert query.status_code == 503
+    detail = query.json()["detail"]
+    assert detail["mode"] == "embedded-monorepo"
+    assert detail["integrated"] is False
