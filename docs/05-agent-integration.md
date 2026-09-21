@@ -8,13 +8,15 @@ The implemented P3 runtime is:
 
 ```text
 DataControl Web
-  -> Portal FastAPI (:8000, Python 3.13)
-  -> Embedded Agent Gateway (:8910, Python 3.14)
+  -> Portal FastAPI (:8000)
+  -> Embedded Agent Gateway (:8910)
   -> dsh `dataagent-headless` session
   -> Agent3 MCP (:8900)
   -> Agent3 Core
   -> Portal read-only HTTP facts
 ```
+
+Portal and Agent are separate processes with explicit HTTP/MCP contracts, but local development uses one repository-local Python environment. P3 supports Python `>=3.13,<3.15`; Python 3.14 is not a separate runtime requirement.
 
 No ACP contract is used. The session bridge uses the actual DeepSeek Harness headless surface: one task per process invocation, newline-delimited JSON events, optional `sessionId` continuation, and a terminal `final` event.
 
@@ -24,7 +26,7 @@ Source repository: `Hunter-ZK/DataAgent-dsh`
 
 Pinned source commit: `f04e266c6fe93e6e89d7e4b5c6e31128082a8c96`
 
-The baseline provides the harness-agnostic Agent3 Core, MCP/HTTP/CLI adapters, dsh assets, Skills, Guard plugin, semantic assets and security/architecture tests. The old `Hunter-ZK/Agent3.0` repository is historical/reference material only.
+The baseline provides the harness-agnostic Agent3 Core, MCP/HTTP/CLI adapters, dsh assets, Skills, Guard plugin, semantic assets and security/architecture tests. Its historical Python 3.14 pin is migration-source metadata, not a DataControl product constraint. The old `Hunter-ZK/Agent3.0` repository is historical/reference material only.
 
 ## Implemented bridge
 
@@ -65,12 +67,13 @@ This split is required by the actual dsh runtime contract and is covered by Agen
 6. SQL generation, explanation and validation are allowed; production SQL execution is forbidden.
 7. Hidden model reasoning is not returned from the Gateway.
 8. The local dsh Guard is defense in depth; network/process isolation remains the deployment boundary.
+9. Python environment layout is not a security boundary; Portal and Agent may share `.venv` while keeping process/contracts isolated.
 
 ## Readiness and acceptance
 
-Repository/CI verifies source migration, the Web and restricted Headless compositions, Gateway event projection, MCP boundaries and cross-platform setup without any model secret.
+Repository/CI verifies source migration, the Web and restricted Headless compositions, Gateway event projection, MCP boundaries and cross-platform setup without any model secret. Agent CI executes on Python 3.13 across Windows, macOS and Ubuntu to validate the lower supported runtime boundary.
 
-The final P3 real-model gate is intentionally local because `DEEPSEEK_API_KEY` must not enter repository CI. With the key set **before** starting DataControl, run the repository acceptance script with the Portal environment Python:
+The final P3 real-model gate is intentionally local because `DEEPSEEK_API_KEY` must not enter repository CI. With the key set **before** starting DataControl, run the repository acceptance script with the shared environment Python:
 
 ```bash
 .venv/bin/python scripts/p3_agent_acceptance.py
