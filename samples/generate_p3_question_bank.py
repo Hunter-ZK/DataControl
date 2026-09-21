@@ -34,6 +34,7 @@ def build() -> list[dict]:
             for dimension_phrase, dimensions in (("", []), ("按地区", ["region_code"])):
                 cases.append({
                     "id": f"Q{seq:03d}",
+                    "kind": "query",
                     "question": f"{period}{dimension_phrase}{name}，生成并校验 SQL",
                     "expectedMetric": code,
                     "expectedTime": "LATEST",
@@ -44,6 +45,7 @@ def build() -> list[dict]:
         for dimension_phrase, dimensions in (("", []), ("按地区", ["region_code"]), ("按机构", ["org_code"])):
             cases.append({
                 "id": f"Q{seq:03d}",
+                "kind": "query",
                 "question": f"上期{dimension_phrase}{name}，生成并校验 SQL",
                 "expectedMetric": code,
                 "expectedTime": "PREVIOUS",
@@ -61,7 +63,14 @@ def build() -> list[dict]:
         ("资管产品余额的指标定义是什么？", "metric_aum_balance"),
     ]
     for question, code in metadata_questions:
-        cases.append({"id": f"Q{seq:03d}", "question": question, "expectedMetric": code, "expectedTime": None, "expectedDimensions": []})
+        cases.append({
+            "id": f"Q{seq:03d}",
+            "kind": "metadata",
+            "question": question,
+            "expectedMetric": code,
+            "expectedTime": None,
+            "expectedDimensions": [],
+        })
         seq += 1
     return cases
 
