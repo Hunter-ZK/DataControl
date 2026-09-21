@@ -16,11 +16,19 @@ class HarnessRunError(RuntimeError):
 
 
 MCP_TOOL_SUFFIXES = {
-    "search_tables", "get_schema", "get_semantic_model", "resolve_metric",
-    "search_verified_sql", "validate_sql", "explain_sql", "compile_query", "submit_ddl",
+    "search_tables",
+    "get_schema",
+    "get_semantic_model",
+    "resolve_metric",
+    "search_verified_sql",
+    "validate_sql",
+    "explain_sql",
+    "compile_query",
+    "submit_ddl",
 }
 
 _LOOPBACK_NO_PROXY = ("127.0.0.1", "localhost", "::1")
+_SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 
 
 def _with_loopback_no_proxy(env: dict[str, str]) -> dict[str, str]:
@@ -41,14 +49,25 @@ def _tool_suffix(name: str) -> str:
     return name.rsplit("__", 1)[-1]
 
 
+def _safe_session_id(session_id: str) -> str:
+    """Limit DataControl resumes to harness-generated, shell-safe session identifiers."""
+    if not _SESSION_ID_PATTERN.fullmatch(session_id):
+        raise HarnessRunError("Invalid DataAgent session id")
+    return session_id
+
+
 def _extract_sql_from_text(text: str) -> str | None:
     stripped = text.strip()
     fenced = re.search(r"```(?:sql)?\s*(.+?)```", stripped, flags=re.IGNORECASE | re.DOTALL)
     if fenced:
         candidate = fenced.group(1).strip()
-        if re.match(r"^(SELECT|WITH)\b", candidate, flags=re.IGNORECASE):
+        if re.match(r"^(SELECT|WITH|INSERT|UPDATE|DELETE|MERGE|CREATE|ALTER|DROP|TRUNCATE)\b", candidate, flags=re.IGNORECASE):
             return candidate
-    match = re.search(r"\b(SELECT|WITH)\b[\s\S]*", stripped, flags=re.IGNORECASE)
+    match = re.search(
+        r"\b(SELECT|WITH|INSERT|UPDATE|DELETE|MERGE|CREATE|ALTER|DROP|TRUNCATE)\b[\s\S]*",
+        stripped,
+        flags=re.IGNORECASE,
+    )
     if not match:
         return None
     candidate = match.group(0).strip()
@@ -59,7 +78,7 @@ def _extract_sql_from_text(text: str) -> str | None:
 
 def _extract_sql(value: Any) -> str | None:
     if isinstance(value, dict):
-        for key in ("sql", "generated_sql", "generatedSql"):
+        for key in ("sql", "generated_sql", "generatedSql", "normalized_sql", "normalizedSql"):
             candidate = value.get(key)
             if isinstance(candidate, str) and candidate.strip():
                 return candidate.strip()
@@ -111,13 +130,35 @@ def _dedupe_dicts(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
     return out
 
 
+def _validation_state(sql: str | None, validation: Any) -> str:
+    if not sql:
+        return "not_applicable"
+    if not isinstance(validation, dict):
+        return "not_validated"
+    if validation.get("valid") is True:
+        return "passed"
+    if validation.get("valid") is False:
+        return "failed"
+    return "unknown"
+
+
 def parse_event_stream(stdout: str) -> dict[str, Any]:
     events: list[dict[str, Any]] = []
     session_id: str | None = None
     final_text = ""
     stop_reason: str | None = None
+
+    # SQL and validation are evidence-bound. We only associate a validation result
+    # with the SQL carried by that validate_sql call (or by a compile_query result
+    # that embeds its own validation). A later unvalidated compile must not inherit
+    # an earlier validation badge.
     sql: str | None = None
     validation: Any = None
+    sql_source_call_id: str | None = None
+    validation_call_id: str | None = None
+    last_compiled_sql: str | None = None
+    last_compile_call_id: str | None = None
+
     call_tools: dict[str, str] = {}
     call_inputs: dict[str, dict[str, Any]] = {}
     metrics: list[dict[str, Any]] = []
@@ -137,20 +178,24 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
             continue
         if not isinstance(event, dict):
             continue
+
         event_type = event.get("type")
         if event_type == "session":
             value = event.get("sessionId")
             session_id = value if isinstance(value, str) else session_id
             continue
+
         if event_type == "final":
             value = event.get("text")
             final_text = value if isinstance(value, str) else ""
             continue
+
         if event_type == "status":
             if event.get("phase") == "turn_end":
                 reason = event.get("reason")
                 stop_reason = str(reason) if reason is not None else None
             continue
+
         if event_type == "tool_call":
             tool = str(event.get("tool") or "")
             suffix = _tool_suffix(tool)
@@ -173,6 +218,7 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
                         else:
                             period = {"label": token, "resolved": token}
             continue
+
         if event_type == "tool_result":
             call_id = str(event.get("callId") or "")
             tool = call_tools.get(call_id)
@@ -181,19 +227,40 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
             result = _json_or_text(event.get("result"))
             events.append({"type": "tool_result", "callId": call_id, "tool": tool, "status": event.get("status")})
 
-            if tool in {"compile_query", "validate_sql", "explain_sql"}:
-                sql = sql or _extract_sql(result)
-            if tool == "validate_sql":
-                validation = result
+            if tool == "compile_query":
+                compiled_sql = _extract_sql(result)
+                if compiled_sql:
+                    last_compiled_sql = compiled_sql
+                    last_compile_call_id = call_id
+                if isinstance(result, dict):
+                    nested_validation = result.get("validation")
+                    if compiled_sql and nested_validation is not None:
+                        sql = compiled_sql
+                        validation = nested_validation
+                        sql_source_call_id = call_id
+                        validation_call_id = call_id
+
+            elif tool == "validate_sql":
+                # The validate_sql input is the authoritative SQL for this result.
+                # Never pair a validation result with an unrelated earlier compile.
+                validated_sql = _extract_sql(call_inputs.get(call_id, {})) or _extract_sql(result)
+                if validated_sql:
+                    sql = validated_sql
+                    validation = result
+                    sql_source_call_id = call_id
+                    validation_call_id = call_id
 
             if isinstance(result, dict):
                 if tool in {"resolve_metric", "get_semantic_model"}:
                     metric = result.get("metric")
                     if isinstance(metric, dict):
                         row = {
-                            "code": metric.get("id"), "name": metric.get("name"),
-                            "sourceEntity": metric.get("source_entity"), "measure": metric.get("measure"),
-                            "timeField": metric.get("time_field"), "validDimensions": metric.get("valid_dimensions") or [],
+                            "code": metric.get("id"),
+                            "name": metric.get("name"),
+                            "sourceEntity": metric.get("source_entity"),
+                            "measure": metric.get("measure"),
+                            "timeField": metric.get("time_field"),
+                            "validDimensions": metric.get("valid_dimensions") or [],
                         }
                         metrics.append(row)
                         if metric.get("source_entity"):
@@ -208,18 +275,25 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
                     datasets.append({"tableName": result.get("table"), "name": result.get("description") or result.get("table")})
                     for warning in result.get("warnings", []) if isinstance(result.get("warnings"), list) else []:
                         warnings.append(str(warning))
-                elif tool == "compile_query":
-                    nested_validation = result.get("validation")
-                    if validation is None and nested_validation is not None:
-                        validation = nested_validation
             continue
+
         # Deliberately drop thinking and intermediate model text events.
 
     if not final_text.strip():
         raise HarnessRunError("dsh completed without a final assistant answer")
+
+    # A compiled SQL can be shown even before validation, but it must be explicitly
+    # marked not_validated instead of inheriting a previous validation result.
+    if sql is None and last_compiled_sql:
+        sql = last_compiled_sql
+        sql_source_call_id = last_compile_call_id
+        validation = None
+        validation_call_id = None
+
     answer = _plain_answer(final_text)
     if not answer:
         answer = "已完成分析。请查看下方指标、资产、SQL 与校验结果。"
+
     return {
         "sessionId": session_id,
         "answer": answer,
@@ -228,6 +302,9 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
         "events": events,
         "sql": sql,
         "validation": validation,
+        "validationState": _validation_state(sql, validation),
+        "sqlSourceCallId": sql_source_call_id,
+        "validationCallId": validation_call_id,
         "evidence": {
             "metrics": _dedupe_dicts(metrics, "code"),
             "datasets": _dedupe_dicts(datasets, "tableName"),
@@ -271,41 +348,70 @@ class HeadlessHarnessRunner:
         mcp_reachable = await self._mcp_reachable()
         ready = dsh_installed and profile_ready and api_key_present and mcp_reachable
         blockers: list[str] = []
-        if not dsh_installed: blockers.append("DeepSeek Harness is not installed")
-        if not profile_ready: blockers.append(f"dsh profile '{self.profile}' is not initialized")
-        if not api_key_present: blockers.append("DEEPSEEK_API_KEY is not set")
-        if not mcp_reachable: blockers.append("Agent3 MCP is not reachable on 127.0.0.1:8900")
-        return {"ready": ready, "dshInstalled": dsh_installed, "profileReady": profile_ready,
-                "apiKeyPresent": api_key_present, "mcpReachable": mcp_reachable, "profile": self.profile,
-                "reason": "; ".join(blockers) if blockers else None}
+        if not dsh_installed:
+            blockers.append("DeepSeek Harness is not installed")
+        if not profile_ready:
+            blockers.append(f"dsh profile '{self.profile}' is not initialized")
+        if not api_key_present:
+            blockers.append("DEEPSEEK_API_KEY is not set")
+        if not mcp_reachable:
+            blockers.append("Agent3 MCP is not reachable on 127.0.0.1:8900")
+        return {
+            "ready": ready,
+            "dshInstalled": dsh_installed,
+            "profileReady": profile_ready,
+            "apiKeyPresent": api_key_present,
+            "mcpReachable": mcp_reachable,
+            "profile": self.profile,
+            "reason": "; ".join(blockers) if blockers else None,
+        }
 
-    def _command(self, question: str, session_id: str | None) -> list[str]:
+    def _command(self, session_id: str | None) -> list[str]:
+        # The user prompt is deliberately absent from argv and is sent through
+        # stdin instead. dsh-headless officially reads the task from stdin when
+        # no positional task is supplied.
         command = [str(self.dsh_bin), "--profile", self.profile, "--json"]
-        if session_id: command.extend(["--session-id", session_id])
-        command.append(question)
+        if session_id:
+            command.extend(["--session-id", _safe_session_id(session_id)])
         return command
 
     async def _spawn(self, command: list[str], env: dict[str, str]):
+        process_kwargs = {
+            "cwd": self.repo_root,
+            "env": env,
+            "stdin": asyncio.subprocess.PIPE,
+            "stdout": asyncio.subprocess.PIPE,
+            "stderr": asyncio.subprocess.PIPE,
+        }
         if os.name == "nt":
+            # npm exposes dsh as dsh.cmd on Windows. The only dynamic argv value
+            # is the validated session id; the untrusted user question is stdin.
             cmdline = subprocess.list2cmdline(command)
-            return await asyncio.create_subprocess_exec("cmd.exe", "/d", "/s", "/c", cmdline,
-                cwd=self.repo_root, env=env, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        return await asyncio.create_subprocess_exec(*command, cwd=self.repo_root, env=env,
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            return await asyncio.create_subprocess_exec("cmd.exe", "/d", "/s", "/c", cmdline, **process_kwargs)
+        return await asyncio.create_subprocess_exec(*command, **process_kwargs)
 
     async def run(self, question: str, *, session_id: str | None = None) -> dict[str, Any]:
+        if not question.strip():
+            raise HarnessRunError("DataAgent question cannot be empty")
+
         health = await self.health()
         if not health["ready"]:
             raise HarnessRunError(str(health["reason"] or "DataAgent runtime is not ready"))
+
         env = _with_loopback_no_proxy(os.environ.copy())
         env["DSH_HOME"] = str(self.dsh_home)
         env["DSH_TELEMETRY_MODE"] = "DISABLED"
-        process = await self._spawn(self._command(question, session_id), env)
+        process = await self._spawn(self._command(session_id), env)
         try:
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=self.timeout_seconds)
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(input=question.encode("utf-8")),
+                timeout=self.timeout_seconds,
+            )
         except TimeoutError as exc:
-            process.kill(); await process.wait()
+            process.kill()
+            await process.wait()
             raise HarnessRunError(f"dsh request exceeded {self.timeout_seconds:g}s timeout") from exc
+
         stdout_text = stdout.decode("utf-8", errors="replace")
         stderr_text = stderr.decode("utf-8", errors="replace")
         if process.returncode != 0:
