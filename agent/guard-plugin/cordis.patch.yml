@@ -1,5 +1,9 @@
 - insert:
     - id: agent3-guard
       name: '@hunter-zk/agent3-guard'
-      config:
-        auditEndpoint: http://127.0.0.1:8000/api/v1/agent/audit
+      # Audit delivery is intentionally not configured here. The previous
+      # /api/v1/agent/audit target did not exist and silently dropped every
+      # best-effort fetch. A production audit sink will be designed with
+      # authentication, persistence and trace identity instead of pointing the
+      # Guard at a fictitious Portal route.
+      config: {}
