@@ -8,6 +8,8 @@ from agent3.semantic.registry import SemanticRegistry
 
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _TABLE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$")
+_LATEST = {"LATEST", "CURRENT", "本期", "当期", "当前", "最新", "最近一期"}
+_PREVIOUS = {"PREVIOUS", "PRIOR", "上期", "上一期"}
 
 
 class SemanticCompileError(ValueError):
@@ -43,7 +45,7 @@ def _filter_sql(item: MandatoryFilter) -> str:
 
 
 class SemanticCompiler:
-    """V1 deterministic compiler for one metric + dimensions + time snapshot."""
+    """Deterministic compiler for one governed metric plus dimensions and time semantics."""
     def __init__(self, registry: SemanticRegistry, metadata: MetadataProvider) -> None:
         self._registry = registry
         self._metadata = metadata
@@ -57,6 +59,8 @@ class SemanticCompiler:
             raise SemanticCompileError(f"unknown source entity: {metric.source_entity}")
         if table.column(metric.measure) is None:
             raise SemanticCompileError(f"unknown measure: {metric.measure}")
+        if table.column(metric.time_field) is None:
+            raise SemanticCompileError(f"unknown time field: {metric.time_field}")
         for dim in ir.dimensions:
             if metric.valid_dimensions and dim not in metric.valid_dimensions:
                 raise SemanticCompileError(f"dimension not valid for metric: {dim}")
@@ -64,16 +68,33 @@ class SemanticCompiler:
                 raise SemanticCompileError(f"unknown dimension: {dim}")
         if metric.additivity_time is Additivity.NON_ADDITIVE and len(ir.time_values) > 1:
             raise SemanticCompileError("non-additive metric cannot aggregate across multiple snapshots")
+
         dims = [_ident(dim) for dim in ir.dimensions]
         select = [*dims, f"{metric.aggregation.upper()}({_ident(metric.measure)}) AS {_ident(metric.id)}"]
         filters = [*metric.mandatory_filters, *ir.filters]
         where_parts = [_filter_sql(item) for item in filters]
+        table_name = _table(metric.source_entity)
+        time_field = _ident(metric.time_field)
+
         if len(ir.time_values) == 1:
-            where_parts.append(f"dt = {_literal(ir.time_values[0])}")
+            value = str(ir.time_values[0]).strip()
+            upper = value.upper()
+            if upper in _LATEST or value in _LATEST:
+                where_parts.append(
+                    f"{time_field} = (SELECT MAX({time_field}) FROM {table_name})"
+                )
+            elif upper in _PREVIOUS or value in _PREVIOUS:
+                where_parts.append(
+                    f"{time_field} = (SELECT MAX({time_field}) FROM {table_name} "
+                    f"WHERE {time_field} < (SELECT MAX({time_field}) FROM {table_name}))"
+                )
+            else:
+                where_parts.append(f"{time_field} = {_literal(value)}")
         elif len(ir.time_values) > 1:
             values = ", ".join(_literal(v) for v in ir.time_values)
-            where_parts.append(f"dt IN ({values})")
-        sql = f"SELECT {', '.join(select)} FROM {_table(metric.source_entity)}"
+            where_parts.append(f"{time_field} IN ({values})")
+
+        sql = f"SELECT {', '.join(select)} FROM {table_name}"
         if where_parts:
             sql += " WHERE " + " AND ".join(where_parts)
         if dims:
