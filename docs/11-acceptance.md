@@ -1,76 +1,46 @@
-# 11 · Acceptance
+# 11 · Acceptance gates
 
-## P2 automated acceptance
+## P0/P1/P2 retained gates
 
-Run the platform-specific verification script after setup.
+- Windows/macOS/Linux backend CI stays green.
+- Vue type-check, test and production build stay green.
+- Stable `asset_id` remains the asset identity.
+- Existing asset/search/detail/reference routes remain compatible.
+- Legacy SQLite databases upgrade through Alembic without destructive reset.
 
-Windows:
-```powershell
-.\scripts\setup-dev.ps1
-.\scripts\verify.ps1
-```
+## P3 search acceptance
 
-macOS:
-```bash
-bash scripts/setup-dev.sh
-bash scripts/verify.sh
-```
+- Search covers datasets, fields, metrics, code tables, data standards, word roots and statistical systems.
+- Search supports suggestions, highlight output and type/layer/catalog/status facets.
+- Search benchmark remains within the agreed local target scale.
 
-The verification gate covers:
-- Alembic migration
-- deterministic demo/P1 enrichment data
-- Ruff
-- backend pytest
-- search benchmark
-- Vue/TypeScript type-check
-- Vitest
-- Vite production build
+## P3 relation acceptance
 
-The final line must be `P2 VERIFICATION PASSED`.
+- Multi-level upstream/downstream graph is queryable from a dataset.
+- Directed path finding works for reachable and unreachable pairs.
+- Downstream impact summary is available.
+- Relation navigation resolves back to stable asset detail URLs.
 
-## Cross-platform CI
+## P3 DataAgent monorepo acceptance
 
-Both Python and frontend jobs must pass on:
-- Windows
-- macOS
-- Ubuntu
+The Agent readiness gate is closed until every item below passes:
 
-## P2 functional acceptance
+1. `DataControl/agent` contains the runtime assets migrated from the pinned `DataAgent-dsh` baseline.
+2. Runtime startup does not clone or import another Git repository.
+3. Portal calls only the local Agent Gateway contract; it does not import Agent3 Core.
+4. DataAgent keeps `dsh/UI/API -> adapters -> Agent3 Core -> domain/ports` dependency direction.
+5. MCP stays an adapter and contains no duplicated business rules.
+6. Windows and macOS setup/start/verify scripts can install and launch the embedded Agent runtime from the DataControl checkout.
+7. Python compatibility is explicitly resolved: the DataAgent source baseline declares Python 3.14 and this requirement may not be silently downgraded.
+8. DataAgent architecture/security tests pass after migration.
+9. dsh can call the embedded MCP tools.
+10. Portal can reach the local Agent Gateway and complete at least one real model-backed Q&A flow.
+11. SQL execution remains disabled and is asserted in the returned contract.
+12. Hidden model reasoning is not exposed.
+13. `agent/runtime-manifest.json` is changed to `integrated: true` only after items 1–12 pass.
 
-1. `/health` reports phase `P2`.
-2. Home is a search portal, not an asset dashboard.
-3. Main navigation uses the light-ocean product shell and real SVG icons.
-4. Search submission opens `/search?q=...`; search results can open dataset, field, metric and code-table destinations.
-5. Asset catalog supports business-directory filtering and keyword lookup.
-6. Dataset detail contains business definition, field list, common SQL, changes, lineage summary and `调度与运行` within the dataset page.
-7. Field detail is independently routable and linked from the dataset field table.
-8. Code tables and data standards have list/detail navigation; word roots, metrics and statistical systems have detail routes.
-9. Data Overview is a separate page.
-10. Personal Center exposes favorites, recent views and search history after development login.
-11. Browser forward/back and direct routes work through Vue Router; built SPA routes can be served by FastAPI history fallback.
-12. The layout remains centered and usable at 1920, 1440, 1280, 1024, 820 and narrow mobile-like browser widths without page-level horizontal overflow.
-13. Sidebar behaviour: full navigation -> icon rail -> hidden navigation as viewport width decreases.
-14. Technical names never widen the page; tables scroll internally when necessary.
-15. Windows and macOS use the same product capability and validation data.
+Until then, `/api/v1/agent/status` must report not-ready instead of returning a simulated success.
 
-## Visual acceptance focus
+## P4 production acceptance
 
-P2 design direction is `Light Ocean × Calm SaaS × Data Tool`:
-- very light ocean/blue-grey navigation
-- white reading surfaces
-- blue reserved for actions/selection/links rather than large saturated panels
-- restrained shadows and gradients
-- consistent radius, spacing and type hierarchy
-- low-contrast chrome so asset content remains the visual focus
-- professional vector icons instead of prototype Unicode glyphs
-
-## Deferred acceptance
-
-Not P2 gates:
-- full relationship graph/path/impact explorer
-- production advanced search ranking/facet service
-- real dsh + Agent3 conversation
-- SQL execution
-- production SSO/LDAP
-- admin/operations console
-- metadata ingestion/governance
+SSO/LDAP, production DB deployment, fine-grained security, audit/observability, caching and operational deployment are P4 concerns and are not prerequisites for P3 functional acceptance unless they become necessary to close a security boundary.
