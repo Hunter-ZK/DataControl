@@ -41,9 +41,20 @@ jobs:
       - name: Install pinned dsh
         working-directory: agent/dsh
         run: npm install --no-audit --no-fund
+      - name: Verify pinned dsh headless surface
+        working-directory: agent/dsh
+        run: npx --no-install dsh --profile headless --help
       - name: Build and test guard plugin
         working-directory: agent/guard-plugin
         run: npm install --no-audit --no-fund && npm run build && npm test
+      - name: Bootstrap DataAgent profiles (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\agent\scripts\setup_dataagent.ps1 -DshHome (Join-Path $env:RUNNER_TEMP 'datacontrol-dsh-home')
+      - name: Bootstrap DataAgent profiles (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: DSH_HOME="$RUNNER_TEMP/datacontrol-dsh-home" bash agent/scripts/setup_dataagent.sh
 
   frontend-cross-platform:
     strategy:
