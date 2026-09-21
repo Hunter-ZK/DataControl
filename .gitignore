@@ -11,4 +11,6 @@ __pycache__/
 node_modules/
 dist/
 .local/dsh-home/
+.local/*.log
+.local/p3-agent-acceptance.json
 .DS_Store
