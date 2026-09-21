@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 
@@ -7,10 +8,14 @@ from backend.app.core.config import SEARCH_DB
 
 
 class SearchEngine:
-    """Embedded derivative search index based on SQLite FTS5 trigram.
+    """Embedded derivative search index with token-aware literal matching.
 
-    Relational data remains the source of truth. This index is rebuilt from persisted
-    asset facts and can be deleted/recreated at any time.
+    The FTS5 table remains a disposable derivative index, while P1 deliberately
+    uses literal predicates over its content columns for result correctness:
+    two-character Chinese terms, whitespace-separated queries and technical
+    identifiers no longer inherit trigram MATCH token limits. At the intended
+    thousands/tens-of-thousands scale this bounded embedded scan keeps exact
+    result/facet accounting without introducing another search service.
     """
 
     def __init__(self, path: Path = SEARCH_DB):
@@ -34,69 +39,110 @@ class SearchEngine:
             )
 
     @staticmethod
-    def _literal_match(query: str) -> str:
-        # Quote user input so FTS operators, punctuation and technical identifiers are
-        # treated as data instead of executable MATCH syntax.
-        return f'"{query.strip().replace(chr(34), chr(34) * 2)}"'
+    def _terms(query: str) -> tuple[str, ...]:
+        return tuple(dict.fromkeys(x for x in re.split(r"\s+", query.strip()) if x))
 
-    def search(self, query: str, limit: int = 20, asset_types: list[str] | None = None):
-        if not query.strip() or not self.path.exists():
+    @staticmethod
+    def _escape_like(value: str) -> str:
+        return value.replace("!", "!!").replace("%", "!%").replace("_", "!_")
+
+    @classmethod
+    def _highlight(cls, value: str, terms: tuple[str, ...]) -> str:
+        if not value or not terms:
+            return value
+        pattern = re.compile(
+            "(" + "|".join(re.escape(term) for term in sorted(terms, key=len, reverse=True)) + ")",
+            flags=re.IGNORECASE,
+        )
+        return pattern.sub(lambda match: f"<mark>{match.group(0)}</mark>", value)
+
+    @staticmethod
+    def _relevance(row: sqlite3.Row, query: str, terms: tuple[str, ...]) -> float:
+        title = str(row["title"] or "").casefold()
+        technical = str(row["technical_name"] or "").casefold()
+        body = str(row["body"] or "").casefold()
+        phrase = " ".join(query.strip().split()).casefold()
+        folded_terms = tuple(term.casefold() for term in terms)
+
+        if title == phrase:
+            return 0.0
+        if technical == phrase:
+            return 0.1
+        if title.startswith(phrase):
+            return 0.4
+        if technical.startswith(phrase):
+            return 0.6
+        if phrase and phrase in title:
+            return 0.9
+        if phrase and phrase in technical:
+            return 1.1
+
+        title_hits = sum(term in title for term in folded_terms)
+        tech_hits = sum(term in technical for term in folded_terms)
+        body_hits = sum(term in body for term in folded_terms)
+        # Lower is better, preserving the old bm25-facing ordering convention.
+        return round(10.0 - title_hits * 2.0 - tech_hits * 1.5 - body_hits * 0.25, 4)
+
+    def search(
+        self,
+        query: str,
+        limit: int | None = 20,
+        asset_types: list[str] | None = None,
+    ) -> list[dict]:
+        terms = self._terms(query)
+        if not terms or not self.path.exists():
             return []
 
-        where = ["asset_fts MATCH ?"]
-        params: list[object] = [self._literal_match(query)]
+        where: list[str] = []
+        params: list[object] = []
+        for term in terms:
+            pattern = f"%{self._escape_like(term)}%"
+            where.append(
+                "(title LIKE ? ESCAPE '!' OR technical_name LIKE ? ESCAPE '!' "
+                "OR body LIKE ? ESCAPE '!')"
+            )
+            params.extend([pattern, pattern, pattern])
         if asset_types:
             placeholders = ",".join("?" for _ in asset_types)
             where.append(f"asset_type IN ({placeholders})")
             params.extend(asset_types)
-        params.append(limit)
 
         sql = (
-            "SELECT asset_id,asset_type,title,technical_name,"
-            "highlight(asset_fts,2,'<mark>','</mark>') AS title_hl,"
-            "highlight(asset_fts,3,'<mark>','</mark>') AS technical_name_hl,"
-            "snippet(asset_fts,4,'<mark>','</mark>',' … ',18) AS snippet,"
-            "bm25(asset_fts,0,0,8,7,2) AS score "
-            f"FROM asset_fts WHERE {' AND '.join(where)} ORDER BY score LIMIT ?"
+            "SELECT asset_id,asset_type,title,technical_name,body "
+            f"FROM asset_fts WHERE {' AND '.join(where)}"
         )
-
         with self.connect() as c:
             c.row_factory = sqlite3.Row
-            try:
-                rows = c.execute(sql, params).fetchall()
-            except sqlite3.OperationalError:
-                # FTS trigram needs sufficiently useful tokens. Short keywords and
-                # unusual identifiers fall back to bounded LIKE matching.
-                like = f"%{query.strip()}%"
-                clauses = ["(title LIKE ? OR technical_name LIKE ? OR body LIKE ?)"]
-                fallback_params: list[object] = [like, like, like]
-                if asset_types:
-                    placeholders = ",".join("?" for _ in asset_types)
-                    clauses.append(f"asset_type IN ({placeholders})")
-                    fallback_params.extend(asset_types)
-                fallback_params.append(limit)
-                rows = c.execute(
-                    "SELECT asset_id,asset_type,title,technical_name,title AS title_hl,"
-                    "technical_name AS technical_name_hl,substr(body,1,220) AS snippet,0 AS score "
-                    f"FROM asset_fts WHERE {' AND '.join(clauses)} "
-                    "ORDER BY CASE WHEN title LIKE ? THEN 0 WHEN technical_name LIKE ? THEN 1 ELSE 2 END, title "
-                    "LIMIT ?",
-                    fallback_params[:-1] + [like, like, fallback_params[-1]],
-                ).fetchall()
-            return [dict(r) for r in rows]
+            rows = c.execute(sql, params).fetchall()
+
+        ranked: list[dict] = []
+        for row in rows:
+            data = dict(row)
+            data["score"] = self._relevance(row, query, terms)
+            data["title_hl"] = self._highlight(str(row["title"] or ""), terms)
+            data["technical_name_hl"] = self._highlight(str(row["technical_name"] or ""), terms)
+            body = str(row["body"] or "")
+            data["snippet"] = self._highlight(body[:260], terms)
+            data.pop("body", None)
+            ranked.append(data)
+
+        ranked.sort(key=lambda item: (float(item["score"]), str(item["title"]), str(item["asset_id"])))
+        return ranked if limit is None else ranked[: max(0, limit)]
 
     def suggest(self, query: str, limit: int = 8):
         if not query.strip() or not self.path.exists():
             return []
-        prefix = f"{query.strip()}%"
-        contains = f"%{query.strip()}%"
+        escaped = self._escape_like(query.strip())
+        prefix = f"{escaped}%"
+        contains = f"%{escaped}%"
         with self.connect() as c:
             c.row_factory = sqlite3.Row
             rows = c.execute(
                 "SELECT asset_id,asset_type,title,technical_name FROM asset_fts "
-                "WHERE title LIKE ? OR technical_name LIKE ? OR title LIKE ? OR technical_name LIKE ? "
-                "ORDER BY CASE WHEN title LIKE ? THEN 0 WHEN technical_name LIKE ? THEN 1 ELSE 2 END, title "
-                "LIMIT ?",
+                "WHERE title LIKE ? ESCAPE '!' OR technical_name LIKE ? ESCAPE '!' "
+                "OR title LIKE ? ESCAPE '!' OR technical_name LIKE ? ESCAPE '!' "
+                "ORDER BY CASE WHEN title LIKE ? ESCAPE '!' THEN 0 "
+                "WHEN technical_name LIKE ? ESCAPE '!' THEN 1 ELSE 2 END, title LIMIT ?",
                 (prefix, prefix, contains, contains, prefix, prefix, limit),
             ).fetchall()
-            return [dict(r) for r in rows]
+            return [dict(row) for row in rows]

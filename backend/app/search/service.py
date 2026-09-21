@@ -14,57 +14,93 @@ class SearchService:
         self.db = db
         self.engine = SearchEngine()
 
-    def _context(self, row: dict) -> dict:
-        asset_type = row["asset_type"]
-        context: dict = {
-            "assetId": row["asset_id"],
-            "assetType": asset_type,
-            "title": row["title"],
-            "technicalName": row["technical_name"],
-            "titleHighlight": row.get("title_hl") or row["title"],
-            "technicalNameHighlight": row.get("technical_name_hl") or row["technical_name"],
-            "snippet": row.get("snippet") or "",
-            "score": row.get("score", 0),
-            "catalogCode": None,
-            "layerCode": None,
-            "status": None,
-            "parentAssetId": None,
-        }
-        if asset_type == "TABLE":
-            ds = self.db.get(Dataset, row["asset_id"])
-            if ds:
-                context.update(
-                    catalogCode=ds.catalog_code,
-                    layerCode=ds.layer_code,
-                    status=ds.status,
-                )
-        elif asset_type == "COLUMN":
-            column = self.db.get(Column, row["asset_id"])
-            if column:
-                ds = self.db.get(Dataset, column.dataset_id)
-                context["parentAssetId"] = column.dataset_id
+    def _enrich(self, rows: list[dict]) -> list[dict]:
+        table_ids = {row["asset_id"] for row in rows if row["asset_type"] == "TABLE"}
+        column_ids = {row["asset_id"] for row in rows if row["asset_type"] == "COLUMN"}
+        metric_ids = {row["asset_id"] for row in rows if row["asset_type"] == "METRIC"}
+
+        columns = (
+            self.db.execute(select(Column).where(Column.asset_id.in_(column_ids))).scalars().all()
+            if column_ids
+            else []
+        )
+        metrics = (
+            self.db.execute(select(Metric).where(Metric.asset_id.in_(metric_ids))).scalars().all()
+            if metric_ids
+            else []
+        )
+        column_map = {item.asset_id: item for item in columns}
+        metric_map = {item.asset_id: item for item in metrics}
+        parent_ids = {item.dataset_id for item in columns}
+        parent_ids.update(item.source_dataset_id for item in metrics)
+        dataset_ids = table_ids | parent_ids
+        datasets = (
+            self.db.execute(select(Dataset).where(Dataset.asset_id.in_(dataset_ids))).scalars().all()
+            if dataset_ids
+            else []
+        )
+        dataset_map = {item.asset_id: item for item in datasets}
+
+        enriched: list[dict] = []
+        for row in rows:
+            asset_type = row["asset_type"]
+            context = {
+                "assetId": row["asset_id"],
+                "assetType": asset_type,
+                "title": row["title"],
+                "technicalName": row["technical_name"],
+                "titleHighlight": row.get("title_hl") or row["title"],
+                "technicalNameHighlight": row.get("technical_name_hl") or row["technical_name"],
+                "snippet": row.get("snippet") or "",
+                "score": row.get("score", 0),
+                "catalogCode": None,
+                "layerCode": None,
+                "status": None,
+                "parentAssetId": None,
+            }
+            if asset_type == "TABLE":
+                ds = dataset_map.get(row["asset_id"])
                 if ds:
                     context.update(
                         catalogCode=ds.catalog_code,
                         layerCode=ds.layer_code,
                         status=ds.status,
                     )
-        elif asset_type == "METRIC":
-            metric = self.db.get(Metric, row["asset_id"])
-            if metric:
-                ds = self.db.get(Dataset, metric.source_dataset_id)
-                context["parentAssetId"] = metric.source_dataset_id
-                context["status"] = metric.status
-                if ds:
-                    context.update(catalogCode=ds.catalog_code, layerCode=ds.layer_code)
-        else:
-            # Reference assets expose status through their own APIs. Search keeps
-            # filtering intentionally conservative rather than inventing catalog/layer.
-            context["status"] = "EFFECTIVE"
-        return context
+            elif asset_type == "COLUMN":
+                column = column_map.get(row["asset_id"])
+                if column:
+                    ds = dataset_map.get(column.dataset_id)
+                    context["parentAssetId"] = column.dataset_id
+                    if ds:
+                        context.update(
+                            catalogCode=ds.catalog_code,
+                            layerCode=ds.layer_code,
+                            status=ds.status,
+                        )
+            elif asset_type == "METRIC":
+                metric = metric_map.get(row["asset_id"])
+                if metric:
+                    ds = dataset_map.get(metric.source_dataset_id)
+                    context["parentAssetId"] = metric.source_dataset_id
+                    context["status"] = metric.status
+                    if ds:
+                        context.update(catalogCode=ds.catalog_code, layerCode=ds.layer_code)
+            else:
+                context["status"] = "EFFECTIVE"
+            enriched.append(context)
+        return enriched
 
     @staticmethod
-    def _match_filters(item: dict, catalog: str | None, layer: str | None, status: str | None) -> bool:
+    def _filter(
+        item: dict,
+        *,
+        asset_types: set[str] | None = None,
+        catalog: str | None = None,
+        layer: str | None = None,
+        status: str | None = None,
+    ) -> bool:
+        if asset_types and item.get("assetType") not in asset_types:
+            return False
         if catalog and item.get("catalogCode") != catalog:
             return False
         if layer and item.get("layerCode") != layer:
@@ -84,16 +120,56 @@ class SearchService:
         offset: int = 0,
         limit: int = 20,
     ) -> dict:
-        # Pull a bounded candidate window so facets describe the current query rather
-        # than just one page. The index itself stays responsible for ranking.
-        raw = self.engine.search(query, limit=500, asset_types=asset_types)
-        enriched = [self._context(row) for row in raw]
-        filtered = [x for x in enriched if self._match_filters(x, catalog, layer, status)]
+        # Retrieve the complete literal match set so total/facets are exact. The
+        # index handles textual narrowing/ranking; metadata filters stay grounded
+        # in relational facts and are applied after one batched enrichment pass.
+        raw = self.engine.search(query, limit=None)
+        enriched = self._enrich(raw)
+        type_filter = set(asset_types) if asset_types else None
 
-        type_counts = Counter(x["assetType"] for x in filtered)
-        layer_counts = Counter(x["layerCode"] for x in filtered if x.get("layerCode"))
-        catalog_counts = Counter(x["catalogCode"] for x in filtered if x.get("catalogCode"))
-        status_counts = Counter(x["status"] for x in filtered if x.get("status"))
+        type_scope = [
+            item
+            for item in enriched
+            if self._filter(item, catalog=catalog, layer=layer, status=status)
+        ]
+        typed_scope = [
+            item
+            for item in enriched
+            if self._filter(item, asset_types=type_filter)
+        ]
+        layer_scope = [
+            item
+            for item in typed_scope
+            if self._filter(item, catalog=catalog, status=status)
+        ]
+        catalog_scope = [
+            item
+            for item in typed_scope
+            if self._filter(item, layer=layer, status=status)
+        ]
+        status_scope = [
+            item
+            for item in typed_scope
+            if self._filter(item, catalog=catalog, layer=layer)
+        ]
+        filtered = [
+            item
+            for item in enriched
+            if self._filter(
+                item,
+                asset_types=type_filter,
+                catalog=catalog,
+                layer=layer,
+                status=status,
+            )
+        ]
+
+        type_counts = Counter(item["assetType"] for item in type_scope)
+        layer_counts = Counter(item["layerCode"] for item in layer_scope if item.get("layerCode"))
+        catalog_counts = Counter(
+            item["catalogCode"] for item in catalog_scope if item.get("catalogCode")
+        )
+        status_counts = Counter(item["status"] for item in status_scope if item.get("status"))
 
         return {
             "query": query,

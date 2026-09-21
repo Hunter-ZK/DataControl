@@ -73,8 +73,19 @@ def test_upgrade_from_pre_alembic_p0_schema(tmp_path: Path) -> None:
     try:
         code_columns = _columns(connection, "std_code_table")
         metric_columns = _columns(connection, "biz_metric")
+        lineage_columns = _columns(connection, "rel_column_lineage")
         assert {"en_name", "category_code", "source_standard", "version", "owner"} <= code_columns
         assert {"stat_system_code", "time_additivity", "valid_dimensions"} <= metric_columns
+        assert {
+            "src_dataset_id",
+            "src_column_id",
+            "dst_dataset_id",
+            "dst_column_id",
+            "transformation",
+            "task_name",
+            "evidence",
+            "relation_type",
+        } <= lineage_columns
 
         code_row = connection.execute(
             "SELECT code_table_name, description FROM std_code_table WHERE asset_id='CT000001'"
@@ -86,6 +97,6 @@ def test_upgrade_from_pre_alembic_p0_schema(tmp_path: Path) -> None:
         assert metric_row == ("各项贷款余额", "ADDITIVE")
 
         revision = connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-        assert revision == "20260920_0002"
+        assert revision == "20260921_0003"
     finally:
         connection.close()

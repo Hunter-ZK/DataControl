@@ -22,6 +22,7 @@ jobs:
       - run: python samples/generate_demo_data.py
       - run: python samples/enrich_p1_data.py
       - run: python samples/enrich_p3_reference.py
+      - run: python samples/enrich_next_p1_lineage.py
       - run: python samples/rebuild_search_index.py
       - run: python samples/generate_p3_question_bank.py
       - run: python -m ruff check .
@@ -66,9 +67,6 @@ jobs:
         shell: bash
         run: DSH_HOME="$RUNNER_TEMP/datacontrol-dsh-home" bash agent/scripts/setup_dataagent.sh
 
-  # One deterministic full-chain gate is intentionally separate from the unit
-  # matrix. It proves Portal -> Gateway -> dsh -> MCP -> Agent3 behavior without
-  # a paid/remote model and keeps real-model acceptance as a distinct local gate.
   agent-stub-e2e:
     runs-on: ubuntu-latest
     steps:
@@ -88,6 +86,7 @@ jobs:
           python samples/generate_demo_data.py
           python samples/enrich_p1_data.py
           python samples/enrich_p3_reference.py
+          python samples/enrich_next_p1_lineage.py
           python samples/rebuild_search_index.py
       - name: Install pinned dsh
         working-directory: agent/dsh

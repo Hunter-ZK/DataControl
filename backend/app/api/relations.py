@@ -29,6 +29,38 @@ def relation_graph(
     return {"code": "OK", "data": data}
 
 
+@router.get("/columns/{column_id}")
+def column_relation_graph(
+    column_id: str,
+    depth: int = Query(2, ge=1, le=5),
+    direction: str = Query("both", pattern="^(upstream|downstream|both)$"),
+    max_nodes: int = Query(120, ge=10, le=500),
+    db: Session = Depends(get_db),
+):
+    try:
+        data = RelationService(db).column_graph(
+            column_id,
+            depth=depth,
+            direction=direction,
+            max_nodes=max_nodes,
+        )
+    except KeyError:
+        raise HTTPException(404, "Column not found") from None
+    return {"code": "OK", "data": data}
+
+
+@router.get("/fields/table/{dataset_id}")
+def table_field_lineage(
+    dataset_id: str,
+    db: Session = Depends(get_db),
+):
+    try:
+        data = RelationService(db).table_field_lineage(dataset_id)
+    except KeyError:
+        raise HTTPException(404, "Dataset not found") from None
+    return {"code": "OK", "data": data}
+
+
 @router.get("/path")
 def relation_path(
     source: str,

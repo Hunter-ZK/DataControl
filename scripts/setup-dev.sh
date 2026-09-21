@@ -40,6 +40,7 @@ fi
 .venv/bin/python samples/generate_demo_data.py
 .venv/bin/python samples/enrich_p1_data.py
 .venv/bin/python samples/enrich_p3_reference.py
+.venv/bin/python samples/enrich_next_p1_lineage.py
 .venv/bin/python samples/rebuild_search_index.py
 .venv/bin/python samples/generate_p3_question_bank.py
 (cd web && npm install)
