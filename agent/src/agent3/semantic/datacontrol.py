@@ -13,6 +13,14 @@ from agent3.semantic.registry import SemanticRegistry
 _SPLIT = re.compile(r"[,，;；|]+")
 
 
+def _tokens(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, (list, tuple)):
+        return tuple(str(x).strip() for x in value if str(x).strip())
+    return tuple(x.strip() for x in _SPLIT.split(str(value)) if x.strip())
+
+
 def load_portal_semantics(base_url: str, metadata: PortalMetadataProvider, *, client: httpx.Client | None = None) -> SemanticRegistry:
     http = client or httpx.Client(timeout=10.0)
     try:
@@ -35,8 +43,21 @@ def load_portal_semantics(base_url: str, metadata: PortalMetadataProvider, *, cl
         table = metadata.get_table(authz, str(source_id))
         if table is None:
             continue
-        aliases = tuple(x.strip() for x in _SPLIT.split(str(row.get("aliases") or "")) if x.strip())
         raw_additivity = str(row.get("timeAdditivity") or "additive").casefold()
         additivity = Additivity.NON_ADDITIVE if "non" in raw_additivity or "不可加" in raw_additivity else Additivity.ADDITIVE
-        metrics.append(MetricDefinition(id=str(code), name=str(name), aliases=aliases, aggregation=str(aggregation), measure=str(measure), source_entity=table.full_name, additivity_time=additivity, caveats=str(row.get("caliber") or "")))
+        metrics.append(
+            MetricDefinition(
+                id=str(code),
+                name=str(name),
+                aliases=_tokens(row.get("aliases")),
+                aggregation=str(aggregation),
+                measure=str(measure),
+                source_entity=table.full_name,
+                additivity_time=additivity,
+                valid_dimensions=_tokens(row.get("validDimensions")),
+                time_field=str(row.get("timeField") or "dt"),
+                owner=str(row.get("statSystemCode") or ""),
+                caveats=str(row.get("caliber") or row.get("definition") or ""),
+            )
+        )
     return SemanticRegistry(tuple(metrics))
