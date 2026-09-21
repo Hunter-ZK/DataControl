@@ -27,14 +27,14 @@ testpaths = ["backend/tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py313"
-# `agent/` is an independently versioned Python 3.14 package with its own CI gate.
-# The Portal's Python 3.13 lint job must not parse or govern that package.
+# `agent/` has its own architecture/test gate even though Portal and Agent share
+# the same local Python 3.13+ virtual environment.
 extend-exclude = ["agent"]
 
 [tool.ruff.lint]
 # FastAPI dependency injection in default arguments is intentional. Keep the
 # Portal gate focused on syntax/runtime/import defects; Agent boundaries are
-# verified independently under Python 3.14.
+# verified independently by the Agent CI job.
 select = ["E4", "E7", "E9", "F"]
 ignore = ["E501"]
 
