@@ -3,9 +3,9 @@
 # Important: dsh headless is a direct Agent driver and intentionally does not
 # compose the per-session agent-preset roster. The DataAgent capabilities that
 # must be visible to the headless model therefore live directly in this host
-# composition. Keep this file fail-closed: only Agent3 MCP plus read-only local
-# Skill discovery remain model-facing; general shell/filesystem/subagent/web
-# tools are explicitly disabled.
+# composition. Keep this file fail-closed: only Agent3 MCP plus the embedded
+# read-only DataAgent Skill root remain model-facing; general shell/filesystem/
+# subagent/web tools are explicitly disabled.
 
 - id: session-log-deepseek
   disabled: true
@@ -49,8 +49,7 @@
       Do not use or claim capabilities outside the Agent3 MCP and DataAgent Skill surfaces.
 
 # Defense in depth. The model does not receive the general-purpose tool rows
-# inherited from dsh-base. Skill discovery and tool-skill intentionally remain
-# enabled so DataControl/.dsh/skills can guide the read-only query workflow.
+# inherited from dsh-base.
 - id: tool-plugin-manager
   disabled: true
 - id: tool-bash
@@ -92,7 +91,18 @@
 - id: tool-todo
   disabled: true
 
-# Keep Agent instructions + DataAgent local Skills as read-only prompt context.
+# dsh normally discovers <git-root>/.dsh/skills plus user roots. DataControl's
+# migrated domain Skills deliberately live under agent/.dsh/skills, so pin the
+# provider to that directory and exclude user/project defaults. This keeps the
+# headless product deterministic and prevents unrelated local Skills from
+# changing production Q&A behavior.
+- id: skill-filesystem
+  config:
+    includeDefaultRoots: false
+    customSkillDirs:
+      - !!js process.cwd() + '/agent/.dsh/skills'
+    watch: false
+
 - id: permission
   config:
     defaultPreset: analyst
