@@ -23,14 +23,34 @@ def _table_name(table: exp.Table) -> str:
 
 class SQLAnalyzer:
     """Thin SQLGlot adapter; owns dialect mapping and parse-error translation only."""
+
     def analyze(self, sql: str, *, dialect: str = "maxcompute") -> SQLAnalysis:
         tree = self.parse(sql, dialect=dialect)
         tables = tuple(sorted({_table_name(t) for t in tree.find_all(exp.Table)}))
-        columns = tuple(SQLColumnRef(table=(c.table or None), name=c.name) for c in tree.find_all(exp.Column))
+        columns = tuple(
+            SQLColumnRef(table=(c.table or None), name=c.name)
+            for c in tree.find_all(exp.Column)
+        )
         where = tree.find(exp.Where)
-        return SQLAnalysis(sql=sql, dialect=dialect, statement_type=tree.key.upper(), tables=tables, columns=columns, where_sql=where.sql(dialect=_dialect(dialect)) if where else None, normalized_sql=tree.sql(dialect=_dialect(dialect), pretty=False))
+        return SQLAnalysis(
+            sql=sql,
+            dialect=dialect,
+            statement_type=tree.key.upper(),
+            tables=tables,
+            columns=columns,
+            where_sql=where.sql(dialect=_dialect(dialect)) if where else None,
+            # normalized_sql is also the product-facing canonical rendering after
+            # validation. Keep semantics unchanged while making generated SQL
+            # readable enough to review/copy directly from the DataAgent UI.
+            normalized_sql=tree.sql(dialect=_dialect(dialect), pretty=True),
+        )
 
-    def parse_program(self, sql: str, *, dialect: str = "maxcompute") -> tuple[exp.Expression, ...]:
+    def parse_program(
+        self,
+        sql: str,
+        *,
+        dialect: str = "maxcompute",
+    ) -> tuple[exp.Expression, ...]:
         normalized = sql.strip()
         if not normalized:
             raise SQLAnalysisError("SQL cannot be empty")
