@@ -49,9 +49,9 @@
           <article v-for="item in rows" :key="item.assetId" class="result-card" @click="open(item)">
             <div class="result-main">
               <div class="kicker"><span class="dc-chip">{{label(item.assetType)}}</span><span v-if="item.layerCode">{{item.layerCode}}</span><span v-if="item.catalogCode">{{item.catalogCode}}</span></div>
-              <h3 v-html="item.titleHighlight || item.title" />
-              <code class="dc-tech" v-html="item.technicalNameHighlight || item.technicalName" />
-              <p v-html="item.snippet || '点击查看资产定义、字段、口径及相关信息。'" />
+              <h3 v-html="safeMarkHtml(item.titleHighlight || item.title)" />
+              <code class="dc-tech" v-html="safeMarkHtml(item.technicalNameHighlight || item.technicalName)" />
+              <p v-html="safeMarkHtml(item.snippet || '点击查看资产定义、字段、口径及相关信息。')" />
             </div>
             <div class="score"><small>索引得分</small><b>{{formatScore(item.score)}}</b><ArrowRight :size="18"/></div>
           </article>
@@ -74,6 +74,8 @@ const layerOptions=computed(()=>Object.entries(facets.value.layers||{}).map(([ke
 function count(k:string){ return k==='ALL'?total.value:Number(facets.value.assetTypes?.[k]||0) }
 function label(v:string){ return ({TABLE:'数据集',COLUMN:'字段',METRIC:'指标',CODE_TABLE:'码表',STANDARD:'数据标准',WORD_ROOT:'词根',STAT_SYSTEM:'统计制度'} as Record<string,string>)[v]||v }
 function formatScore(v:number){ return Number.isFinite(Number(v))?Number(v).toFixed(2):'—' }
+function escapeHtml(value:string){return value.replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'} as Record<string,string>)[ch])}
+function safeMarkHtml(value:string){return value.split(/(<\/?mark>)/gi).map(part=>/^<\/?mark>$/i.test(part)?part:escapeHtml(part)).join('')}
 async function runSearch(){ const value=q.value.trim(); if(!value)return; loading.value=true; showSuggestions.value=false; try{const result=await assetApi.search(value,{asset_type:type.value==='ALL'?undefined:[type.value],layer:layer.value==='ALL'?undefined:layer.value,limit:60}); rows.value=result.items; total.value=result.total; facets.value=result.facets; await activityApi.recordSearch(value); await router.replace({query:{q:value,...(type.value!=='ALL'?{type:type.value}:{}),...(layer.value!=='ALL'?{layer:layer.value}:{})}})}finally{loading.value=false} }
 async function loadSuggestions(){ const value=q.value.trim(); const seq=++suggestionSeq; if(!value){suggestions.value=[];return} try{const data=await assetApi.suggest(value,8); if(seq===suggestionSeq)suggestions.value=data}catch{if(seq===suggestionSeq)suggestions.value=[]} }
 function quick(v:string){q.value=v;runSearch()}
