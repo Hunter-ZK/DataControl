@@ -1,4 +1,4 @@
-# 05 · Agent integration V5
+# 05 · Agent integration V6
 
 ## Product rule
 
@@ -38,7 +38,22 @@ The baseline provides the harness-agnostic Agent3 Core, MCP/HTTP/CLI adapters, d
 6. extracts generated SQL / validation evidence when returned by Agent3 tools;
 7. never exposes a production SQL execution path.
 
-`dataagent-headless` is bootstrapped from dsh's shipped `headless` profile and receives the same repository patch, model provider, restricted DataAgent preset, Agent3 MCP connection and local Guard plugin as the browser profile.
+## Web profile versus headless profile
+
+DeepSeek Harness's shipped Web surface supports a per-session Agent Preset roster, so the optional `dataagent` browser profile uses the `dataagent-query` preset.
+
+The shipped Headless runner deliberately does **not** compose that preset roster. `dataagent-headless` therefore uses a separate direct overlay at `agent/dsh/profile/headless.patch.yml` rather than pretending a Web preset exists in headless mode. The overlay:
+
+- sets the DataControl DataAgent persona directly on the headless host Agent;
+- forces native tool presentation and disables PTC;
+- exposes Agent3 MCP;
+- keeps only the read-only DataAgent Skill surface beside MCP;
+- pins Skill discovery to `agent/.dsh/skills` and excludes unrelated project/user Skill roots;
+- explicitly disables shell, PowerShell, filesystem, job, subagent, workflow, web, todo, goal and plugin-manager model tools;
+- applies a read-only permission preset as defense in depth;
+- retains the local Guard plugin.
+
+This split is required by the actual dsh runtime contract and is covered by Agent CI tests.
 
 ## Integration rules
 
@@ -53,22 +68,28 @@ The baseline provides the harness-agnostic Agent3 Core, MCP/HTTP/CLI adapters, d
 
 ## Readiness and acceptance
 
-Repository/CI can verify source migration, profile composition, Gateway parsing, MCP boundaries and cross-platform startup without any model secret.
+Repository/CI verifies source migration, the Web and restricted Headless compositions, Gateway event projection, MCP boundaries and cross-platform setup without any model secret.
 
-The final P3 real-model gate is intentionally local because `DEEPSEEK_API_KEY` must not enter repository CI. With the key set before startup, run:
+The final P3 real-model gate is intentionally local because `DEEPSEEK_API_KEY` must not enter repository CI. With the key set **before** starting DataControl, run the repository acceptance script with the Portal environment Python:
 
-```text
-scripts/p3_agent_acceptance.py
+```bash
+.venv/bin/python scripts/p3_agent_acceptance.py
 ```
 
-The acceptance verifies:
+On Windows:
 
-- Portal -> Gateway -> dsh -> MCP -> Agent3 is reachable;
+```powershell
+.\.venv\Scripts\python.exe scripts\p3_agent_acceptance.py
+```
+
+The acceptance verifies in one run:
+
+- unified search, suggestions, relationship graph, path and impact endpoints;
+- Portal -> Gateway -> dsh -> MCP -> Agent3 real-model reachability;
 - a real model calls Agent3 tools;
-- generated SQL is captured;
-- `validate_sql` is observed;
-- SQL is not executed;
-- hidden reasoning is not exposed;
+- generated SQL is captured and `validate_sql` is observed;
+- an actual second dsh invocation resumes the first persisted `sessionId`;
+- SQL is never executed and hidden reasoning is never exposed;
 - a destructive request does not execute SQL.
 
-A passing run writes `.local/p3-agent-acceptance.json`. Portal status treats that evidence as the real-model gate for the current machine. The committed manifest remains `integrated: false` until user acceptance and P3 merge approval.
+A passing run writes `.local/p3-agent-acceptance.json`. Portal status only treats local Agent acceptance as complete when the evidence includes a successful session resume plus the SQL/safety invariants. The committed manifest remains conservative (`integrated: false`, `realModelAccepted: false`) until local evidence exists; no secret or machine-specific acceptance result is committed.
