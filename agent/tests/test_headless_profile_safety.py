@@ -6,6 +6,7 @@ from pathlib import Path
 AGENT_ROOT = Path(__file__).resolve().parents[1]
 WEB_PATCH = AGENT_ROOT / "dsh" / "profile" / "cordis.patch.yml"
 HEADLESS_PATCH = AGENT_ROOT / "dsh" / "profile" / "headless.patch.yml"
+QUERY_PRESET = AGENT_ROOT / "dsh" / "presets" / "dataagent-query" / "agent.cordis.yml"
 
 
 def _row_disabled(text: str, row_id: str) -> bool:
@@ -51,14 +52,16 @@ def test_headless_profile_disables_general_purpose_model_tools():
     assert missing == [], f"headless safety tombstones missing: {missing}"
 
 
-def test_headless_keeps_only_read_only_skill_surface_beside_agent3_mcp():
-    text = HEADLESS_PATCH.read_text(encoding="utf-8")
-    # The base profile already owns these rows. The overlay deliberately does
-    # not disable them so project .dsh/skills remain available read-only.
-    assert "- id: skill-filesystem\n  disabled: true" not in text
-    assert "- id: tool-skill\n  disabled: true" not in text
-    assert "sandbox: read-only" in text
-    assert "approval: ask" in text
+def test_dataagent_skill_discovery_is_embedded_and_deterministic():
+    headless = HEADLESS_PATCH.read_text(encoding="utf-8")
+    preset = QUERY_PRESET.read_text(encoding="utf-8")
+    for text in (headless, preset):
+        assert "includeDefaultRoots: false" in text
+        assert "/agent/.dsh/skills" in text
+    assert "- id: skill-filesystem\n  disabled: true" not in headless
+    assert "- id: tool-skill\n  disabled: true" not in headless
+    assert "sandbox: read-only" in headless
+    assert "approval: ask" in headless
 
 
 def test_web_profile_still_uses_dataagent_query_preset():
