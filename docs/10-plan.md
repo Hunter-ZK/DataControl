@@ -1,18 +1,41 @@
-# 10 · Phase plan
+# 10 · Delivery plan
 
-## P0 Foundation — complete
-Python architecture, stable identity, deterministic synthetic data, search spike, Agent boundary, initial design baseline and runnable verification.
+## P0 — foundation
+Repository, backend skeleton, synthetic assets, search spike, cross-platform scripts and CI.
 
-## P1 Backend service layer — complete
-Read-only asset/domain APIs, auth/application data, audit, schema migration, Windows/macOS support and responsive validation shell.
+## P1 — asset backend
+Asset/reference/application models, read APIs, local auth boundary, migrations and rich synthetic fixtures.
 
-## P2 Product UI — current candidate
-Formal Vue 3 + TypeScript portal with real routing and deep links, refined light-ocean design system, home/search/catalog/overview, dataset and field details, standards/code tables/word roots/metrics/statistical systems, personal center and development login. Frontend type-check/test/build is part of the cross-platform CI gate.
+## P2 — product portal
+Formal Vue 3 + TypeScript product UI, routed asset pages, responsive shell and cross-platform frontend quality gate.
 
-## P3 Advanced capabilities
-Unified advanced search, relationship graph/path/impact explorer, and real dsh + Agent3 intelligent Q&A through read-only MCP tools. No SQL execution.
+## P3 — intelligence and relations
+P3 is split into three coordinated tracks:
 
-## P4 Operations and release
-Administration, production authentication/security hardening, analytics, system status, full E2E/performance gates and release packaging.
+### P3-A · Search and relationship intelligence
+- unified asset index;
+- suggestions/facets/highlights;
+- multi-level upstream/downstream graph;
+- path finder;
+- downstream impact analysis.
 
-Each phase is delivered as one user-verifiable package. The next phase starts only after the user accepts the current phase.
+### P3-B · Embedded DataAgent migration
+- pin `Hunter-ZK/DataAgent-dsh` source baseline;
+- migrate required Agent3 Core/adapters, dsh profile/preset, Skills, guard and semantic assets into `DataControl/agent`;
+- keep Portal and Agent as separate runtime boundaries inside one monorepo;
+- reconcile Portal Python 3.13 with DataAgent's declared Python 3.14 baseline explicitly;
+- extend Windows/macOS setup/start/verify scripts without cloning another repository;
+- preserve DataAgent architecture/security gates.
+
+### P3-C · Intelligent Q&A product integration
+- Portal Agent Gateway to local embedded Agent service;
+- dsh Agent Loop -> MCP -> Agent3 Core;
+- trusted SQL generation/validation and evidence presentation;
+- no production SQL execution;
+- no hidden reasoning display;
+- real end-to-end model/MCP acceptance before enabling the Agent readiness flag.
+
+P3 must not assume ACP or any other Harness protocol that is not present in the migrated DataAgent implementation.
+
+## P4 — production hardening
+Enterprise SSO/LDAP, production MySQL deployment, permissions/security hardening, audit/observability, caching, operational deployment and performance gates.
