@@ -32,7 +32,9 @@ def tool_calls(result: dict) -> set[str]:
 
 
 def main() -> None:
-    with httpx.Client(timeout=180.0) as client:
+    # Acceptance only talks to local DataControl services. A developer proxy must
+    # not intercept loopback traffic and fabricate 502/connection failures.
+    with httpx.Client(timeout=180.0, trust_env=False) as client:
         health = client.get(HEALTH_URL)
         health.raise_for_status()
         health_data = health.json()
