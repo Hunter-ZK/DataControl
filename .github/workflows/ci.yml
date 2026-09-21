@@ -41,8 +41,10 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: '24'}
       - run: python -m pip install -U pip
+      - name: Install wheel-compatible cryptography
+        run: python -m pip install --only-binary=:all: "cryptography>=48.0.1,<49"
       - run: python -m pip install -e "./agent[all,dev]"
-      - run: python -c "import agent3, dataagent_gateway; print('Agent runtime OK')"
+      - run: python -c "import agent3, dataagent_gateway, cryptography; major=int(cryptography.__version__.split('.')[0]); assert major == 48, cryptography.__version__; print('Agent runtime OK; cryptography=' + cryptography.__version__)"
       - run: python agent/scripts/check_architecture.py
       - run: python -m pytest -q agent/tests
       - name: Install pinned dsh
