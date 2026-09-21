@@ -40,8 +40,8 @@
 
               <div v-if="hasEvidence(item.evidence)" class="evidence-area">
                 <div class="evidence-row" v-if="item.evidence?.period"><span>统计期间</span><b>{{item.evidence.period.label}}</b></div>
-                <div class="evidence-row" v-if="item.evidence?.metrics?.length"><span>使用指标</span><div class="chips"><span v-for="metric in item.evidence.metrics" :key="metric.code||metric.name" class="evidence-chip metric"><BarChart3 :size="13"/>{{metric.name||metric.code}}</span></div></div>
-                <div class="evidence-row" v-if="item.evidence?.datasets?.length"><span>引用资产</span><div class="chips"><span v-for="table in item.evidence.datasets.slice(0,4)" :key="table.tableName" class="evidence-chip"><Database :size="13"/>{{shortTable(table.tableName||table.name||'')}}</span></div></div>
+                <div class="evidence-row" v-if="item.evidence?.metrics?.length"><span>使用指标</span><div class="chips"><span v-for="(metric,m) in item.evidence.metrics" :key="metric.code||metric.name||`metric-${m}`" class="evidence-chip metric"><BarChart3 :size="13"/>{{metric.name||metric.code}}</span></div></div>
+                <div class="evidence-row" v-if="item.evidence?.datasets?.length"><span>引用资产</span><div class="chips"><span v-for="(table,t) in item.evidence.datasets.slice(0,4)" :key="table.tableName||table.name||`dataset-${t}`" class="evidence-chip"><Database :size="13"/>{{shortTable(table.tableName||table.name||'')}}</span></div></div>
                 <div class="evidence-row" v-if="item.evidence?.dimensions?.length"><span>分析维度</span><div class="chips"><span v-for="dim in item.evidence.dimensions" :key="dim" class="evidence-chip neutral">{{dimensionName(dim)}} <code>{{dim}}</code></span></div></div>
                 <div class="caliber" v-if="item.evidence?.caliber"><span>统计口径</span><p>{{item.evidence.caliber}}</p></div>
               </div>
