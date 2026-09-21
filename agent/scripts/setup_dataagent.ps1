@@ -6,10 +6,14 @@ $repoRoot=(Resolve-Path (Join-Path $agentRoot "..")).Path
 if ([string]::IsNullOrWhiteSpace($DshHome)) { $DshHome=Join-Path $repoRoot ".local\dsh-home" }
 $env:DSH_HOME=[System.IO.Path]::GetFullPath($DshHome)
 $env:DSH_TELEMETRY_MODE="DISABLED"
-$dshBin=Join-Path $agentRoot "dsh\node_modules\.bin\dsh.cmd"
+$dshBinDir=Join-Path $agentRoot "dsh\node_modules\.bin"
+$dshBin=Join-Path $dshBinDir "dsh.cmd"
+$pnpmBin=Join-Path $dshBinDir "pnpm.cmd"
 $guardDir=Join-Path $agentRoot "guard-plugin"
 $patch=Join-Path $agentRoot "dsh\profile\cordis.patch.yml"
 if (-not (Test-Path $dshBin)) { throw "DeepSeek Harness is not installed. Run .\scripts\setup-agent.ps1 first." }
+if (-not (Test-Path $pnpmBin)) { throw "Pinned pnpm is missing from agent\dsh. Run .\scripts\setup-agent.ps1 again." }
+$env:PATH="$dshBinDir;$env:PATH"
 New-Item -ItemType Directory -Force -Path $env:DSH_HOME | Out-Null
 
 $profiles=@(
