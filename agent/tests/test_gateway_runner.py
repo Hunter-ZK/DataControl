@@ -49,6 +49,33 @@ def test_headless_event_stream_exposes_tools_but_not_hidden_reasoning():
     ]
 
 
+def test_textual_mcp_result_still_captures_generated_sql():
+    stream = "\n".join(
+        [
+            json.dumps(
+                {
+                    "type": "tool_call",
+                    "callId": "c1",
+                    "tool": "mcp__agent3__compile_query",
+                    "input": {"metric_id": "loan_balance"},
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "tool_result",
+                    "callId": "c1",
+                    "status": "completed",
+                    "result": "compiled SQL:\n```sql\nSELECT region_code, SUM(balance_amt) FROM dw.dwd_loan_snapshot GROUP BY region_code;\n```",
+                }
+            ),
+            json.dumps({"type": "final", "text": "done"}),
+        ]
+    )
+    result = parse_event_stream(stream)
+    assert result["sql"].startswith("SELECT region_code")
+    assert result["sql"].endswith(";")
+
+
 def test_non_agent3_tool_activity_is_not_exposed():
     stream = "\n".join(
         [
