@@ -10,18 +10,20 @@ from backend.app.api.details import router as details_router
 from backend.app.api.reference import router as reference_router
 from backend.app.api.relations import router as relations_router
 from backend.app.api.search import router as search_router
+from backend.app.api.semantic import router as semantic_router
 from backend.app.core.config import MODEL_NAME, MODEL_PROVIDER, ROOT
 from backend.app.db.application_models import AuditLog, SearchHistory  # noqa: F401
 
 P3_RUNTIME_CONTRACT = "embedded-agent-gateway-v1"
 
-app = FastAPI(title="DataControl API", version="0.4.0-p3")
+app = FastAPI(title="DataControl API", version="0.5.0-p2")
 app.include_router(auth_router)
 app.include_router(assets_router)
 app.include_router(details_router)
 app.include_router(reference_router)
 app.include_router(search_router)
 app.include_router(relations_router)
+app.include_router(semantic_router)
 app.include_router(agent_router)
 app.include_router(activity_router)
 
@@ -30,7 +32,7 @@ app.include_router(activity_router)
 def health():
     return {
         "status": "ok",
-        "phase": "P3",
+        "phase": "P2",
         "runtimeContract": P3_RUNTIME_CONTRACT,
     }
 
@@ -40,12 +42,13 @@ def system_info():
     return {
         "code": "OK",
         "data": {
-            "phase": "P3",
+            "phase": "P2",
             "runtimeContract": P3_RUNTIME_CONTRACT,
             "modelProvider": MODEL_PROVIDER,
             "modelName": MODEL_NAME,
             "platforms": ["windows", "macos"],
             "sqlExecutionEnabled": False,
+            "externalResearchEnabled": False,
         },
     }
 
