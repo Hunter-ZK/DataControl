@@ -21,15 +21,48 @@ def _table_name(table: exp.Table) -> str:
     return ".".join(parts)
 
 
+def _top_level_projection_aliases(tree: exp.Expression) -> frozenset[str]:
+    """Return aliases produced by the outer query projection.
+
+    ORDER BY may legally refer to a SELECT alias. Such a reference is not a
+    source-column dependency and must not be sent to metadata validation as one.
+    """
+    select = tree if isinstance(tree, exp.Select) else tree.find(exp.Select)
+    if select is None:
+        return frozenset()
+    return frozenset(
+        selection.alias_or_name.casefold()
+        for selection in select.selects
+        if selection.alias_or_name and selection.alias_or_name != "*"
+    )
+
+
+def _is_order_alias_reference(column: exp.Column, projection_aliases: frozenset[str]) -> bool:
+    if column.table or column.name.casefold() not in projection_aliases:
+        return False
+    parent = column.parent
+    while parent is not None:
+        if isinstance(parent, exp.Order):
+            return True
+        # Once another SELECT is reached this column belongs to a nested scope,
+        # not the outer ORDER BY that owns the projection alias.
+        if isinstance(parent, exp.Select):
+            return False
+        parent = parent.parent
+    return False
+
+
 class SQLAnalyzer:
     """Thin SQLGlot adapter; owns dialect mapping and parse-error translation only."""
 
     def analyze(self, sql: str, *, dialect: str = "maxcompute") -> SQLAnalysis:
         tree = self.parse(sql, dialect=dialect)
-        tables = tuple(sorted({_table_name(t) for t in tree.find_all(exp.Table)}))
+        tables = tuple(sorted({_table_name(table) for table in tree.find_all(exp.Table)}))
+        projection_aliases = _top_level_projection_aliases(tree)
         columns = tuple(
-            SQLColumnRef(table=(c.table or None), name=c.name)
-            for c in tree.find_all(exp.Column)
+            SQLColumnRef(table=(column.table or None), name=column.name)
+            for column in tree.find_all(exp.Column)
+            if not _is_order_alias_reference(column, projection_aliases)
         )
         where = tree.find(exp.Where)
         return SQLAnalysis(
