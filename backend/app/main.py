@@ -32,7 +32,8 @@ app.include_router(activity_router)
 def health():
     return {
         "status": "ok",
-        "phase": "P2",
+        "phase": "P3",
+        "developmentIncrement": "Next-P2",
         "runtimeContract": P3_RUNTIME_CONTRACT,
     }
 
@@ -42,7 +43,8 @@ def system_info():
     return {
         "code": "OK",
         "data": {
-            "phase": "P2",
+            "phase": "P3",
+            "developmentIncrement": "Next-P2",
             "runtimeContract": P3_RUNTIME_CONTRACT,
             "modelProvider": MODEL_PROVIDER,
             "modelName": MODEL_NAME,
