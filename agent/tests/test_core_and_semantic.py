@@ -300,7 +300,7 @@ def test_p2_governed_derived_yoy_metric_compiles_without_free_form_formula_sql()
 
 
 def test_p2_multi_metric_comparison_fails_closed():
-    with pytest.raises(SemanticCompileError, match="multi-metric comparison"):
+    with pytest.raises(SemanticCompileError, match="同比/环比"):
         _p2_core().compile_query(
             AuthzContext.system(),
             QueryIR(
