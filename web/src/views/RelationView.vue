@@ -1,50 +1,47 @@
 <template>
-  <div class="dc-page"><div class="dc-container">
-    <button class="dc-back" @click="router.back()"><ArrowLeft :size="16"/>返回</button>
-    <section class="dc-page-head"><div><span class="dc-eyebrow">LINEAGE & IMPACT</span><h1 class="dc-title">关系指引</h1><p class="dc-subtitle">从当前数据集展开上下游、查询路径并评估下游影响范围。</p></div></section>
-
-    <section class="dc-card relation-toolbar">
-      <div><span>中心资产</span><el-input v-model="assetId" placeholder="例如 DS000001" @keyup.enter="loadGraph"/></div>
-      <div><span>展开层级</span><el-select v-model="depth" @change="loadGraph"><el-option v-for="x in [1,2,3,4,5]" :key="x" :label="`${x} 层`" :value="x"/></el-select></div>
-      <div><span>方向</span><el-select v-model="direction" @change="loadGraph"><el-option label="上下游" value="both"/><el-option label="仅上游" value="upstream"/><el-option label="仅下游" value="downstream"/></el-select></div>
-      <el-button type="primary" @click="loadGraph"><RefreshCw :size="15"/>重新加载</el-button>
+  <div class="dc-page relation-v2"><div class="dc-container wide">
+    <section class="relation-toolbar dc-card">
+      <div class="mode-switch"><button :class="{active:mode==='table'}" @click="switchMode('table')">表级血缘</button><button :class="{active:mode==='field'}" @click="switchMode('field')">字段血缘</button></div>
+      <div class="picker-wrap">
+        <label>中心资产</label>
+        <div class="asset-picker"><Search :size="16"/><input v-model="pickerQuery" :placeholder="mode==='table'?'搜索数据集名称或表名':'搜索字段中文名或技术名'" @input="searchPicker" @focus="showPicker=true"/><span v-if="centerTech">{{ centerTech }}</span></div>
+        <div v-if="showPicker && pickerRows.length" class="picker-results dc-card">
+          <button v-for="item in pickerRows" :key="item.assetId" @mousedown.prevent="chooseCenter(item)"><span class="type-pill">{{mode==='table'?'数据集':'字段'}}</span><div><b>{{item.title}}</b><code>{{item.technicalName}}</code></div><ArrowRight :size="14"/></button>
+        </div>
+      </div>
+      <div class="control-block"><label>方向</label><div class="segmented"><button v-for="item in directions" :key="item.key" :class="{active:direction===item.key}" @click="direction=item.key;loadGraph()">{{item.label}}</button></div></div>
+      <div class="control-block depth"><label>展开层级</label><select v-model.number="depth" @change="loadGraph"><option v-for="n in [1,2,3,4,5]" :key="n" :value="n">{{n}} 层</option></select></div>
+      <div class="control-block evidence"><label>关系证据</label><div><label><input v-model="showConfirmed" type="checkbox"/>已确认</label><label><input v-model="showInferred" type="checkbox"/>推断</label></div></div>
     </section>
 
-    <section class="dc-card graph-panel">
-      <div class="panel-head"><div><b>{{ graph.nodes.length }} 个节点 · {{ graph.edges.length }} 条关系</b><span v-if="graph.truncated" class="warn">节点过多，已截断展示</span></div><RouterLink v-if="assetId" :to="`/datasets/${assetId}`">查看中心资产</RouterLink></div>
-      <div v-if="loading" class="dc-empty">正在加载关系图…</div>
-      <div v-else-if="graph.nodes.length===0" class="dc-empty">输入一个数据集 Asset ID 开始查看关系。</div>
-      <div v-else class="lineage-lanes">
-        <div v-for="lane in lanes" :key="lane.level" class="lane" :class="{center:lane.level===0}">
-          <div class="lane-title">{{ laneTitle(lane.level) }}</div>
-          <div class="lane-nodes">
-            <RouterLink v-for="node in lane.nodes" :key="node.assetId" :to="`/datasets/${node.assetId}`" class="node-card" :class="{current:node.isCenter}">
-              <div><span class="dc-chip">{{node.layerCode||'TABLE'}}</span><span class="node-status">{{node.status||'—'}}</span></div>
-              <b>{{node.name}}</b><code class="dc-tech">{{node.tableName||node.assetId}}</code><small>{{node.catalogCode||'未分类'}}</small>
+    <div class="relation-grid">
+      <section class="graph-card dc-card">
+        <header class="graph-head"><div><b>{{ visibleNodes.length }} 个节点 · {{ visibleEdges.length }} 条关系</b><span>{{ evidenceSummary }}</span></div><div class="graph-tools"><button @click="zoom=Math.max(.65,zoom-.1)"><Minus :size="14"/></button><button @click="zoom=1"><RotateCcw :size="14"/></button><button @click="zoom=Math.min(1.35,zoom+.1)"><Plus :size="14"/></button></div></header>
+        <div v-if="loading" class="dc-empty">正在加载关系图…</div>
+        <div v-else-if="!centerId" class="dc-empty">请搜索并选择一个{{mode==='table'?'数据集':'字段'}}作为中心资产。</div>
+        <div v-else-if="visibleNodes.length===0" class="dc-empty">当前资产在所选方向和层级内暂无血缘关系。</div>
+        <div v-else class="graph-scroll">
+          <div class="stage-scale" :style="{width:`${graphWidth}px`,height:`${graphHeight}px`,transform:`scale(${zoom})`}">
+            <svg class="edge-layer" :width="graphWidth" :height="graphHeight" :viewBox="`0 0 ${graphWidth} ${graphHeight}`">
+              <defs><marker id="arrow-confirmed" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#2185ab"/></marker><marker id="arrow-inferred" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#8caab8"/></marker></defs>
+              <path v-for="edge in visibleEdges" :key="edge.id" :d="edgePath(edge)" class="edge" :class="{inferred:edge.evidence==='INFERRED',highlight:pathEdgeIds.has(edge.id)}" :marker-end="edge.evidence==='INFERRED'?'url(#arrow-inferred)':'url(#arrow-confirmed)'"/>
+            </svg>
+            <div v-for="lane in lanes" :key="lane.level" class="lane-title" :style="{left:`${lane.x}px`}">{{ laneTitle(lane.level) }}</div>
+            <RouterLink v-for="node in visibleNodes" :key="node.assetId" :to="nodeTarget(node)" class="graph-node" :class="{center:node.isCenter}" :style="nodeStyle(node.assetId)">
+              <div><span class="layer-pill" :data-layer="node.layerCode">{{node.layerCode||'FIELD'}}</span><em v-if="node.isCenter">当前</em></div>
+              <b>{{node.name}}</b><code>{{mode==='table'?(node.tableName||node.assetId):(node.columnName||node.assetId)}}</code><small v-if="mode==='field'">{{node.datasetName}}</small>
             </RouterLink>
           </div>
         </div>
-      </div>
-    </section>
-
-    <div class="analysis-grid">
-      <section class="dc-card impact-panel">
-        <span class="dc-eyebrow">IMPACT</span><h2>影响分析</h2>
-        <p>从中心资产向下游展开，统计潜在受影响资产。CONFIRMED 与 INFERRED 关系均展示，但不会被解释为绝对影响事实。</p>
-        <div class="impact-stat"><strong>{{ impact.impactCount || 0 }}</strong><span>潜在受影响资产</span></div>
-        <div class="layer-tags"><span v-for="(count,key) in impact.impactByLayer||{}" :key="key"><b>{{key}}</b>{{count}}</span></div>
-        <el-button @click="loadImpact">重新计算 {{depth}} 层影响</el-button>
+        <footer class="graph-legend"><span><i class="solid"></i>已确认</span><span><i class="dashed"></i>推断</span><span v-if="pathEdgeIds.size"><i class="path"></i>当前路径</span><b v-if="graph.truncated">节点较多，已按上限截断</b></footer>
       </section>
 
-      <section class="dc-card path-panel">
-        <span class="dc-eyebrow">PATH FINDER</span><h2>路径查询</h2><p>沿确认的数据加工方向查找从源表到目标表的一条最短路径。</p>
-        <div class="path-form"><el-input v-model="pathSource" placeholder="源 Asset ID"/><ArrowRight :size="18"/><el-input v-model="pathTarget" placeholder="目标 Asset ID"/><el-button type="primary" @click="findPath">查找</el-button></div>
-        <div v-if="pathResult && !pathResult.found" class="dc-empty compact">在限定层级内未找到路径。</div>
-        <div v-else-if="pathResult?.found" class="path-result">
-          <span>{{pathResult.hopCount}} 跳</span>
-          <template v-for="(node,index) in pathResult.nodes" :key="node.assetId"><RouterLink :to="`/datasets/${node.assetId}`">{{node.name}}</RouterLink><ArrowRight v-if="Number(index)<pathResult.nodes.length-1" :size="14"/></template>
-        </div>
-      </section>
+      <aside class="relation-side">
+        <section v-if="mode==='table'" class="impact-card dc-card"><span class="dc-eyebrow">IMPACT</span><h2>下游影响（{{depth}} 层内）</h2><div class="impact-numbers"><div><strong>{{impact.impactCount||0}}</strong><span>数据集</span></div><div><strong>{{ visibleImpactEdges }}</strong><span>关系</span></div></div><div class="impact-layers"><span v-for="(count,key) in impact.impactByLayer||{}" :key="key"><b>{{key}}</b>{{count}}</span></div><div class="impact-list"><RouterLink v-for="node in impactedNodes.slice(0,5)" :key="node.assetId" :to="`/datasets/${node.assetId}`"><span class="layer-pill" :data-layer="node.layerCode">{{node.layerCode}}</span><div><b>{{node.name}}</b><code>{{node.tableName}}</code></div><ArrowRight :size="14"/></RouterLink></div><button class="export-btn" :disabled="!impactedNodes.length" @click="exportImpact"><Download :size="14"/>导出影响清单 CSV</button></section>
+        <section v-else class="impact-card dc-card"><span class="dc-eyebrow">FIELD LINEAGE</span><h2>字段变换</h2><p>字段血缘来自持久化关系事实。聚合、派生和直接映射分别展示，不根据字段同名关系临时推断。</p><div class="transform-list"><article v-for="edge in visibleEdges.slice(0,8)" :key="edge.id"><span>{{edge.relationType||'DIRECT'}}</span><code>{{edge.transformation||'直接映射'}}</code><small>{{edge.taskName||'未登记任务'}} · {{edge.evidence==='CONFIRMED'?'已确认':'推断'}}</small></article></div></section>
+
+        <section v-if="mode==='table'" class="path-card dc-card"><span class="dc-eyebrow">PATH</span><h2>路径查询</h2><p>沿加工方向查找从当前中心表到目标表的一条最短路径，并展示任务名。</p><div class="path-target"><Search :size="15"/><input v-model="targetQuery" placeholder="搜索目标数据集" @input="searchTarget"/><div v-if="targetRows.length" class="target-results"><button v-for="item in targetRows" :key="item.assetId" @click="chooseTarget(item)"><b>{{item.title}}</b><code>{{item.technicalName}}</code></button></div></div><button class="path-btn" :disabled="!pathTarget" @click="findPath"><Route :size="14"/>查找路径</button><div v-if="pathResult && !pathResult.found" class="path-empty">在限定层级内未找到有向路径。</div><div v-else-if="pathResult?.found" class="path-result"><div class="path-summary"><span>{{pathResult.hopCount}} 跳</span><b>{{pathResult.nodes[0]?.name}} → {{pathResult.nodes[pathResult.nodes.length-1]?.name}}</b></div><article v-for="(edge,index) in pathResult.edges" :key="edge.id"><span class="layer-pill" :data-layer="pathResult.nodes[index]?.layerCode">{{pathResult.nodes[index]?.layerCode}}</span><div><b>{{pathResult.nodes[index]?.name}}</b><code>↳ {{edge.taskName||'未登记任务'}}</code></div></article><article class="path-last"><span class="layer-pill" :data-layer="pathResult.nodes[pathResult.nodes.length-1]?.layerCode">{{pathResult.nodes[pathResult.nodes.length-1]?.layerCode}}</span><div><b>{{pathResult.nodes[pathResult.nodes.length-1]?.name}}</b></div></article></div></section>
+      </aside>
     </div>
   </div></div>
 </template>
@@ -52,32 +49,54 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-vue-next'
+import { ArrowRight, Download, Minus, Plus, RotateCcw, Route, Search } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
-import { relationApi, type RelationGraph, type RelationNode } from '@/api/client'
+import { assetApi, relationApi, type RelationEdge, type RelationGraph, type RelationNode, type SearchItem } from '@/api/client'
 
-const route=useRoute(); const router=useRouter(); const assetId=ref(String(route.params.id||route.query.id||'DS000001')); const depth=ref(2); const direction=ref('both'); const loading=ref(false); const graph=reactive<RelationGraph>({centerAssetId:'',depth:2,direction:'both',truncated:false,nodes:[],edges:[]}); const impact=reactive<any>({impactCount:0,impactByLayer:{}}); const pathSource=ref(assetId.value); const pathTarget=ref(''); const pathResult=ref<any|null>(null)
-const levelMap=computed(()=>{
-  const levels=new Map<string,number>(); if(!graph.centerAssetId)return levels; levels.set(graph.centerAssetId,0)
-  for(let pass=0;pass<depth.value;pass++){
-    let changed=false
-    for(const edge of graph.edges){const s=levels.get(edge.source);const t=levels.get(edge.target);if(s!==undefined&&s>=0&&t===undefined){levels.set(edge.target,s+1);changed=true}if(t!==undefined&&t<=0&&s===undefined){levels.set(edge.source,t-1);changed=true}}
-    if(!changed)break
-  }
-  return levels
-})
-const lanes=computed(()=>{
-  const groups=new Map<number,RelationNode[]>(); for(const node of graph.nodes){const level=levelMap.value.get(node.assetId)??0;const list=groups.get(level)||[];list.push(node);groups.set(level,list)}
-  return [...groups.entries()].sort((a,b)=>a[0]-b[0]).map(([level,nodes])=>({level,nodes}))
-})
+const route=useRoute(); const router=useRouter()
+const mode=ref<'table'|'field'>(route.query.mode==='field'?'field':'table')
+const centerId=ref(mode.value==='field'?String(route.query.field||''):String(route.params.id||route.query.id||'DS000004'))
+const centerTech=ref(''); const pickerQuery=ref(''); const pickerRows=ref<SearchItem[]>([]); const showPicker=ref(false); let pickerSeq=0
+const depth=ref(3); const direction=ref('both'); const showConfirmed=ref(true); const showInferred=ref(true); const loading=ref(false); const zoom=ref(1)
+const graph=reactive<RelationGraph>({centerAssetId:'',depth:3,direction:'both',truncated:false,nodes:[],edges:[]})
+const impact=reactive<RelationGraph>({centerAssetId:'',depth:3,direction:'downstream',truncated:false,nodes:[],edges:[],impactCount:0,impactByLayer:{}})
+const targetQuery=ref(''); const targetRows=ref<SearchItem[]>([]); const pathTarget=ref(''); const pathResult=ref<any|null>(null); let targetSeq=0
+const directions=[{key:'upstream',label:'上游'},{key:'downstream',label:'下游'},{key:'both',label:'上下游'}]
+const nodeW=156, nodeH=76, laneGap=34, laneW=190
+
+const visibleEdges=computed(()=>graph.edges.filter(edge=>(showConfirmed.value&&edge.evidence!=='INFERRED')||(showInferred.value&&edge.evidence==='INFERRED')))
+const visibleNodeIds=computed(()=>{const ids=new Set<string>(); if(graph.centerAssetId)ids.add(graph.centerAssetId); for(const edge of visibleEdges.value){ids.add(edge.source);ids.add(edge.target)}; return ids})
+const visibleNodes=computed(()=>graph.nodes.filter(node=>visibleNodeIds.value.has(node.assetId)))
+const levelValues=computed(()=>Array.from(new Set(visibleNodes.value.map(node=>Number(node.level||0)))).sort((a,b)=>a-b))
+const lanes=computed(()=>levelValues.value.map((level,index)=>({level,x:30+index*(laneW+laneGap)})))
+const positionMap=computed(()=>{const map=new Map<string,{x:number;y:number}>(); for(const [laneIndex,level] of levelValues.value.entries()){const nodes=visibleNodes.value.filter(node=>Number(node.level||0)===level); nodes.forEach((node,index)=>map.set(node.assetId,{x:30+laneIndex*(laneW+laneGap),y:54+index*(nodeH+30)}))} return map})
+const maxLaneNodes=computed(()=>Math.max(1,...levelValues.value.map(level=>visibleNodes.value.filter(node=>Number(node.level||0)===level).length)))
+const graphWidth=computed(()=>Math.max(760,60+levelValues.value.length*(laneW+laneGap)))
+const graphHeight=computed(()=>Math.max(330,90+maxLaneNodes.value*(nodeH+30)))
+const evidenceSummary=computed(()=>{const confirmed=graph.edges.filter(edge=>edge.evidence!=='INFERRED').length;const inferred=graph.edges.length-confirmed;return `${confirmed} 条已确认${inferred?` · ${inferred} 条推断`:''}`})
+const impactedNodes=computed(()=>impact.nodes.filter(node=>node.assetId!==centerId.value))
+const visibleImpactEdges=computed(()=>impact.edges.length)
+const pathEdgeIds=computed(()=>new Set<number>((pathResult.value?.edges||[]).map((edge:RelationEdge)=>edge.id)))
+
 function laneTitle(level:number){if(level===0)return '当前资产';return level<0?`上游 ${Math.abs(level)} 层`:`下游 ${level} 层`}
-async function loadGraph(){if(!assetId.value.trim())return;loading.value=true;try{Object.assign(graph,await relationApi.graph(assetId.value.trim(),{depth:depth.value,direction:direction.value}));pathSource.value=assetId.value.trim();await loadImpact();await router.replace({name:'relations',params:{id:assetId.value.trim()}})}catch{ElMessage.error('关系加载失败，请确认 Asset ID 是否存在')}finally{loading.value=false}}
-async function loadImpact(){if(!assetId.value.trim())return;try{Object.assign(impact,await relationApi.impact(assetId.value.trim(),{depth:depth.value}))}catch{impact.impactCount=0;impact.impactByLayer={}}}
-async function findPath(){if(!pathSource.value.trim()||!pathTarget.value.trim())return;try{pathResult.value=await relationApi.path(pathSource.value.trim(),pathTarget.value.trim(),12)}catch{ElMessage.error('路径查询失败')}}
-watch(()=>route.params.id,(v)=>{if(typeof v==='string'&&v!==assetId.value){assetId.value=v;loadGraph()}})
+function nodeStyle(id:string){const pos=positionMap.value.get(id)||{x:0,y:0};return{left:`${pos.x}px`,top:`${pos.y}px`,width:`${nodeW}px`,height:`${nodeH}px`}}
+function edgePath(edge:RelationEdge){const s=positionMap.value.get(edge.source);const t=positionMap.value.get(edge.target);if(!s||!t)return'';const x1=s.x+nodeW,y1=s.y+nodeH/2,x2=t.x,y2=t.y+nodeH/2,mid=(x1+x2)/2;return`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`}
+function nodeTarget(node:RelationNode){return mode.value==='table'?`/datasets/${node.assetId}`:`/fields/${node.assetId}`}
+
+async function loadGraph(){if(!centerId.value)return;loading.value=true;pathResult.value=null;try{const data=mode.value==='table'?await relationApi.graph(centerId.value,{depth:depth.value,direction:direction.value}):await relationApi.columnGraph(centerId.value,{depth:depth.value,direction:direction.value});Object.assign(graph,data);const center=data.nodes.find(node=>node.assetId===centerId.value);if(center){pickerQuery.value=center.name;centerTech.value=mode.value==='table'?(center.tableName||''):`${center.datasetName||''} · ${center.columnName||''}`}if(mode.value==='table'){Object.assign(impact,await relationApi.impact(centerId.value,{depth:depth.value}));await router.replace({name:'relations',params:{id:centerId.value}})}else{Object.assign(impact,{nodes:[],edges:[],impactCount:0,impactByLayer:{}});await router.replace({name:'relations',query:{mode:'field',field:centerId.value}})}}catch{ElMessage.error(`血缘加载失败，请确认${mode.value==='table'?'数据集':'字段'}是否存在`)}finally{loading.value=false}}
+
+async function searchPicker(){const query=pickerQuery.value.trim();const seq=++pickerSeq;if(!query){pickerRows.value=[];return}try{const result=await assetApi.search(query,{asset_type:[mode.value==='table'?'TABLE':'COLUMN'],limit:8});if(seq===pickerSeq){pickerRows.value=result.items;showPicker.value=true}}catch{if(seq===pickerSeq)pickerRows.value=[]}}
+function chooseCenter(item:SearchItem){centerId.value=item.assetId;pickerQuery.value=item.title;centerTech.value=item.technicalName;pickerRows.value=[];showPicker.value=false;loadGraph()}
+function switchMode(value:'table'|'field'){if(mode.value===value)return;mode.value=value;centerId.value=value==='table'?'DS000004':'';pickerQuery.value='';centerTech.value='';Object.assign(graph,{centerAssetId:'',nodes:[],edges:[],truncated:false});if(centerId.value)loadGraph();else router.replace({name:'relations',query:{mode:'field'}})}
+
+async function searchTarget(){const query=targetQuery.value.trim();const seq=++targetSeq;pathTarget.value='';if(!query){targetRows.value=[];return}try{const result=await assetApi.search(query,{asset_type:['TABLE'],limit:6});if(seq===targetSeq)targetRows.value=result.items}catch{if(seq===targetSeq)targetRows.value=[]}}
+function chooseTarget(item:SearchItem){pathTarget.value=item.assetId;targetQuery.value=item.title;targetRows.value=[]}
+async function findPath(){if(!centerId.value||!pathTarget.value)return;try{pathResult.value=await relationApi.path(centerId.value,pathTarget.value,12)}catch{ElMessage.error('路径查询失败')}}
+function exportImpact(){const rows=impactedNodes.value.map(node=>[node.assetId,node.name,node.tableName||'',node.layerCode||'',node.catalogCode||'']);const csv=['Asset ID,资产名称,物理表名,层级,目录',...rows.map(row=>row.map(value=>`"${String(value).replaceAll('"','""')}"`).join(','))].join('\n');const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`impact-${centerId.value}.csv`;a.click();URL.revokeObjectURL(url)}
+watch(()=>route.params.id,(value)=>{if(mode.value==='table'&&typeof value==='string'&&value!==centerId.value){centerId.value=value;loadGraph()}})
 onMounted(loadGraph)
 </script>
 
 <style scoped>
-.relation-toolbar{padding:15px 18px;display:grid;grid-template-columns:minmax(220px,1.5fr) 150px 160px auto;gap:12px;align-items:end}.relation-toolbar>div{display:grid;gap:6px}.relation-toolbar span{font-size:10px;color:var(--dc-text-3)}.relation-toolbar :deep(.el-button>span){display:flex;align-items:center;gap:6px}.graph-panel{margin-top:16px;padding:0 18px 20px;overflow:hidden}.panel-head{min-height:58px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #edf2f5}.panel-head>div{display:flex;gap:10px;align-items:center}.panel-head b{font-size:12px}.panel-head a{font-size:11px;color:var(--dc-primary-strong)}.warn{font-size:10px;color:#b7791f}.lineage-lanes{display:flex;gap:12px;overflow:auto;padding:18px 2px 4px;min-height:300px}.lane{flex:1 0 220px;min-width:220px}.lane.center{flex-basis:250px}.lane-title{height:32px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#7892a1;text-transform:uppercase;letter-spacing:.08em}.lane-nodes{display:grid;gap:10px}.node-card{display:grid;gap:7px;padding:13px;border:1px solid var(--dc-border);border-radius:11px;background:#fff;box-shadow:0 6px 18px rgba(48,108,138,.04)}.node-card:hover{border-color:#b9dce9;box-shadow:0 10px 26px rgba(48,108,138,.08)}.node-card.current{border-color:#7cc6df;background:linear-gradient(135deg,#eef9fd,#fff);box-shadow:0 10px 30px rgba(60,145,181,.11)}.node-card>div{display:flex;justify-content:space-between;align-items:center}.node-status{font-size:9px;color:#7d97a6}.node-card b{font-size:12px}.node-card code{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.node-card small{font-size:9px;color:var(--dc-text-3)}.analysis-grid{display:grid;grid-template-columns:.8fr 1.2fr;gap:16px;margin-top:16px}.impact-panel,.path-panel{padding:22px}.impact-panel h2,.path-panel h2{font-size:18px;margin:6px 0 8px}.impact-panel p,.path-panel p{font-size:11px;line-height:1.7;color:var(--dc-text-2)}.impact-stat{display:flex;align-items:baseline;gap:8px;margin:18px 0}.impact-stat strong{font-size:34px;color:#27789b}.impact-stat span{font-size:11px;color:var(--dc-text-3)}.layer-tags{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:15px}.layer-tags span{padding:6px 9px;border-radius:999px;background:#f2f8fb;font-size:10px;color:#698596}.layer-tags b{margin-right:5px;color:#2f718f}.path-form{display:grid;grid-template-columns:1fr auto 1fr auto;gap:8px;align-items:center;margin-top:18px}.path-result{margin-top:17px;padding:13px;border-radius:10px;background:#f5fafc;display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:11px}.path-result>span{padding:4px 7px;border-radius:999px;background:#dff2f8;color:#2e7896}.path-result a{color:#285f7a;font-weight:700}.compact{padding:18px 0}@media(max-width:1000px){.relation-toolbar{grid-template-columns:1fr 1fr}.analysis-grid{grid-template-columns:1fr}}@media(max-width:680px){.relation-toolbar{grid-template-columns:1fr}.path-form{grid-template-columns:1fr}.path-form>svg{transform:rotate(90deg);justify-self:center}.lineage-lanes{min-height:0}}
+.relation-v2{background:#eef6fa;min-height:100%}.wide{max-width:1500px}.relation-toolbar{padding:13px 16px;display:grid;grid-template-columns:auto minmax(300px,1fr) auto 110px 170px;gap:14px;align-items:end}.relation-toolbar label{display:block;font-size:9px;color:#617e8d;margin-bottom:5px;font-weight:700}.mode-switch{display:flex;border:1px solid #c8dce5;border-radius:8px;padding:2px;background:#f7fbfd}.mode-switch button,.segmented button{border:0;background:transparent;color:#5c7888;padding:7px 9px;border-radius:6px;font-size:10px;cursor:pointer}.mode-switch button.active,.segmented button.active{background:#dceff6;color:#116f96;font-weight:800}.picker-wrap{position:relative}.asset-picker{height:36px;display:flex;align-items:center;gap:7px;border:1px solid #c9dce5;border-radius:7px;background:#fff;padding:0 9px;color:#618598}.asset-picker input{border:0;outline:0;flex:1;min-width:0;font-size:11px;color:#284e62}.asset-picker span{font-size:9px;color:#607f8f;max-width:230px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.picker-results{position:absolute;left:0;right:0;top:58px;z-index:50;padding:6px;box-shadow:0 16px 35px rgba(37,88,113,.15)}.picker-results button{width:100%;border:0;background:#fff;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px;padding:8px;border-radius:7px;text-align:left;cursor:pointer}.picker-results button:hover{background:#f0f8fb}.picker-results div{min-width:0}.picker-results b,.picker-results code{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.picker-results b{font-size:11px}.picker-results code{font-size:9px;color:#708b99;margin-top:2px}.type-pill{font-size:8px;padding:3px 6px;border-radius:999px;background:#dff1f8;color:#176f91}.control-block{display:grid}.segmented{display:flex;border:1px solid #c8dce5;border-radius:7px;padding:2px;background:#fff}.depth select{height:36px;border:1px solid #c8dce5;border-radius:7px;background:#fff;color:#3f6274;font-size:10px;padding:0 8px}.evidence>div{height:36px;display:flex;align-items:center;gap:10px}.evidence>div label{display:flex;align-items:center;gap:4px;margin:0;font-weight:500}.relation-grid{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:14px;margin-top:14px;align-items:start}.graph-card{overflow:hidden}.graph-head{height:50px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid #e2ebef}.graph-head>div:first-child{display:flex;align-items:center;gap:10px}.graph-head b{font-size:11px;color:#294f63}.graph-head span{font-size:9px;color:#718995}.graph-tools{display:flex;gap:4px}.graph-tools button{width:28px;height:28px;border:1px solid #d3e1e7;border-radius:6px;background:#fff;color:#4d7183;display:grid;place-items:center;cursor:pointer}.graph-scroll{overflow:auto;min-height:430px;padding:0 0 12px}.stage-scale{position:relative;transform-origin:top left;transition:transform .15s ease}.edge-layer{position:absolute;inset:0;z-index:1;overflow:visible}.edge{fill:none;stroke:#2185ab;stroke-width:1.6}.edge.inferred{stroke:#8caab8;stroke-dasharray:5 5}.edge.highlight{stroke:#0f6d98;stroke-width:3}.lane-title{position:absolute;top:18px;width:156px;text-align:center;font-size:9px;font-weight:800;color:#678392;letter-spacing:.05em}.graph-node{position:absolute;z-index:2;padding:9px 10px;border:1px solid #c7dce6;border-radius:9px;background:#fff;box-shadow:0 5px 14px rgba(44,96,122,.08);display:grid;align-content:center;gap:4px;color:#284d60}.graph-node:hover{border-color:#65afca;box-shadow:0 8px 20px rgba(44,96,122,.13)}.graph-node.center{border:2px solid #1e86ad;background:#f2fbfe;box-shadow:0 8px 24px rgba(30,134,173,.16)}.graph-node>div{display:flex;justify-content:space-between;align-items:center}.graph-node em{font-size:8px;font-style:normal;color:#14779d}.graph-node b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.graph-node code,.graph-node small{font-size:8px;color:#718b98;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layer-pill{display:inline-flex;padding:2px 5px;border-radius:4px;background:#edf3f6;color:#486575;font-size:8px;font-weight:800}.layer-pill[data-layer="ODS"]{background:#eeeafd;color:#4f3fa8}.layer-pill[data-layer="DWD"]{background:#e2f4f1;color:#0d6f68}.layer-pill[data-layer="DWS"]{background:#e3f1f8;color:#126b93}.layer-pill[data-layer="ADS"]{background:#fff3da;color:#83570a}.layer-pill[data-layer="DIM"]{background:#edf1f4;color:#44596a}.graph-legend{min-height:42px;border-top:1px solid #e2ebef;padding:0 14px;display:flex;align-items:center;gap:15px;font-size:9px;color:#6f8794}.graph-legend span{display:flex;align-items:center;gap:5px}.graph-legend i{width:20px;height:0;border-top:1.5px solid #2185ab}.graph-legend i.dashed{border-top-style:dashed;border-color:#8caab8}.graph-legend i.path{border-width:3px}.graph-legend b{margin-left:auto;color:#a06513}.relation-side{display:grid;gap:12px}.impact-card,.path-card{padding:15px}.impact-card h2,.path-card h2{font-size:15px;margin:5px 0 9px;color:#21495e}.impact-card>p,.path-card>p{font-size:10px;line-height:1.6;color:#68818f}.impact-numbers{display:flex;gap:28px;padding:8px 0 10px}.impact-numbers div{display:grid}.impact-numbers strong{font-size:24px;color:#235d78}.impact-numbers span{font-size:9px;color:#728a97}.impact-layers{display:flex;flex-wrap:wrap;gap:5px;padding-bottom:9px}.impact-layers span{padding:4px 6px;border-radius:999px;background:#f0f6f8;font-size:8px;color:#687f8c}.impact-layers b{margin-right:4px;color:#2a718f}.impact-list{display:grid}.impact-list>a{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:7px;padding:8px 0;border-top:1px solid #edf2f4}.impact-list div{min-width:0}.impact-list b,.impact-list code{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.impact-list b{font-size:9px}.impact-list code{font-size:8px;color:#78909c;margin-top:2px}.export-btn,.path-btn{width:100%;margin-top:10px;height:32px;border:1px solid #cadce5;border-radius:7px;background:#fff;color:#356b83;display:flex;align-items:center;justify-content:center;gap:5px;font-size:9px;cursor:pointer}.export-btn:disabled{opacity:.45}.transform-list{display:grid;gap:7px;margin-top:10px}.transform-list article{padding:8px;border:1px solid #e0e9ed;border-radius:7px;background:#fbfdfe;display:grid;gap:3px}.transform-list span{font-size:8px;color:#19789e;font-weight:800}.transform-list code{font-size:9px;color:#315b70;overflow-wrap:anywhere}.transform-list small{font-size:8px;color:#7a909c}.path-target{position:relative;height:34px;border:1px solid #cbdde5;border-radius:7px;display:flex;align-items:center;gap:6px;padding:0 8px}.path-target input{flex:1;min-width:0;border:0;outline:0;font-size:10px}.target-results{position:absolute;top:38px;left:0;right:0;z-index:20;border:1px solid #d4e2e8;background:#fff;border-radius:7px;padding:4px;box-shadow:0 10px 24px rgba(40,91,117,.12)}.target-results button{width:100%;border:0;background:#fff;text-align:left;padding:6px;border-radius:5px;cursor:pointer}.target-results button:hover{background:#f1f8fb}.target-results b,.target-results code{display:block;font-size:9px}.target-results code{font-size:8px;color:#7b909c}.path-btn{background:#eaf6fa;color:#176f92}.path-empty{font-size:9px;color:#748c98;padding:12px 0}.path-result{margin-top:10px}.path-summary{display:grid;gap:4px;margin-bottom:7px}.path-summary span{font-size:8px;color:#197da5}.path-summary b{font-size:9px}.path-result article{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px;align-items:start;padding:6px 0;border-top:1px solid #edf2f4}.path-result article div{display:grid;gap:2px}.path-result article b{font-size:9px}.path-result article code{font-size:8px;color:#718995}@media(max-width:1150px){.relation-toolbar{grid-template-columns:auto 1fr 1fr 100px}.evidence{grid-column:2/-1}.relation-grid{grid-template-columns:1fr}.relation-side{grid-template-columns:1fr 1fr}}@media(max-width:760px){.relation-toolbar{grid-template-columns:1fr}.evidence{grid-column:auto}.relation-side{grid-template-columns:1fr}.graph-scroll{min-height:360px}}
 </style>
