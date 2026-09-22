@@ -15,6 +15,8 @@ def build_demo_metadata() -> InMemoryMetadataProvider:
                 ColumnMetadata("region_code", "string", "地区代码"),
                 ColumnMetadata("product_id", "string", "产品编号"),
                 ColumnMetadata("balance_amt", "decimal(20,2)", "贷款余额"),
+                ColumnMetadata("npl_balance", "decimal(20,2)", "不良贷款余额"),
+                ColumnMetadata("new_loan_amt", "decimal(20,2)", "新增贷款金额"),
                 ColumnMetadata("status", "string", "贷款状态"),
             ),
         ),
