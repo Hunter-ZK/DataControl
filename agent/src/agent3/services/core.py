@@ -7,7 +7,7 @@ from agent3.contracts.authz import AuthzContext
 from agent3.knowledge.injection import scan_retrieved_evidence
 from agent3.knowledge.verified_sql import InMemoryVerifiedSQLStore
 from agent3.metadata.provider import MetadataProvider
-from agent3.semantic.compiler import SemanticCompiler
+from agent3.semantic.compiler import SemanticCompileError, SemanticCompiler
 from agent3.semantic.models import (
     ClarificationOption,
     ClarificationRequest,
@@ -234,7 +234,7 @@ class Agent3Core:
         semantic_validation = self.semantic_validator.validate(authz, ir)
         if not semantic_validation.valid:
             summary = "; ".join(issue.message for issue in semantic_validation.issues)
-            raise ValueError(f"semantic query plan rejected: {summary}")
+            raise SemanticCompileError(f"semantic query plan rejected: {summary}")
 
         metric_ids = ir.all_metric_ids()
         metrics = [self.semantics.get(authz, metric_id) for metric_id in metric_ids]
