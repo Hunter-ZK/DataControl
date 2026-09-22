@@ -4,6 +4,14 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)
+class CodeValueMetadata:
+    code_table_no: str
+    value: str
+    name: str
+    description: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class ColumnMetadata:
     name: str
     data_type: str
