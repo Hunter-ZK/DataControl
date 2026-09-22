@@ -11,6 +11,7 @@ def build_demo_metadata() -> InMemoryMetadataProvider:
             partition_fields=("dt",),
             columns=(
                 ColumnMetadata("dt", "string", "数据日期"),
+                ColumnMetadata("stat_month", "string", "统计月份，ISO YYYY-MM"),
                 ColumnMetadata("org_id", "string", "机构编号"),
                 ColumnMetadata(
                     "region_code",
