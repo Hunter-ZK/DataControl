@@ -2,7 +2,14 @@ import pytest
 
 from agent3.contracts.authz import AuthzContext
 from agent3.semantic.compiler import SemanticCompileError
-from agent3.semantic.models import Additivity, MetricDefinition, MetricKind, QueryIR
+from agent3.semantic.models import (
+    Additivity,
+    ComparisonKind,
+    MandatoryFilter,
+    MetricDefinition,
+    MetricKind,
+    QueryIR,
+)
 from agent3.semantic.registry import SemanticRegistry
 from agent3.services.core import Agent3Core
 from agent3.services.factory import build_demo_core
@@ -88,6 +95,12 @@ def test_p2_code_value_resolution_uses_internal_governed_code_table():
 
 def _p2_core() -> Agent3Core:
     demo = build_demo_core()
+    monthly = {
+        "source_entity": "dw.dwd_loan_snapshot",
+        "valid_dimensions": ("region_code", "org_id"),
+        "time_field": "stat_month",
+        "time_grain": "MONTH",
+    }
     metrics = (
         MetricDefinition(
             id="loan_balance",
@@ -95,10 +108,9 @@ def _p2_core() -> Agent3Core:
             aliases=("贷款增长",),
             aggregation="sum",
             measure="balance_amt",
-            source_entity="dw.dwd_loan_snapshot",
             additivity_time=Additivity.NON_ADDITIVE,
-            valid_dimensions=("region_code", "org_id"),
-            time_field="dt",
+            mandatory_filters=(MandatoryFilter("currency_cd", "eq", "CNY"),),
+            **monthly,
         ),
         MetricDefinition(
             id="new_loan_amount",
@@ -106,32 +118,36 @@ def _p2_core() -> Agent3Core:
             aliases=("贷款增长",),
             aggregation="sum",
             measure="new_loan_amt",
-            source_entity="dw.dwd_loan_snapshot",
-            valid_dimensions=("region_code", "org_id"),
-            time_field="dt",
+            **monthly,
         ),
         MetricDefinition(
             id="npl_balance",
             name="不良贷款余额",
             aggregation="sum",
             measure="npl_balance",
-            source_entity="dw.dwd_loan_snapshot",
             additivity_time=Additivity.NON_ADDITIVE,
-            valid_dimensions=("region_code",),
-            time_field="dt",
+            **monthly,
         ),
         MetricDefinition(
             id="npl_ratio",
             name="不良贷款率",
             aggregation="ratio",
             measure="npl_balance",
-            source_entity="dw.dwd_loan_snapshot",
             additivity_time=Additivity.NON_ADDITIVE,
-            valid_dimensions=("region_code",),
-            time_field="dt",
             kind=MetricKind.RATIO,
             numerator_metric_id="npl_balance",
             denominator_metric_id="loan_balance",
+            **monthly,
+        ),
+        MetricDefinition(
+            id="loan_balance_yoy",
+            name="贷款余额同比增长率",
+            aggregation="derived",
+            measure="balance_amt",
+            additivity_time=Additivity.NON_ADDITIVE,
+            kind=MetricKind.DERIVED,
+            formula="(current(loan_balance) - yoy(loan_balance)) / yoy(loan_balance)",
+            **monthly,
         ),
     )
     return Agent3Core(metadata=demo.metadata, semantics=SemanticRegistry(metrics))
@@ -159,7 +175,7 @@ def test_p2_missing_metric_fails_closed_to_custom_clarification():
 
 def test_p2_ratio_metric_and_topn_compile_deterministically():
     core = _p2_core()
-    sql = core.compile_query(
+    compiled = core.compile_query(
         AuthzContext.system(),
         QueryIR(
             metric_id="npl_ratio",
@@ -168,8 +184,129 @@ def test_p2_ratio_metric_and_topn_compile_deterministically():
             order="DESC",
             limit=10,
         ),
-    )["sql"]
+    )
+    sql = compiled["sql"]
     assert "CASE WHEN SUM(balance_amt) = 0 THEN NULL" in sql
     assert "SUM(npl_balance) / SUM(balance_amt)" in sql
     assert "GROUP BY region_code" in sql
     assert "ORDER BY npl_ratio DESC LIMIT 10" in sql
+    assert compiled["validation"]["valid"] is True
+    assert compiled["semanticPlan"]["semanticValidated"] is True
+
+
+def test_p2_multi_metric_same_source_query_is_compiled_once():
+    compiled = _p2_core().compile_query(
+        AuthzContext.system(),
+        QueryIR(
+            metric_id="loan_balance",
+            metric_ids=("new_loan_amount",),
+            dimensions=("region_code",),
+            time_values=("2026-08",),
+            order="DESC",
+            order_metric_id="new_loan_amount",
+            limit=20,
+        ),
+    )
+    sql = compiled["sql"]
+    assert "SUM(balance_amt) AS loan_balance" in sql
+    assert "SUM(new_loan_amt) AS new_loan_amount" in sql
+    assert "currency_cd = 'CNY'" in sql
+    assert "ORDER BY new_loan_amount DESC LIMIT 20" in sql
+    assert compiled["semanticPlan"]["metrics"] == ["loan_balance", "new_loan_amount"]
+    assert compiled["validation"]["valid"] is True
+
+
+def test_p2_complex_filters_are_declarative_and_escaped():
+    compiled = _p2_core().compile_query(
+        AuthzContext.system(),
+        QueryIR(
+            metric_id="new_loan_amount",
+            dimensions=("region_code",),
+            time_values=("2026-08",),
+            filters=(
+                MandatoryFilter("region_code", "in", ["440000", "440300"]),
+                MandatoryFilter("org_id", "between", ["001", "999"]),
+                MandatoryFilter("status", "contains", "正常"),
+            ),
+        ),
+    )
+    sql = compiled["sql"]
+    assert "region_code IN ('440000', '440300')" in sql
+    assert "org_id BETWEEN '001' AND '999'" in sql
+    assert "status LIKE '%正常%'" in sql
+    assert compiled["validation"]["valid"] is True
+
+
+def test_p2_yoy_and_mom_use_governed_month_calendar():
+    core = _p2_core()
+    yoy = core.compile_query(
+        AuthzContext.system(),
+        QueryIR(
+            metric_id="loan_balance",
+            dimensions=("region_code",),
+            time_values=("2026-08",),
+            comparison=ComparisonKind.YOY,
+        ),
+    )
+    assert "'2025-08'" in yoy["sql"]
+    assert "AS loan_balance_yoy" in yoy["sql"]
+    assert yoy["validation"]["valid"] is True
+
+    mom = core.compile_query(
+        AuthzContext.system(),
+        QueryIR(
+            metric_id="loan_balance",
+            dimensions=("region_code",),
+            time_values=("2026-01",),
+            comparison=ComparisonKind.MOM,
+        ),
+    )
+    assert "'2025-12'" in mom["sql"]
+    assert "AS loan_balance_mom" in mom["sql"]
+    assert mom["validation"]["valid"] is True
+
+
+def test_p2_latest_comparison_uses_dynamic_governed_period_offset():
+    compiled = _p2_core().compile_query(
+        AuthzContext.system(),
+        QueryIR(
+            metric_id="loan_balance",
+            time_values=("LATEST",),
+            comparison=ComparisonKind.MOM,
+        ),
+    )
+    sql = compiled["sql"]
+    assert "MAX(stat_month)" in sql
+    assert "LPAD" in sql
+    assert compiled["validation"]["valid"] is True
+
+
+def test_p2_governed_derived_yoy_metric_compiles_without_free_form_formula_sql():
+    compiled = _p2_core().compile_query(
+        AuthzContext.system(),
+        QueryIR(
+            metric_id="loan_balance_yoy",
+            dimensions=("region_code",),
+            time_values=("2026-08",),
+            order="DESC",
+            limit=5,
+        ),
+    )
+    sql = compiled["sql"]
+    assert "AS loan_balance_yoy" in sql
+    assert "'2025-08'" in sql
+    assert "ORDER BY loan_balance_yoy DESC LIMIT 5" in sql
+    assert compiled["validation"]["valid"] is True
+
+
+def test_p2_multi_metric_comparison_fails_closed():
+    with pytest.raises(SemanticCompileError, match="multi-metric comparison"):
+        _p2_core().compile_query(
+            AuthzContext.system(),
+            QueryIR(
+                metric_id="loan_balance",
+                metric_ids=("new_loan_amount",),
+                comparison=ComparisonKind.YOY,
+                time_values=("2026-08",),
+            ),
+        )
