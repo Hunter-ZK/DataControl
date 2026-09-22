@@ -46,7 +46,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, BarChart3, BookOpenCheck, Boxes, CircleGauge, Database, GitFork, Hash, Search, Sparkles, UserRound } from 'lucide-vue-next'
+import { ArrowLeft, BarChart3, BookOpenCheck, Boxes, CircleGauge, Database, Hash, Search, Sparkles, UserRound } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()
@@ -54,7 +54,6 @@ const primary = [
   { to: '/', label: '首页', icon: CircleGauge },
   { to: '/catalog', label: '资产目录', icon: Database },
   { to: '/search', label: '资产检索', icon: Search },
-  { to: '/relations', label: '关系指引', icon: GitFork },
   { to: '/code-tables', label: '标准码值', icon: Boxes },
   { to: '/word-roots', label: '词根索引', icon: Hash },
   { to: '/metrics', label: '指标与制度', icon: BookOpenCheck },
