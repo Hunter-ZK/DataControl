@@ -119,93 +119,51 @@ const quickPrompts = [
 ]
 
 async function refreshStatus() {
-  try {
-    status.value = await agentApi.status()
-  } catch {
-    status.value = null
-  }
+  try { status.value = await agentApi.status() } catch { status.value = null }
 }
 
 async function loadContext() {
   const asset = typeof route.query.asset === 'string' ? route.query.asset : ''
-  if (!asset) {
-    contextAsset.value = null
-    return
-  }
+  if (!asset) { contextAsset.value = null; return }
   try {
     const row = await assetApi.table(asset)
-    contextAsset.value = {
-      assetId: String(row.assetId),
-      tableName: String(row.tableName),
-      bizName: row.bizName ? String(row.bizName) : null,
-    }
-  } catch {
-    contextAsset.value = null
-  }
+    contextAsset.value = { assetId: String(row.assetId), tableName: String(row.tableName), bizName: row.bizName ? String(row.bizName) : null }
+  } catch { contextAsset.value = null }
 }
 
 function restoreConversation(conversation: AgentConversation) {
   sessionId.value = conversation.sessionId || null
   messages.value = [...conversation.messages]
   contextAsset.value = conversation.contextAsset ? { ...conversation.contextAsset } : null
-  nextTick(() => {
-    resizeComposer()
-    scrollBottom()
-  })
+  nextTick(() => { resizeComposer(); scrollBottom() })
 }
 
 async function selectConversation(conversation: AgentConversation) {
   if (loading.value) return
-  if (route.query.asset) await router.replace({ name: 'agent' })
+  if (route.query.asset || route.query.q) await router.replace({ name: 'agent' })
   const selected = activateConversation(conversation.id)
   if (selected) restoreConversation(selected)
 }
 
 async function renameConversation(conversation: AgentConversation) {
   try {
-    const result = await ElMessageBox.prompt('输入新的会话名称', '重命名会话', {
-      inputValue: conversation.title,
-      inputPlaceholder: '会话名称',
-      confirmButtonText: '保存',
-      cancelButtonText: '取消',
-      inputValidator: (value) => !!String(value || '').trim() || '请输入会话名称',
-    })
+    const result = await ElMessageBox.prompt('输入新的会话名称', '重命名会话', { inputValue: conversation.title, inputPlaceholder: '会话名称', confirmButtonText: '保存', cancelButtonText: '取消', inputValidator: (value) => !!String(value || '').trim() || '请输入会话名称' })
     rename(conversation.id, String(result.value || ''))
-  } catch {
-    // User cancelled.
-  }
+  } catch { /* user cancelled */ }
 }
 
 async function deleteConversation(conversation: AgentConversation) {
-  try {
-    await ElMessageBox.confirm(`删除“${conversation.title}”？删除后仅移除当前浏览器中的历史记录。`, '删除会话', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
-  } catch {
-    return
-  }
+  try { await ElMessageBox.confirm(`删除“${conversation.title}”？删除后仅移除当前浏览器中的历史记录。`, '删除会话', { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }) } catch { return }
   if (remove(conversation.id)) resetConversationState()
 }
 
-function toggleConversationPin(conversation: AgentConversation) {
-  togglePin(conversation.id)
-}
-
-function resetConversationState() {
-  sessionId.value = null
-  messages.value = []
-  contextAsset.value = null
-  question.value = ''
-  nextTick(resizeComposer)
-}
+function toggleConversationPin(conversation: AgentConversation) { togglePin(conversation.id) }
+function resetConversationState() { sessionId.value = null; messages.value = []; contextAsset.value = null; question.value = ''; nextTick(resizeComposer) }
 
 async function newSession() {
   if (loading.value) return
-  clearActive()
-  resetConversationState()
-  if (route.query.asset) await router.replace({ name: 'agent' })
+  clearActive(); resetConversationState()
+  if (route.query.asset || route.query.q) await router.replace({ name: 'agent' })
 }
 
 async function clearContext() {
@@ -216,17 +174,12 @@ async function clearContext() {
 
 function usePrompt(value: string) {
   question.value = value
-  nextTick(() => {
-    resizeComposer()
-    submit()
-  })
+  nextTick(() => { resizeComposer(); submit() })
 }
 
 async function scrollBottom() {
   await nextTick()
-  if (messageBox.value) {
-    messageBox.value.scrollTo({ top: messageBox.value.scrollHeight, behavior: 'smooth' })
-  }
+  if (messageBox.value) messageBox.value.scrollTo({ top: messageBox.value.scrollHeight, behavior: 'smooth' })
 }
 
 function resizeComposer() {
@@ -239,32 +192,18 @@ function resizeComposer() {
 async function submit() {
   const userQuestion = question.value.trim()
   if (!userQuestion || !status.value?.ready || loading.value) return
-
   if (!activeConversationId.value) createConversation(userQuestion, contextAsset.value)
   messages.value.push({ role: 'user', text: userQuestion })
   syncActive(messages.value, sessionId.value, contextAsset.value)
-  question.value = ''
-  resizeComposer()
-  loading.value = true
-  await scrollBottom()
+  question.value = ''; resizeComposer(); loading.value = true; await scrollBottom()
 
   const prompt = contextAsset.value
     ? `当前问题针对 DataControl 数据资产：${contextAsset.value.bizName || contextAsset.value.tableName}（asset_id=${contextAsset.value.assetId}，table=${contextAsset.value.tableName}）。请优先通过 Agent3 MCP 读取该资产及关联事实后回答，不要凭空猜测。\n用户问题：${userQuestion}`
     : userQuestion
-
   try {
     const result: AgentResult = await agentApi.query(prompt, sessionId.value)
     if (result.sessionId) sessionId.value = result.sessionId
-    messages.value.push({
-      role: 'assistant',
-      text: result.answer || '分析完成。',
-      summary: result.summary,
-      sql: result.sql,
-      validation: result.validation,
-      validationState: result.validationState,
-      events: result.events,
-      evidence: result.evidence,
-    })
+    messages.value.push({ role: 'assistant', text: result.answer || '分析完成。', summary: result.summary, sql: result.sql, validation: result.validation, validationState: result.validationState, events: result.events, evidence: result.evidence })
     syncActive(messages.value, sessionId.value, contextAsset.value)
     await scrollBottom()
   } catch (error) {
@@ -272,20 +211,18 @@ async function submit() {
     ElMessage.error('智能问数本次未完成，请确认 Agent 服务状态后重试。')
     await refreshStatus()
     syncActive(messages.value, sessionId.value, contextAsset.value)
-  } finally {
-    loading.value = false
-    await scrollBottom()
-  }
+  } finally { loading.value = false; await scrollBottom() }
 }
 
 onMounted(async () => {
   loadConversations()
   await refreshStatus()
+  const initialQuestion = typeof route.query.q === 'string' ? route.query.q.trim() : ''
   const hasRouteAsset = typeof route.query.asset === 'string' && !!route.query.asset
-  if (hasRouteAsset) {
-    clearActive()
-    resetConversationState()
-    await loadContext()
+  if (hasRouteAsset || initialQuestion) {
+    clearActive(); resetConversationState()
+    if (hasRouteAsset) await loadContext()
+    if (initialQuestion) question.value = initialQuestion
   } else {
     const restored = restoreLast()
     if (restored) restoreConversation(restored)
