@@ -68,6 +68,62 @@ class Agent3Core:
             ),
         }
 
+    def resolve_code_value(
+        self,
+        authz: AuthzContext,
+        table_name: str,
+        field: str,
+        phrase: str,
+        *,
+        limit: int = 8,
+    ) -> dict[str, Any]:
+        """Resolve a business label such as 人民币 to a governed code value.
+
+        The field -> code-table association comes from DataControl metadata. No
+        external source is consulted and no code is guessed when the association
+        or value is missing.
+        """
+        table = self.metadata.get_table(authz, table_name)
+        if table is None:
+            return {
+                "status": "table_not_found",
+                "table": table_name,
+                "field": field,
+                "matches": [],
+                "researchPolicy": "internal_only",
+            }
+        column = table.column(field)
+        if column is None:
+            return {
+                "status": "field_not_found",
+                "table": table.full_name,
+                "field": field,
+                "matches": [],
+                "researchPolicy": "internal_only",
+            }
+        if not column.code_table_no:
+            return {
+                "status": "code_table_not_governed",
+                "table": table.full_name,
+                "field": field,
+                "matches": [],
+                "researchPolicy": "internal_only",
+            }
+        matches = self.metadata.resolve_code_values(
+            authz,
+            column.code_table_no,
+            phrase,
+            limit=limit,
+        )
+        return {
+            "status": "resolved" if matches else "value_not_found",
+            "table": table.full_name,
+            "field": field,
+            "codeTableNo": column.code_table_no,
+            "matches": [asdict(item) for item in matches],
+            "researchPolicy": "internal_only",
+        }
+
     def get_semantic_model(self, authz: AuthzContext, metric_id: str) -> dict[str, Any]:
         metric = self.semantics.get(authz, metric_id)
         return {"found": metric is not None, "metric": asdict(metric) if metric else None}
