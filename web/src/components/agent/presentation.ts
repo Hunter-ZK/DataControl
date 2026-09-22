@@ -84,6 +84,7 @@ export function displaySql(item: AgentMessage) {
 
 export function activityLabel(event: AgentActivity) {
   const labels: Record<string, string> = {
+    plan_metric: '规划指标口径',
     resolve_metric: '解析指标',
     get_schema: '读取表结构',
     search_tables: '检索数据资产',
