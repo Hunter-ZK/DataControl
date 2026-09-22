@@ -11,6 +11,8 @@ from agent3.semantic.compiler import SemanticCompiler
 from agent3.semantic.models import (
     ClarificationOption,
     ClarificationRequest,
+    ComparisonKind,
+    MetricKind,
     QueryIR,
     SelectionMode,
 )
@@ -227,9 +229,48 @@ class Agent3Core:
         }
 
     def compile_query(self, authz: AuthzContext, ir: QueryIR) -> dict[str, Any]:
+        metric_ids = ir.all_metric_ids()
+        metrics = [self.semantics.get(authz, metric_id) for metric_id in metric_ids]
+        if any(metric is None for metric in metrics):
+            missing = [
+                metric_id
+                for metric_id, metric in zip(metric_ids, metrics, strict=True)
+                if metric is None
+            ]
+            raise ValueError(f"unknown metric(s): {', '.join(missing)}")
+
         sql = self.compiler.compile(authz, ir)
-        validation = self.validator.validate(authz, sql, metric_id=ir.metric_id)
-        return {"sql": sql, "validation": validation.to_dict()}
+        # The deterministic semantic compiler itself enforces governed metric,
+        # dimension, filter, time, ratio and comparison contracts. The SQL
+        # validator then checks syntax/metadata/risk. For the legacy single BASE
+        # metric path we additionally retain metric-shape validation.
+        single_base = (
+            len(metric_ids) == 1
+            and metrics[0] is not None
+            and metrics[0].kind is MetricKind.BASE
+            and ir.comparison is ComparisonKind.NONE
+        )
+        validation = self.validator.validate(
+            authz,
+            sql,
+            metric_id=ir.metric_id if single_base else None,
+        )
+        return {
+            "sql": sql,
+            "validation": validation.to_dict(),
+            "semanticPlan": {
+                "metrics": list(metric_ids),
+                "dimensions": list(ir.dimensions),
+                "filters": [asdict(item) for item in ir.filters],
+                "timeValues": list(ir.time_values),
+                "comparison": ir.comparison.value,
+                "order": ir.order,
+                "orderMetricId": ir.order_metric_id or ir.metric_id,
+                "limit": ir.limit,
+                "researchPolicy": "internal_only",
+                "semanticValidated": True,
+            },
+        }
 
     def register_verified_sql(
         self,
