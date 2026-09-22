@@ -7,6 +7,7 @@ import DatasetDetailView from '@/views/DatasetDetailView.vue'
 import FieldDetailView from '@/views/FieldDetailView.vue'
 import CodeTableDetailView from '@/views/CodeTableDetailView.vue'
 import DataStandardDetailView from '@/views/DataStandardDetailView.vue'
+import MetricDetailView from '@/views/MetricDetailView.vue'
 import ReferenceDetailView from '@/views/ReferenceDetailView.vue'
 import OverviewView from '@/views/OverviewView.vue'
 import ReferenceListView from '@/views/ReferenceListView.vue'
@@ -36,7 +37,7 @@ const router = createRouter({
         { path: 'word-roots', name: 'wordRoots', component: ReferenceListView, props: { kind: 'word-roots' }, meta: { title: '词根索引' } },
         { path: 'word-roots/:root', name: 'wordRoot', component: ReferenceDetailView, props: { kind: 'word-roots' }, meta: { title: '词根详情' } },
         { path: 'metrics', name: 'metrics', component: ReferenceListView, props: { kind: 'metrics' }, meta: { title: '指标与制度' } },
-        { path: 'metrics/:code', name: 'metric', component: ReferenceDetailView, props: { kind: 'metrics' }, meta: { title: '指标详情' } },
+        { path: 'metrics/:code', name: 'metric', component: MetricDetailView, meta: { title: '指标语义详情' } },
         { path: 'stat-systems', name: 'statSystems', component: ReferenceListView, props: { kind: 'stat-systems' }, meta: { title: '统计制度' } },
         { path: 'stat-systems/:code', name: 'statSystem', component: ReferenceDetailView, props: { kind: 'stat-systems' }, meta: { title: '统计制度详情' } },
         { path: 'profile', name: 'profile', component: ProfileView, meta: { title: '个人中心' } },
