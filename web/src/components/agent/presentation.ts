@@ -86,10 +86,11 @@ export function activityLabel(event: AgentActivity) {
   const labels: Record<string, string> = {
     plan_metric: '规划指标口径',
     resolve_metric: '解析指标',
+    resolve_code_value: '解析标准码值',
     get_schema: '读取表结构',
     search_tables: '检索数据资产',
     get_semantic_model: '读取指标口径',
-    compile_query: '生成可信 SQL',
+    compile_query: '编译语义查询',
     validate_sql: '静态校验 SQL',
     explain_sql: '解析 SQL',
     search_verified_sql: '检索可信 SQL',
