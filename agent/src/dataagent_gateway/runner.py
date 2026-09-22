@@ -20,6 +20,7 @@ MCP_TOOL_SUFFIXES = {
     "get_schema",
     "get_semantic_model",
     "resolve_metric",
+    "plan_metric",
     "search_verified_sql",
     "validate_sql",
     "explain_sql",
@@ -61,7 +62,11 @@ def _extract_sql_from_text(text: str) -> str | None:
     fenced = re.search(r"```(?:sql)?\s*(.+?)```", stripped, flags=re.IGNORECASE | re.DOTALL)
     if fenced:
         candidate = fenced.group(1).strip()
-        if re.match(r"^(SELECT|WITH|INSERT|UPDATE|DELETE|MERGE|CREATE|ALTER|DROP|TRUNCATE)\b", candidate, flags=re.IGNORECASE):
+        if re.match(
+            r"^(SELECT|WITH|INSERT|UPDATE|DELETE|MERGE|CREATE|ALTER|DROP|TRUNCATE)\b",
+            candidate,
+            flags=re.IGNORECASE,
+        ):
             return candidate
     match = re.search(
         r"\b(SELECT|WITH|INSERT|UPDATE|DELETE|MERGE|CREATE|ALTER|DROP|TRUNCATE)\b[\s\S]*",
@@ -106,12 +111,7 @@ def _json_or_text(value: Any) -> Any:
 
 
 def _presentation_answer(text: str) -> str:
-    """Preserve safe presentation markdown while removing duplicate SQL/image payloads.
-
-    SQL and evidence have dedicated product blocks. Markdown structure is retained so
-    the Vue client can render headings, lists, tables, emphasis, quotes and non-SQL
-    code without exposing hidden reasoning or trusting raw HTML.
-    """
+    """Preserve safe presentation markdown while removing duplicate SQL/image payloads."""
     value = re.sub(r"```sql\s*[\s\S]*?```", "", text, flags=re.IGNORECASE)
     value = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", value)
     value = re.sub(r"\n{3,}", "\n\n", value).strip()
@@ -150,16 +150,25 @@ def _validation_state(sql: str | None, validation: Any) -> str:
     return "unknown"
 
 
+def _metric_evidence(metric: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "code": metric.get("id"),
+        "name": metric.get("name"),
+        "sourceEntity": metric.get("source_entity"),
+        "measure": metric.get("measure"),
+        "timeField": metric.get("time_field"),
+        "validDimensions": metric.get("valid_dimensions") or [],
+    }
+
+
 def parse_event_stream(stdout: str) -> dict[str, Any]:
     events: list[dict[str, Any]] = []
     session_id: str | None = None
     final_text = ""
     stop_reason: str | None = None
 
-    # SQL and validation are evidence-bound. We only associate a validation result
-    # with the SQL carried by that validate_sql call (or by a compile_query result
-    # that embeds its own validation). A later unvalidated compile must not inherit
-    # an earlier validation badge.
+    # SQL and validation are evidence-bound. Validation may only describe the SQL
+    # carried by the same validate/compile result.
     sql: str | None = None
     validation: Any = None
     sql_source_call_id: str | None = None
@@ -175,6 +184,8 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
     period: dict[str, str] | None = None
     caliber: str | None = None
     warnings: list[str] = []
+    clarification: dict[str, Any] | None = None
+    research_policy = "internal_only"
 
     for raw_line in stdout.splitlines():
         line = raw_line.strip()
@@ -213,13 +224,21 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
                 tool_input = raw_input if isinstance(raw_input, dict) else {}
                 call_tools[call_id] = suffix
                 call_inputs[call_id] = tool_input
-                events.append({"type": "tool_call", "callId": call_id, "tool": suffix, "input": tool_input})
+                events.append(
+                    {"type": "tool_call", "callId": call_id, "tool": suffix, "input": tool_input}
+                )
                 if suffix == "compile_query":
-                    dimensions = [str(x) for x in tool_input.get("dimensions", []) if str(x)]
-                    time_values = [str(x) for x in tool_input.get("time_values", []) if str(x)]
+                    dimensions = [str(item) for item in tool_input.get("dimensions", []) if str(item)]
+                    time_values = [str(item) for item in tool_input.get("time_values", []) if str(item)]
                     if time_values:
                         token = time_values[0]
-                        if token.upper() in {"LATEST", "CURRENT"} or token in {"本期", "当期", "当前", "最新", "最近一期"}:
+                        if token.upper() in {"LATEST", "CURRENT"} or token in {
+                            "本期",
+                            "当期",
+                            "当前",
+                            "最新",
+                            "最近一期",
+                        }:
                             period = {"label": "本期 / 最新一期", "resolved": "LATEST"}
                         elif token.upper() in {"PREVIOUS", "PRIOR"} or token in {"上期", "上一期"}:
                             period = {"label": "上期", "resolved": "PREVIOUS"}
@@ -233,7 +252,14 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
             if not tool:
                 continue
             result = _json_or_text(event.get("result"))
-            events.append({"type": "tool_result", "callId": call_id, "tool": tool, "status": event.get("status")})
+            events.append(
+                {
+                    "type": "tool_result",
+                    "callId": call_id,
+                    "tool": tool,
+                    "status": event.get("status"),
+                }
+            )
 
             if tool == "compile_query":
                 compiled_sql = _extract_sql(result)
@@ -249,8 +275,6 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
                         validation_call_id = call_id
 
             elif tool == "validate_sql":
-                # The validate_sql input is the authoritative SQL for this result.
-                # Never pair a validation result with an unrelated earlier compile.
                 validated_sql = _extract_sql(call_inputs.get(call_id, {})) or _extract_sql(result)
                 if validated_sql:
                     sql = validated_sql
@@ -259,29 +283,48 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
                     validation_call_id = call_id
 
             if isinstance(result, dict):
-                if tool in {"resolve_metric", "get_semantic_model"}:
+                if tool in {"resolve_metric", "get_semantic_model", "plan_metric"}:
                     metric = result.get("metric")
                     if isinstance(metric, dict):
-                        row = {
-                            "code": metric.get("id"),
-                            "name": metric.get("name"),
-                            "sourceEntity": metric.get("source_entity"),
-                            "measure": metric.get("measure"),
-                            "timeField": metric.get("time_field"),
-                            "validDimensions": metric.get("valid_dimensions") or [],
-                        }
-                        metrics.append(row)
+                        metrics.append(_metric_evidence(metric))
                         if metric.get("source_entity"):
-                            datasets.append({"tableName": metric.get("source_entity"), "name": metric.get("source_entity")})
+                            datasets.append(
+                                {
+                                    "tableName": metric.get("source_entity"),
+                                    "name": metric.get("source_entity"),
+                                }
+                            )
                         if metric.get("caveats"):
                             caliber = str(metric.get("caveats"))
+                    if tool == "plan_metric":
+                        policy = result.get("researchPolicy")
+                        if isinstance(policy, str) and policy:
+                            research_policy = policy
+                        candidate = result.get("clarification")
+                        if isinstance(candidate, dict) and result.get("status") in {
+                            "clarification_required",
+                            "evidence_insufficient",
+                        }:
+                            clarification = candidate
                 elif tool == "search_tables":
-                    for table in result.get("tables", []) if isinstance(result.get("tables"), list) else []:
+                    tables = result.get("tables", [])
+                    for table in tables if isinstance(tables, list) else []:
                         if isinstance(table, dict):
-                            datasets.append({"tableName": table.get("full_name"), "name": table.get("description") or table.get("full_name")})
+                            datasets.append(
+                                {
+                                    "tableName": table.get("full_name"),
+                                    "name": table.get("description") or table.get("full_name"),
+                                }
+                            )
                 elif tool == "get_schema" and result.get("found"):
-                    datasets.append({"tableName": result.get("table"), "name": result.get("description") or result.get("table")})
-                    for warning in result.get("warnings", []) if isinstance(result.get("warnings"), list) else []:
+                    datasets.append(
+                        {
+                            "tableName": result.get("table"),
+                            "name": result.get("description") or result.get("table"),
+                        }
+                    )
+                    source_warnings = result.get("warnings", [])
+                    for warning in source_warnings if isinstance(source_warnings, list) else []:
                         warnings.append(str(warning))
             continue
 
@@ -290,8 +333,6 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
     if not final_text.strip():
         raise HarnessRunError("dsh completed without a final assistant answer")
 
-    # A compiled SQL can be shown even before validation, but it must be explicitly
-    # marked not_validated instead of inheriting a previous validation result.
     if sql is None and last_compiled_sql:
         sql = last_compiled_sql
         sql_source_call_id = last_compile_call_id
@@ -313,6 +354,8 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
         "validationState": _validation_state(sql, validation),
         "sqlSourceCallId": sql_source_call_id,
         "validationCallId": validation_call_id,
+        "clarification": clarification,
+        "researchPolicy": research_policy,
         "evidence": {
             "metrics": _dedupe_dicts(metrics, "code"),
             "datasets": _dedupe_dicts(datasets, "tableName"),
@@ -330,8 +373,12 @@ class HeadlessHarnessRunner:
     def __init__(self, *, timeout_seconds: float | None = None) -> None:
         self.repo_root = Path(__file__).resolve().parents[3]
         self.agent_root = self.repo_root / "agent"
-        self.timeout_seconds = timeout_seconds or float(os.getenv("DATACONTROL_AGENT_RUN_TIMEOUT", "120"))
-        self.dsh_home = Path(os.getenv("DSH_HOME", str(self.repo_root / ".local" / "dsh-home"))).resolve()
+        self.timeout_seconds = timeout_seconds or float(
+            os.getenv("DATACONTROL_AGENT_RUN_TIMEOUT", "120")
+        )
+        self.dsh_home = Path(
+            os.getenv("DSH_HOME", str(self.repo_root / ".local" / "dsh-home"))
+        ).resolve()
         suffix = "dsh.cmd" if os.name == "nt" else "dsh"
         self.dsh_bin = self.agent_root / "dsh" / "node_modules" / ".bin" / suffix
         self.profile = os.getenv("DATACONTROL_DSH_PROFILE", "dataagent-headless")
@@ -342,7 +389,6 @@ class HeadlessHarnessRunner:
 
     async def _mcp_reachable(self) -> bool:
         try:
-            # MCP is always local. Do not let HTTP(S)_PROXY/ALL_PROXY intercept 8900.
             async with httpx.AsyncClient(timeout=1.0, trust_env=False) as client:
                 await client.get("http://127.0.0.1:8900/mcp")
             return True
@@ -375,9 +421,6 @@ class HeadlessHarnessRunner:
         }
 
     def _command(self, session_id: str | None) -> list[str]:
-        # The user prompt is deliberately absent from argv and is sent through
-        # stdin instead. dsh-headless officially reads the task from stdin when
-        # no positional task is supplied.
         command = [str(self.dsh_bin), "--profile", self.profile, "--json"]
         if session_id:
             command.extend(["--session-id", _safe_session_id(session_id)])
@@ -392,10 +435,10 @@ class HeadlessHarnessRunner:
             "stderr": asyncio.subprocess.PIPE,
         }
         if os.name == "nt":
-            # npm exposes dsh as dsh.cmd on Windows. The only dynamic argv value
-            # is the validated session id; the untrusted user question is stdin.
             cmdline = subprocess.list2cmdline(command)
-            return await asyncio.create_subprocess_exec("cmd.exe", "/d", "/s", "/c", cmdline, **process_kwargs)
+            return await asyncio.create_subprocess_exec(
+                "cmd.exe", "/d", "/s", "/c", cmdline, **process_kwargs
+            )
         return await asyncio.create_subprocess_exec(*command, **process_kwargs)
 
     async def run(self, question: str, *, session_id: str | None = None) -> dict[str, Any]:
@@ -418,7 +461,9 @@ class HeadlessHarnessRunner:
         except TimeoutError as exc:
             process.kill()
             await process.wait()
-            raise HarnessRunError(f"dsh request exceeded {self.timeout_seconds:g}s timeout") from exc
+            raise HarnessRunError(
+                f"dsh request exceeded {self.timeout_seconds:g}s timeout"
+            ) from exc
 
         stdout_text = stdout.decode("utf-8", errors="replace")
         stderr_text = stderr.decode("utf-8", errors="replace")
