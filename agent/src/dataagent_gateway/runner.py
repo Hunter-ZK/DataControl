@@ -21,6 +21,7 @@ MCP_TOOL_SUFFIXES = {
     "get_semantic_model",
     "resolve_metric",
     "plan_metric",
+    "resolve_code_value",
     "search_verified_sql",
     "validate_sql",
     "explain_sql",
@@ -158,7 +159,27 @@ def _metric_evidence(metric: dict[str, Any]) -> dict[str, Any]:
         "measure": metric.get("measure"),
         "timeField": metric.get("time_field"),
         "validDimensions": metric.get("valid_dimensions") or [],
+        "metricKind": metric.get("kind"),
+        "timeGrain": metric.get("time_grain"),
     }
+
+
+def _period_from_tool_input(tool_input: dict[str, Any]) -> dict[str, str] | None:
+    time_values = [str(item) for item in tool_input.get("time_values", []) if str(item)]
+    if not time_values:
+        return None
+    token = time_values[0]
+    if token.upper() in {"LATEST", "CURRENT"} or token in {
+        "本期",
+        "当期",
+        "当前",
+        "最新",
+        "最近一期",
+    }:
+        return {"label": "本期 / 最新一期", "resolved": "LATEST"}
+    if token.upper() in {"PREVIOUS", "PRIOR"} or token in {"上期", "上一期"}:
+        return {"label": "上期", "resolved": "PREVIOUS"}
+    return {"label": token, "resolved": token}
 
 
 def parse_event_stream(stdout: str) -> dict[str, Any]:
@@ -180,11 +201,14 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
     call_inputs: dict[str, dict[str, Any]] = {}
     metrics: list[dict[str, Any]] = []
     datasets: list[dict[str, Any]] = []
+    code_values: list[dict[str, Any]] = []
     dimensions: list[str] = []
     period: dict[str, str] | None = None
     caliber: str | None = None
     warnings: list[str] = []
     clarification: dict[str, Any] | None = None
+    semantic_plan: dict[str, Any] | None = None
+    semantic_validation: dict[str, Any] | None = None
     research_policy = "internal_only"
 
     for raw_line in stdout.splitlines():
@@ -229,21 +253,7 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
                 )
                 if suffix == "compile_query":
                     dimensions = [str(item) for item in tool_input.get("dimensions", []) if str(item)]
-                    time_values = [str(item) for item in tool_input.get("time_values", []) if str(item)]
-                    if time_values:
-                        token = time_values[0]
-                        if token.upper() in {"LATEST", "CURRENT"} or token in {
-                            "本期",
-                            "当期",
-                            "当前",
-                            "最新",
-                            "最近一期",
-                        }:
-                            period = {"label": "本期 / 最新一期", "resolved": "LATEST"}
-                        elif token.upper() in {"PREVIOUS", "PRIOR"} or token in {"上期", "上一期"}:
-                            period = {"label": "上期", "resolved": "PREVIOUS"}
-                        else:
-                            period = {"label": token, "resolved": token}
+                    period = _period_from_tool_input(tool_input) or period
             continue
 
         if event_type == "tool_result":
@@ -273,6 +283,18 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
                         validation = nested_validation
                         sql_source_call_id = call_id
                         validation_call_id = call_id
+                    candidate_plan = result.get("semanticPlan")
+                    if isinstance(candidate_plan, dict):
+                        semantic_plan = candidate_plan
+                        plan_dimensions = candidate_plan.get("dimensions")
+                        if isinstance(plan_dimensions, list):
+                            dimensions = [str(item) for item in plan_dimensions if str(item)]
+                        policy = candidate_plan.get("researchPolicy")
+                        if isinstance(policy, str) and policy:
+                            research_policy = policy
+                    candidate_semantic_validation = result.get("semanticValidation")
+                    if isinstance(candidate_semantic_validation, dict):
+                        semantic_validation = candidate_semantic_validation
 
             elif tool == "validate_sql":
                 validated_sql = _extract_sql(call_inputs.get(call_id, {})) or _extract_sql(result)
@@ -306,6 +328,30 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
                             "evidence_insufficient",
                         }:
                             clarification = candidate
+                elif tool == "resolve_code_value":
+                    policy = result.get("researchPolicy")
+                    if isinstance(policy, str) and policy:
+                        research_policy = policy
+                    matches = result.get("matches", [])
+                    if isinstance(matches, list) and matches:
+                        tool_input = call_inputs.get(call_id, {})
+                        code_values.append(
+                            {
+                                "tableName": result.get("table"),
+                                "field": result.get("field"),
+                                "phrase": tool_input.get("phrase"),
+                                "codeTableNo": result.get("codeTableNo"),
+                                "matches": [
+                                    {
+                                        "value": item.get("value"),
+                                        "name": item.get("name"),
+                                        "description": item.get("description"),
+                                    }
+                                    for item in matches
+                                    if isinstance(item, dict)
+                                ],
+                            }
+                        )
                 elif tool == "search_tables":
                     tables = result.get("tables", [])
                     for table in tables if isinstance(tables, list) else []:
@@ -356,9 +402,12 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
         "validationCallId": validation_call_id,
         "clarification": clarification,
         "researchPolicy": research_policy,
+        "semanticPlan": semantic_plan,
+        "semanticValidation": semantic_validation,
         "evidence": {
             "metrics": _dedupe_dicts(metrics, "code"),
             "datasets": _dedupe_dicts(datasets, "tableName"),
+            "codeValues": code_values,
             "dimensions": list(dict.fromkeys(dimensions)),
             "period": period,
             "caliber": caliber,
