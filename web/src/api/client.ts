@@ -1,6 +1,10 @@
 import axios, { type AxiosRequestConfig } from 'axios'
 
-const http = axios.create({ baseURL: '/api/v1', timeout: 120000 })
+const http = axios.create({
+  baseURL: '/api/v1',
+  timeout: 120000,
+  paramsSerializer: { indexes: null },
+})
 
 http.interceptors.request.use((config) => {
   const token = localStorage.getItem('datacontrol_token')
