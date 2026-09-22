@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 
 from agent3.contracts.authz import AuthzContext
-from agent3.metadata.models import ColumnMetadata, TableMetadata
+from agent3.metadata.models import CodeValueMetadata, ColumnMetadata, TableMetadata
 
 
 class PortalMetadataError(RuntimeError):
@@ -51,7 +51,7 @@ class PortalMetadataProvider:
         return TableMetadata(
             full_name=str(row.get("tableName") or row.get("technicalName") or row.get("assetId") or ""),
             description=str(row.get("bizDefinition") or row.get("snippet") or ""),
-            aliases=tuple(x for x in (row.get("bizName"), row.get("title")) if x),
+            aliases=tuple(value for value in (row.get("bizName"), row.get("title")) if value),
         )
 
     @staticmethod
@@ -61,16 +61,20 @@ class PortalMetadataProvider:
                 name=str(item.get("columnName") or ""),
                 data_type=str(item.get("dataType") or "unknown"),
                 description=str(item.get("bizDefinition") or item.get("cnName") or ""),
+                code_table_no=str(item.get("codeTableNo") or ""),
+                standard_no=str(item.get("standardNo") or ""),
             )
             for item in row.get("columns", [])
             if item.get("columnName")
         )
         description = "；".join(
-            x for x in (
+            value
+            for value in (
                 str(row.get("bizDefinition") or "").strip(),
                 str(row.get("statCaliber") or "").strip(),
                 str(row.get("usageNotes") or "").strip(),
-            ) if x
+            )
+            if value
         )
         return TableMetadata(
             full_name=str(row.get("tableName") or row.get("assetId") or ""),
@@ -78,7 +82,7 @@ class PortalMetadataProvider:
             columns=columns,
             partition_fields=(),
             row_count_estimate=row.get("rowCount"),
-            aliases=tuple(x for x in (row.get("bizName"),) if x),
+            aliases=tuple(value for value in (row.get("bizName"),) if value),
         )
 
     def all_tables(self, authz: AuthzContext) -> tuple[TableMetadata, ...]:
@@ -86,17 +90,29 @@ class PortalMetadataProvider:
         rows = self._get("/tables", params={"limit": 200})
         return tuple(self._brief(row) for row in rows)
 
-    def search_tables(self, authz: AuthzContext, query: str, *, limit: int = 8) -> tuple[TableMetadata, ...]:
+    def search_tables(
+        self,
+        authz: AuthzContext,
+        query: str,
+        *,
+        limit: int = 8,
+    ) -> tuple[TableMetadata, ...]:
         _ = authz
         phrase = _search_phrase(query)
         try:
-            result = self._get("/search", params={"q": phrase, "asset_type": "TABLE", "limit": max(limit * 3, 20)})
+            result = self._get(
+                "/search",
+                params={"q": phrase, "asset_type": "TABLE", "limit": max(limit * 3, 20)},
+            )
             items = result.get("items", []) if isinstance(result, dict) else []
             rows = [item for item in items if item.get("assetType") == "TABLE"]
         except PortalMetadataError:
             rows = []
         if not rows:
-            rows = self._get("/tables", params={"keyword": phrase, "limit": min(max(limit * 3, 20), 200)})
+            rows = self._get(
+                "/tables",
+                params={"keyword": phrase, "limit": min(max(limit * 3, 20), 200)},
+            )
         return tuple(self._brief(row) for row in rows[:limit])
 
     def get_table(self, authz: AuthzContext, full_name: str) -> TableMetadata | None:
@@ -126,3 +142,44 @@ class PortalMetadataProvider:
                 return None
             raise
         return self._detail(detail)
+
+    def resolve_code_values(
+        self,
+        authz: AuthzContext,
+        code_table_no: str,
+        query: str,
+        *,
+        limit: int = 8,
+    ) -> tuple[CodeValueMetadata, ...]:
+        _ = authz
+        detail = self._get(f"/code-tables/{code_table_no}")
+        values = detail.get("values", []) if isinstance(detail, dict) else []
+        needle = query.strip().casefold()
+        ranked: list[tuple[int, CodeValueMetadata]] = []
+        for row in values if isinstance(values, list) else []:
+            value = str(row.get("value") or "")
+            name = str(row.get("name") or "")
+            description = str(row.get("description") or "")
+            if not value:
+                continue
+            if not needle:
+                score = 1
+            elif value.casefold() == needle or name.casefold() == needle:
+                score = 100
+            elif needle in name.casefold() or needle in description.casefold():
+                score = 10
+            else:
+                continue
+            ranked.append(
+                (
+                    score,
+                    CodeValueMetadata(
+                        code_table_no=code_table_no,
+                        value=value,
+                        name=name or value,
+                        description=description,
+                    ),
+                )
+            )
+        ranked.sort(key=lambda item: (-item[0], item[1].value))
+        return tuple(item for _, item in ranked[: max(1, limit)])
