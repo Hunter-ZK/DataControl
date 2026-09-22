@@ -10,6 +10,8 @@ class ColumnMetadata:
     description: str = ""
     nullable: bool = True
     sensitive: bool = False
+    code_table_no: str = ""
+    standard_no: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,8 +25,8 @@ class TableMetadata:
 
     def column(self, name: str) -> ColumnMetadata | None:
         folded = name.casefold()
-        return next((c for c in self.columns if c.name.casefold() == folded), None)
+        return next((column for column in self.columns if column.name.casefold() == folded), None)
 
     @property
     def column_names(self) -> frozenset[str]:
-        return frozenset(c.name.casefold() for c in self.columns)
+        return frozenset(column.name.casefold() for column in self.columns)
