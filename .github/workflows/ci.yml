@@ -105,6 +105,10 @@ jobs:
         env:
           DSH_HOME: ${{ runner.temp }}/datacontrol-dsh-home
         run: python scripts/p0_stub_e2e.py
+      - name: Run deterministic P2 semantic-agent acceptance
+        env:
+          DSH_HOME: ${{ runner.temp }}/datacontrol-dsh-home
+        run: python scripts/p2_stub_e2e.py
 
   frontend-cross-platform:
     strategy:
