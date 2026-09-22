@@ -23,6 +23,27 @@ async function remove<T>(url: string): Promise<T> {
   return response.data.data
 }
 
+export interface DatasetBrief {
+  assetId: string
+  tableName: string
+  bizName: string
+  layerCode: string
+  workspaceCode?: string | null
+  catalogCode: string
+  status: string
+  isCommon?: boolean
+  techOwner?: string | null
+  updateFreq?: string | null
+  dataUpdatedAt?: string | null
+}
+
+export interface DatasetPage {
+  total: number
+  offset: number
+  limit: number
+  items: DatasetBrief[]
+}
+
 export interface SearchItem {
   assetId: string
   assetType: string
@@ -67,6 +88,11 @@ export interface RelationNode {
   catalogCode?: string | null
   status?: string | null
   isCenter?: boolean
+  level?: number
+  datasetId?: string
+  datasetName?: string
+  columnName?: string
+  dataType?: string
 }
 
 export interface RelationEdge {
@@ -75,10 +101,15 @@ export interface RelationEdge {
   target: string
   taskName?: string | null
   evidence: string
+  transformation?: string | null
+  relationType?: string
+  sourceDatasetId?: string
+  targetDatasetId?: string
 }
 
 export interface RelationGraph {
   centerAssetId: string
+  centerDatasetId?: string
   depth: number
   direction: string
   truncated: boolean
@@ -86,6 +117,12 @@ export interface RelationGraph {
   edges: RelationEdge[]
   impactCount?: number
   impactByLayer?: Record<string, number>
+}
+
+export interface TableFieldLineage {
+  datasetId: string
+  nodes: RelationNode[]
+  edges: RelationEdge[]
 }
 
 export interface AgentStatus {
@@ -188,6 +225,7 @@ export const assetApi = {
   overview: () => get<Record<string, unknown>>('/home/overview'),
   catalogs: () => get<unknown[]>('/catalogs'),
   tables: (params?: Record<string, unknown>) => get<unknown[]>('/tables', { params }),
+  tablePage: (params?: Record<string, unknown>) => get<DatasetPage>('/tables/page', { params }),
   table: (id: string) => get<Record<string, any>>(`/tables/${id}`),
   columns: (params?: Record<string, unknown>) => get<unknown[]>('/columns', { params }),
   search: (q: string, params?: Record<string, unknown>) =>
@@ -205,10 +243,13 @@ export const assetApi = {
 export const relationApi = {
   graph: (id: string, params?: Record<string, unknown>) =>
     get<RelationGraph>(`/relations/graph/${id}`, { params }),
+  columnGraph: (id: string, params?: Record<string, unknown>) =>
+    get<RelationGraph>(`/relations/columns/${id}`, { params }),
+  tableFields: (id: string) => get<TableFieldLineage>(`/relations/fields/table/${id}`),
   impact: (id: string, params?: Record<string, unknown>) =>
     get<RelationGraph>(`/relations/impact/${id}`, { params }),
   path: (source: string, target: string, maxDepth = 8) =>
-    get<unknown>('/relations/path', { params: { source, target, max_depth: maxDepth } }),
+    get<any>('/relations/path', { params: { source, target, max_depth: maxDepth } }),
 }
 
 export const agentApi = {
