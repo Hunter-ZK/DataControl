@@ -34,6 +34,7 @@ def build_poc_server():
     for tool in (
         adapter.search_tables,
         adapter.get_schema,
+        adapter.resolve_code_value,
         adapter.get_semantic_model,
         adapter.resolve_metric,
         adapter.plan_metric,
