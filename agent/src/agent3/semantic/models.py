@@ -29,9 +29,15 @@ class SelectionMode(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class MandatoryFilter:
+    """Governed filter expression used by the semantic compiler.
+
+    P2 intentionally keeps this as a small declarative contract rather than
+    accepting raw SQL. Supported operators are enforced in the compiler.
+    """
+
     field: str
     op: str
-    value: Any
+    value: Any = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,10 +83,23 @@ class ClarificationRequest:
 
 @dataclass(frozen=True, slots=True)
 class QueryIR:
+    """Deterministic query plan consumed by the semantic compiler.
+
+    ``metric_id`` remains the primary/output metric for backwards compatibility.
+    ``metric_ids`` adds compatible secondary metrics for a single governed query.
+    Cross-source combinations fail closed instead of being silently joined.
+    """
+
     metric_id: str
+    metric_ids: tuple[str, ...] = ()
     dimensions: tuple[str, ...] = ()
     filters: tuple[MandatoryFilter, ...] = ()
     time_values: tuple[str, ...] = ()
     comparison: ComparisonKind = ComparisonKind.NONE
     order: str = ""
+    order_metric_id: str = ""
     limit: int | None = None
+
+    def all_metric_ids(self) -> tuple[str, ...]:
+        values = (self.metric_id, *self.metric_ids)
+        return tuple(dict.fromkeys(value for value in values if value))
