@@ -26,6 +26,7 @@ if($LASTEXITCODE -ne 0){throw "Existing .venv must use Python 3.13 or 3.14."}
 & $python samples\enrich_p1_data.py
 & $python samples\enrich_p3_reference.py
 & $python samples\enrich_next_p1_lineage.py
+& $python samples\enrich_next_p2_semantics.py
 & $python samples\rebuild_search_index.py
 & $python samples\generate_p3_question_bank.py
 
@@ -35,4 +36,5 @@ try{npm install}finally{Pop-Location}
 & .\scripts\setup-agent.ps1
 Write-Host ("Setup complete. Python: " + (& $python --version))
 Write-Host "P3 question bank: .local\p3-question-bank.json"
+Write-Host "Next-P2 semantic fixtures: READY"
 Write-Host "Run .\scripts\start-dev.ps1"
