@@ -66,7 +66,24 @@ def test_schema_and_search_are_structured():
     core = build_demo_core()
     authz = AuthzContext.system()
     assert core.search_tables(authz, "贷款快照")["tables"][0]["full_name"] == "dw.dwd_loan_snapshot"
-    assert core.get_schema(authz, "dwd_loan_snapshot")["found"] is True
+    schema = core.get_schema(authz, "dwd_loan_snapshot")
+    assert schema["found"] is True
+    currency = next(item for item in schema["columns"] if item["name"] == "currency_cd")
+    assert currency["code_table_no"] == "CD_CURRENCY"
+
+
+def test_p2_code_value_resolution_uses_internal_governed_code_table():
+    core = build_demo_core()
+    result = core.resolve_code_value(
+        AuthzContext.system(),
+        "dw.dwd_loan_snapshot",
+        "currency_cd",
+        "人民币",
+    )
+    assert result["status"] == "resolved"
+    assert result["researchPolicy"] == "internal_only"
+    assert result["codeTableNo"] == "CD_CURRENCY"
+    assert result["matches"][0]["value"] == "CNY"
 
 
 def _p2_core() -> Agent3Core:
