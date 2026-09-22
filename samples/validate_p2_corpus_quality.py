@@ -11,7 +11,15 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from backend.app.db.lineage_models import ColumnLineage
-from backend.app.db.models import CodeTable, Column, DataStandard, Dataset, Metric, TableLineage
+from backend.app.db.models import (
+    CodeTable,
+    CodeValue,
+    Column,
+    DataStandard,
+    Dataset,
+    Metric,
+    TableLineage,
+)
 from backend.app.db.session import SessionLocal
 
 QUESTION_BANK = ROOT / ".local" / "p2-question-bank.json"
@@ -33,14 +41,21 @@ def fail(errors: list[str], message: str) -> None:
 
 def main() -> None:
     errors: list[str] = []
+    metric_by_code: dict[str, Metric] = {}
+    code_pairs: set[tuple[str, str]] = set()
+
     with SessionLocal() as db:
         datasets = db.execute(select(Dataset)).scalars().all()
         columns = db.execute(select(Column)).scalars().all()
         metrics = db.execute(select(Metric)).scalars().all()
         code_tables = db.execute(select(CodeTable)).scalars().all()
+        code_values = db.execute(select(CodeValue)).scalars().all()
         standards = db.execute(select(DataStandard)).scalars().all()
         table_edges = db.execute(select(TableLineage)).scalars().all()
         column_edges = db.execute(select(ColumnLineage)).scalars().all()
+
+        metric_by_code = {item.metric_code: item for item in metrics}
+        code_pairs = {(item.code_name, item.code_value) for item in code_values}
 
         if len(datasets) < 260:
             fail(errors, f"dataset coverage too small: {len(datasets)} < 260")
@@ -130,6 +145,28 @@ def main() -> None:
         if missing_categories:
             fail(errors, f"P2 question corpus missing categories: {sorted(missing_categories)}")
 
+        for item in cases:
+            case_id = str(item.get("id") or "unknown")
+            expected_status = str(item.get("expectedStatus") or "")
+            expected_metrics = [str(code) for code in item.get("expectedMetrics", []) if code]
+            expected_dimensions = [str(name) for name in item.get("expectedDimensions", []) if name]
+            for metric_code in expected_metrics:
+                metric = metric_by_code.get(metric_code)
+                if metric is None:
+                    fail(errors, f"{case_id} expects unknown metric {metric_code}")
+                    continue
+                if expected_status == "resolved":
+                    valid_dimensions = {
+                        name.strip() for name in (metric.valid_dimensions or "").split(",") if name.strip()
+                    }
+                    for dimension in expected_dimensions:
+                        if dimension not in valid_dimensions:
+                            fail(errors, f"{case_id} expects unsupported dimension {dimension} for {metric_code}")
+
+            for phrase, value in (item.get("expectedCodeValues") or {}).items():
+                if (str(phrase), str(value)) not in code_pairs:
+                    fail(errors, f"{case_id} expects missing code value {phrase!r}->{value!r}")
+
     if errors:
         print("P2 CORPUS QUALITY GATE FAILED")
         for item in errors[:80]:
@@ -138,7 +175,7 @@ def main() -> None:
 
     print("P2 CORPUS QUALITY GATE PASSED")
     print("260+ assets / 30+ governed metrics / 500+ field-lineage edges / 50+ evaluation questions")
-    print("No numbered scenario fillers; metric-source-field/code-table/standard relationships are consistent")
+    print("No numbered scenario fillers; metadata, metric, code-value and evaluation expectations are mutually consistent")
 
 
 if __name__ == "__main__":
