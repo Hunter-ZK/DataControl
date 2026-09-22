@@ -39,6 +39,33 @@ def test_search_supports_short_chinese_multi_token_and_complete_pagination(tmp_p
         assert all("<mark>" in item["titleHighlight"] for item in multi["items"])
 
 
+def test_search_facets_exclude_their_own_filter():
+    unfiltered = client.get("/api/v1/search", params={"q": "贷款 余额", "limit": 20}).json()["data"]
+    filtered = client.get(
+        "/api/v1/search",
+        params=[("q", "贷款 余额"), ("asset_type", "METRIC"), ("limit", 20)],
+    ).json()["data"]
+    assert filtered["total"] == filtered["facets"]["assetTypes"].get("METRIC", 0)
+    assert filtered["facets"]["assetTypes"] == unfiltered["facets"]["assetTypes"]
+    assert len(filtered["facets"]["assetTypes"]) >= 2
+
+
+def test_catalog_page_reaches_assets_beyond_legacy_200_row_cutoff():
+    first = client.get("/api/v1/tables/page", params={"offset": 0, "limit": 20, "status": "ONLINE"})
+    later = client.get("/api/v1/tables/page", params={"offset": 240, "limit": 20, "status": "ONLINE"})
+    assert first.status_code == 200
+    assert later.status_code == 200
+    first_data = first.json()["data"]
+    later_data = later.json()["data"]
+    assert first_data["total"] >= 260
+    assert first_data["limit"] == 20
+    assert len(first_data["items"]) == 20
+    assert len(later_data["items"]) >= 1
+    assert {item["assetId"] for item in first_data["items"]}.isdisjoint(
+        {item["assetId"] for item in later_data["items"]}
+    )
+
+
 def test_both_direction_relation_does_not_cross_upstream_ancestor_into_sibling_branch():
     response = client.get(
         "/api/v1/relations/graph/DS000004",
@@ -48,12 +75,11 @@ def test_both_direction_relation_does_not_cross_upstream_ancestor_into_sibling_b
     data = response.json()["data"]
     node_ids = {node["assetId"] for node in data["nodes"]}
 
-    # DS000008 / DS000009 are downstream of upstream ancestor DS000002, not
-    # downstream of center DS000004. The old one-BFS `both` traversal leaked them.
     assert "DS000008" not in node_ids
     assert "DS000009" not in node_ids
     assert any(node["level"] < 0 for node in data["nodes"])
     assert any(node["level"] > 0 for node in data["nodes"])
+    assert all(edge["evidence"] in {"CONFIRMED", "INFERRED"} for edge in data["edges"])
 
 
 def test_field_lineage_api_exposes_upstream_downstream_and_transformation():
