@@ -22,10 +22,13 @@ jobs:
       - run: python samples/generate_demo_data.py
       - run: python samples/enrich_p1_data.py
       - run: python samples/enrich_p3_reference.py
+      - run: python samples/enrich_p2_realistic_corpus.py
       - run: python samples/enrich_next_p1_lineage.py
       - run: python samples/enrich_next_p2_semantics.py
       - run: python samples/rebuild_search_index.py
+      - run: python samples/generate_p2_question_bank.py
       - run: python samples/generate_p3_question_bank.py
+      - run: python samples/validate_p2_corpus_quality.py
       - run: python -m ruff check .
       - run: python -m pytest -q
       - run: python scripts/search_benchmark.py
@@ -87,9 +90,12 @@ jobs:
           python samples/generate_demo_data.py
           python samples/enrich_p1_data.py
           python samples/enrich_p3_reference.py
+          python samples/enrich_p2_realistic_corpus.py
           python samples/enrich_next_p1_lineage.py
           python samples/enrich_next_p2_semantics.py
           python samples/rebuild_search_index.py
+          python samples/generate_p2_question_bank.py
+          python samples/validate_p2_corpus_quality.py
       - name: Install pinned dsh
         working-directory: agent/dsh
         run: npm install --no-audit --no-fund
