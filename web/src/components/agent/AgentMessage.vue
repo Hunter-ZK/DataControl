@@ -5,6 +5,13 @@
       <div class="answer-label"><span class="agent-avatar"><Sparkles :size="16" /></span><b>DataAgent</b></div>
       <div class="answer-summary">{{ summaryText }}</div>
       <AgentMarkdown :text="message.text" :summary="summaryText" />
+      <AgentClarification
+        v-if="message.clarification"
+        :clarification="message.clarification"
+        :resolved="message.clarificationResolved"
+        :selection="message.clarificationSelection"
+        @clarify="emit('clarify', $event)"
+      />
       <AgentTrace :events="message.events" />
       <AgentEvidence :evidence="message.evidence" />
       <AgentSqlCard :message="message" />
@@ -16,6 +23,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Sparkles } from 'lucide-vue-next'
+import AgentClarification from '@/components/agent/AgentClarification.vue'
 import AgentEvidence from '@/components/agent/AgentEvidence.vue'
 import AgentMarkdown from '@/components/agent/AgentMarkdown.vue'
 import AgentSqlCard from '@/components/agent/AgentSqlCard.vue'
@@ -24,6 +32,9 @@ import AgentValidationPanel from '@/components/agent/AgentValidationPanel.vue'
 import type { AgentMessage } from '@/components/agent/types'
 
 const props = defineProps<{ message: AgentMessage }>()
+const emit = defineEmits<{
+  clarify: [payload: { values: string[]; labels: string[]; custom?: string }]
+}>()
 
 const summaryText = computed(() => {
   const explicit = props.message.summary?.trim()
