@@ -41,7 +41,11 @@ function Wait-HttpEndpoint([System.Diagnostics.Process]$Process,[string]$Url,[st
   while((Get-Date)-lt $deadline){
     $Process.Refresh()
     if($Process.HasExited){throw "$Name exited before becoming reachable (exit=$($Process.ExitCode)).`n--- $Name stderr ---`n$(Get-LogTail $ErrorLog)"}
-    & $python -c "import httpx,sys; r=httpx.get(sys.argv[1],timeout=1.0,trust_env=False); raise SystemExit(0 if r.status_code < 500 else 1)" $Url 2>$null
+    # A service that is still binding normally refuses the first few HTTP
+    # connections. Keep that expected condition silent so Windows PowerShell
+    # does not convert Python's traceback on stderr into a NativeCommandError
+    # while $ErrorActionPreference is Stop.
+    & $python -c "import httpx,sys; u=sys.argv[1]; ok=False;`ntry:`n r=httpx.get(u,timeout=1.0,trust_env=False); ok=r.status_code<500`nexcept Exception:`n pass`nraise SystemExit(0 if ok else 1)" $Url
     if($LASTEXITCODE -eq 0){return}
     Start-Sleep -Milliseconds 250
   }
