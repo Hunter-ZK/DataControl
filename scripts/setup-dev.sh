@@ -40,10 +40,13 @@ fi
 .venv/bin/python samples/generate_demo_data.py
 .venv/bin/python samples/enrich_p1_data.py
 .venv/bin/python samples/enrich_p3_reference.py
+.venv/bin/python samples/enrich_p2_realistic_corpus.py
 .venv/bin/python samples/enrich_next_p1_lineage.py
 .venv/bin/python samples/enrich_next_p2_semantics.py
 .venv/bin/python samples/rebuild_search_index.py
+.venv/bin/python samples/generate_p2_question_bank.py
 .venv/bin/python samples/generate_p3_question_bank.py
+.venv/bin/python samples/validate_p2_corpus_quality.py
 (cd web && npm install)
 
 if [ "$SKIP_AGENT" -eq 0 ]; then
@@ -54,6 +57,8 @@ else
 fi
 
 echo "Setup complete. Python: $(.venv/bin/python --version 2>&1)"
-echo "P3 question bank: .local/p3-question-bank.json"
-echo "Next-P2 semantic fixtures: READY"
+echo "P2 realistic corpus: READY"
+echo "P2 question bank: .local/p2-question-bank.json"
+echo "P2 corpus quality gate: PASSED"
+echo "P3 compatibility question bank: .local/p3-question-bank.json"
 echo "Run ./scripts/start-dev.sh"
