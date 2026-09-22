@@ -4,11 +4,29 @@ from backend.app.db.models import Column, Dataset, Metric
 from backend.app.db.session import SessionLocal
 
 
-def test_p3_acceptance_corpus_has_real_scale():
+def test_acceptance_corpus_has_realistic_scale_without_metric_fillers():
     with SessionLocal() as db:
-        assert (db.scalar(select(func.count()).select_from(Dataset)) or 0) >= 250
-        assert (db.scalar(select(func.count()).select_from(Column)) or 0) >= 2400
-        assert (db.scalar(select(func.count()).select_from(Metric)) or 0) >= 70
+        dataset_count = db.scalar(select(func.count()).select_from(Dataset)) or 0
+        column_count = db.scalar(select(func.count()).select_from(Column)) or 0
+        metrics = db.scalars(select(Metric)).all()
+
+        assert dataset_count >= 250
+        assert column_count >= 2400
+        # P2.1 intentionally removed dozens of near-duplicate metrics that existed
+        # only to satisfy a volume target. Thirty distinct governed metrics are a
+        # stronger corpus than seventy copy variants.
+        assert len(metrics) >= 30
+        assert len({metric.metric_code for metric in metrics}) == len(metrics)
+        assert len({metric.metric_name for metric in metrics}) == len(metrics)
+
+        kinds = {metric.metric_kind for metric in metrics}
+        assert {"BASE", "RATIO", "DERIVED"} <= kinds
+        assert sum(metric.metric_kind == "RATIO" for metric in metrics) >= 5
+        assert not any(
+            metric.metric_name.endswith(suffix)
+            for metric in metrics
+            for suffix in ("总量", "机构口径", "地区口径", "监管口径", "经营口径", "分析口径")
+        )
 
 
 def test_golden_loan_balance_semantics_are_complete():
