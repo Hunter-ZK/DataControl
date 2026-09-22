@@ -66,27 +66,41 @@ class MCPToolAdapter:
     def compile_query(
         self,
         metric_id: str,
+        metric_ids: list[str] | None = None,
         dimensions: list[str] | None = None,
         time_values: list[str] | None = None,
         filters: list[dict[str, Any]] | None = None,
         comparison: str = "none",
         order: str = "",
+        order_metric_id: str = "",
         limit: int | None = None,
     ) -> dict[str, Any]:
+        """Compile a governed P2 query plan.
+
+        ``metric_id`` is the primary metric. ``metric_ids`` may contain compatible
+        secondary metrics from the same source. Filters are declarative objects;
+        raw SQL filter fragments are intentionally not accepted.
+        """
         try:
             comparison_kind = ComparisonKind(comparison.casefold())
         except ValueError as exc:
             raise ValueError("comparison must be one of: none, yoy, mom") from exc
         ir = QueryIR(
             metric_id=metric_id,
+            metric_ids=tuple(metric_ids or ()),
             dimensions=tuple(dimensions or ()),
             time_values=tuple(time_values or ()),
             filters=tuple(
-                MandatoryFilter(field=item["field"], op=item["op"], value=item["value"])
+                MandatoryFilter(
+                    field=str(item["field"]),
+                    op=str(item["op"]),
+                    value=item.get("value"),
+                )
                 for item in (filters or ())
             ),
             comparison=comparison_kind,
             order=order,
+            order_metric_id=order_metric_id,
             limit=limit,
         )
         return self._core.compile_query(self._authz(), ir)
