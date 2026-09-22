@@ -75,7 +75,19 @@ def test_upgrade_from_pre_alembic_p0_schema(tmp_path: Path) -> None:
         metric_columns = _columns(connection, "biz_metric")
         lineage_columns = _columns(connection, "rel_column_lineage")
         assert {"en_name", "category_code", "source_standard", "version", "owner"} <= code_columns
-        assert {"stat_system_code", "time_additivity", "valid_dimensions"} <= metric_columns
+        assert {
+            "stat_system_code",
+            "time_additivity",
+            "valid_dimensions",
+            "metric_kind",
+            "numerator_metric_code",
+            "denominator_metric_code",
+            "formula",
+            "time_grain",
+            "latest_strategy",
+            "mandatory_filters",
+            "semantic_notes",
+        } <= metric_columns
         assert {
             "src_dataset_id",
             "src_column_id",
@@ -91,12 +103,13 @@ def test_upgrade_from_pre_alembic_p0_schema(tmp_path: Path) -> None:
             "SELECT code_table_name, description FROM std_code_table WHERE asset_id='CT000001'"
         ).fetchone()
         metric_row = connection.execute(
-            "SELECT metric_name, time_additivity FROM biz_metric WHERE asset_id='MT000001'"
+            "SELECT metric_name, time_additivity, metric_kind, latest_strategy "
+            "FROM biz_metric WHERE asset_id='MT000001'"
         ).fetchone()
         assert code_row == ("业务状态", "legacy row")
-        assert metric_row == ("各项贷款余额", "ADDITIVE")
+        assert metric_row == ("各项贷款余额", "ADDITIVE", "BASE", "MAX")
 
         revision = connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-        assert revision == "20260921_0003"
+        assert revision == "20260922_0004"
     finally:
         connection.close()
