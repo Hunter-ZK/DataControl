@@ -129,6 +129,47 @@ export interface TableFieldLineage {
   edges: RelationEdge[]
 }
 
+export interface SemanticDimension {
+  name: string
+  label: string
+  dataType?: string | null
+  codeTableNo?: string | null
+  standardNo?: string | null
+}
+
+export interface SemanticMetric {
+  assetId: string
+  metricCode: string
+  name: string
+  aliases: string[]
+  definition?: string | null
+  metricKind: string
+  aggregation: string
+  measureColumn: string
+  formula?: string | null
+  numeratorMetricCode?: string | null
+  denominatorMetricCode?: string | null
+  source: {
+    assetId: string
+    name: string
+    tableName?: string | null
+    layerCode?: string | null
+  }
+  time: {
+    field: string
+    grain?: string | null
+    additivity: string
+    latestStrategy: string
+  }
+  validDimensions: SemanticDimension[]
+  mandatoryFilters: Array<Record<string, unknown>>
+  statSystemCode?: string | null
+  caliber?: string | null
+  semanticNotes?: string | null
+  status: string
+  researchPolicy: 'internal_only'
+}
+
 export interface AgentStatus {
   ready: boolean
   mode: string
@@ -180,6 +221,22 @@ export interface AgentEvidence {
   warnings?: string[]
 }
 
+export interface AgentClarificationOption {
+  id: string
+  label: string
+  description: string
+  value: string
+  metadata?: Record<string, unknown> | null
+}
+
+export interface AgentClarification {
+  id: string
+  question: string
+  selection_mode: 'single' | 'multiple'
+  options: AgentClarificationOption[]
+  allow_custom_input?: boolean
+}
+
 export type AgentValidationState = 'passed' | 'failed' | 'not_validated' | 'not_applicable' | 'unknown'
 export type AgentSqlOperation = 'query' | 'dml' | 'ddl' | 'access_control' | 'unknown'
 export type AgentSqlRiskLevel = 'low' | 'medium' | 'high' | 'critical'
@@ -217,6 +274,8 @@ export interface AgentResult {
   validationState?: AgentValidationState
   sqlSourceCallId?: string | null
   validationCallId?: string | null
+  clarification?: AgentClarification | null
+  researchPolicy?: 'internal_only'
   evidence?: AgentEvidence
   sqlExecuted: boolean
   hiddenReasoningExposed: boolean
@@ -242,6 +301,10 @@ export const assetApi = {
   relations: (id: string) => get<unknown>(`/relations/tables/${id}`),
   reference: (endpoint: string, keyword?: string) =>
     get<unknown[]>(endpoint, { params: keyword ? { keyword } : undefined }),
+}
+
+export const semanticApi = {
+  metric: (code: string) => get<SemanticMetric>(`/semantic/metrics/${code}`),
 }
 
 export const relationApi = {
