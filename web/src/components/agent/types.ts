@@ -1,5 +1,6 @@
 import type {
   AgentActivity,
+  AgentClarification,
   AgentEvidence,
   AgentValidation,
   AgentValidationState,
@@ -14,6 +15,9 @@ export type AgentMessage = {
   validationState?: AgentValidationState
   events?: AgentActivity[]
   evidence?: AgentEvidence
+  clarification?: AgentClarification | null
+  clarificationResolved?: boolean
+  clarificationSelection?: string[]
 }
 
 export type ContextAsset = {
