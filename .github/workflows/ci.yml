@@ -23,6 +23,7 @@ jobs:
       - run: python samples/enrich_p1_data.py
       - run: python samples/enrich_p3_reference.py
       - run: python samples/enrich_next_p1_lineage.py
+      - run: python samples/enrich_next_p2_semantics.py
       - run: python samples/rebuild_search_index.py
       - run: python samples/generate_p3_question_bank.py
       - run: python -m ruff check .
@@ -87,6 +88,7 @@ jobs:
           python samples/enrich_p1_data.py
           python samples/enrich_p3_reference.py
           python samples/enrich_next_p1_lineage.py
+          python samples/enrich_next_p2_semantics.py
           python samples/rebuild_search_index.py
       - name: Install pinned dsh
         working-directory: agent/dsh
