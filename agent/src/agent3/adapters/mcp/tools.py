@@ -20,6 +20,21 @@ class MCPToolAdapter:
     def get_schema(self, table_name: str) -> dict[str, Any]:
         return self._core.get_schema(self._authz(), table_name)
 
+    def resolve_code_value(
+        self,
+        table_name: str,
+        field: str,
+        phrase: str,
+        limit: int = 8,
+    ) -> dict[str, Any]:
+        return self._core.resolve_code_value(
+            self._authz(),
+            table_name,
+            field,
+            phrase,
+            limit=limit,
+        )
+
     def get_semantic_model(self, metric_id: str) -> dict[str, Any]:
         return self._core.get_semantic_model(self._authz(), metric_id)
 
