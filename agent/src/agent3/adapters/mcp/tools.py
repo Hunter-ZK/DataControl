@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from agent3.adapters.mcp.authz import AuthzProvider
-from agent3.semantic.models import MandatoryFilter, QueryIR
+from agent3.semantic.models import ComparisonKind, MandatoryFilter, QueryIR
 from agent3.services.core import Agent3Core
 
 
@@ -54,7 +54,14 @@ class MCPToolAdapter:
         dimensions: list[str] | None = None,
         time_values: list[str] | None = None,
         filters: list[dict[str, Any]] | None = None,
+        comparison: str = "none",
+        order: str = "",
+        limit: int | None = None,
     ) -> dict[str, Any]:
+        try:
+            comparison_kind = ComparisonKind(comparison.casefold())
+        except ValueError as exc:
+            raise ValueError("comparison must be one of: none, yoy, mom") from exc
         ir = QueryIR(
             metric_id=metric_id,
             dimensions=tuple(dimensions or ()),
@@ -63,6 +70,9 @@ class MCPToolAdapter:
                 MandatoryFilter(field=item["field"], op=item["op"], value=item["value"])
                 for item in (filters or ())
             ),
+            comparison=comparison_kind,
+            order=order,
+            limit=limit,
         )
         return self._core.compile_query(self._authz(), ir)
 
