@@ -1,8 +1,8 @@
 """Deterministic DeepSeek Messages stub for DataControl harness acceptance.
 
-Derived from the scripted stub used during the P3 handoff. It deliberately drives
-one governed path: resolve_metric -> compile_query -> validate_sql -> final answer.
-This lets CI exercise Portal -> Gateway -> dsh -> MCP -> Agent3 without a real API key.
+The default path preserves the P0 trusted-SQL chain. Questions prefixed with
+``[P2_*]`` drive deterministic Semantic Model V2 scenarios so CI can exercise
+Portal -> Gateway -> dsh -> MCP -> Agent3 without a real model key.
 """
 from __future__ import annotations
 
@@ -144,6 +144,128 @@ def _content_blocks(message: dict[str, Any]) -> list[dict[str, Any]]:
     return content if isinstance(content, list) else []
 
 
+def _json_result(results: list[str], index: int = -1) -> dict[str, Any]:
+    if not results:
+        return {}
+    try:
+        value = json.loads(results[index])
+    except (json.JSONDecodeError, IndexError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _scenario(question: str) -> str:
+    for marker, name in (
+        ("[P2_AMBIGUOUS]", "ambiguous"),
+        ("[P2_RATIO]", "ratio"),
+        ("[P2_CODE]", "code"),
+        ("[P2_MULTI]", "multi"),
+        ("[P2_YOY]", "yoy"),
+    ):
+        if marker in question:
+            return name
+    return "p0"
+
+
+def _p2_response(
+    scenario: str,
+    step: int,
+    tools: list[dict[str, Any]],
+    results: list[str],
+) -> Iterator[str] | None:
+    if scenario == "ambiguous":
+        if step == 0:
+            return stream_tool(tool_name(tools, "plan_metric"), {"phrase": "贷款增长"})
+        return stream_text("内部治理语义存在多个“贷款增长”口径，请从结构化选项中确认后继续。")
+
+    if scenario == "ratio":
+        if step == 0:
+            return stream_tool(tool_name(tools, "plan_metric"), {"phrase": "不良贷款率"})
+        if step == 1:
+            metric = _json_result(results).get("metric") or {}
+            return stream_tool(
+                tool_name(tools, "compile_query"),
+                {
+                    "metric_id": metric.get("id", "metric_npl_ratio"),
+                    "dimensions": ["region_code"],
+                    "time_values": ["LATEST"],
+                    "order": "DESC",
+                    "limit": 10,
+                },
+            )
+        return stream_text("已按受治理不良贷款率口径生成地区 Top10 查询并完成静态校验，未执行生产 SQL。")
+
+    if scenario == "code":
+        if step == 0:
+            return stream_tool(tool_name(tools, "plan_metric"), {"phrase": "贷款余额"})
+        metric = _json_result(results, 0).get("metric") or {}
+        source = metric.get("source_entity", "stat_prod.dws_loan_region_month")
+        if step == 1:
+            return stream_tool(
+                tool_name(tools, "resolve_code_value"),
+                {"table_name": source, "field": "currency_cd", "phrase": "人民币"},
+            )
+        if step == 2:
+            return stream_tool(
+                tool_name(tools, "resolve_code_value"),
+                {"table_name": source, "field": "region_code", "phrase": "广州市"},
+            )
+        if step == 3:
+            currency = _json_result(results, 1).get("matches") or []
+            region = _json_result(results, 2).get("matches") or []
+            currency_value = currency[0].get("value", "CNY") if currency else "CNY"
+            region_value = region[0].get("value", "440100") if region else "440100"
+            return stream_tool(
+                tool_name(tools, "compile_query"),
+                {
+                    "metric_id": metric.get("id", "metric_loan_balance"),
+                    "time_values": ["LATEST"],
+                    "filters": [
+                        {"field": "region_code", "op": "eq", "value": region_value},
+                        {"field": "currency_cd", "op": "eq", "value": currency_value},
+                    ],
+                },
+            )
+        return stream_text("已将“广州市”“人民币”解析为内部标准码值并生成贷款余额查询，未猜测码值。")
+
+    if scenario == "multi":
+        if step == 0:
+            return stream_tool(tool_name(tools, "plan_metric"), {"phrase": "贷款余额"})
+        if step == 1:
+            return stream_tool(tool_name(tools, "plan_metric"), {"phrase": "新增贷款金额"})
+        if step == 2:
+            primary = _json_result(results, 0).get("metric") or {}
+            secondary = _json_result(results, 1).get("metric") or {}
+            return stream_tool(
+                tool_name(tools, "compile_query"),
+                {
+                    "metric_id": primary.get("id", "metric_loan_balance"),
+                    "metric_ids": [secondary.get("id", "metric_new_loan_amount")],
+                    "dimensions": ["region_code"],
+                    "time_values": ["LATEST"],
+                },
+            )
+        return stream_text("已将两个同源受治理指标合并到同一查询中并完成静态校验。")
+
+    if scenario == "yoy":
+        if step == 0:
+            return stream_tool(tool_name(tools, "plan_metric"), {"phrase": "贷款余额"})
+        if step == 1:
+            metric = _json_result(results).get("metric") or {}
+            return stream_tool(
+                tool_name(tools, "compile_query"),
+                {
+                    "metric_id": metric.get("id", "metric_loan_balance"),
+                    "dimensions": ["region_code"],
+                    "time_values": ["2026-08"],
+                    "comparison": "yoy",
+                },
+            )
+        return stream_text("已按治理后的月度时间语义生成 2026-08 各地区贷款余额同比查询。")
+
+    return None
+
+
 @app.post("/v1/messages")
 async def messages(request: Request):
     body = await request.json()
@@ -152,10 +274,7 @@ async def messages(request: Request):
 
     # Non-agent calls such as session-title generation get a short deterministic answer.
     if not tools:
-        return StreamingResponse(
-            stream_text("贷款余额查询"),
-            media_type="text/event-stream",
-        )
+        return StreamingResponse(stream_text("贷款余额查询"), media_type="text/event-stream")
 
     last_user_index = max(
         (
@@ -192,6 +311,12 @@ async def messages(request: Request):
             + "\n"
         )
 
+    scenario = _scenario(question)
+    p2 = _p2_response(scenario, len(calls), tools, results)
+    if p2 is not None:
+        return StreamingResponse(p2, media_type="text/event-stream")
+
+    # Default P0 regression chain.
     dimensions = ["region_code"] if re.search(r"地区|region", question) else []
     step = len(calls)
     if step == 0:
@@ -200,7 +325,7 @@ async def messages(request: Request):
             media_type="text/event-stream",
         )
     if step == 1:
-        metric = json.loads(results[-1]).get("metric") or {}
+        metric = _json_result(results).get("metric") or {}
         return StreamingResponse(
             stream_tool(
                 tool_name(tools, "compile_query"),
@@ -213,14 +338,11 @@ async def messages(request: Request):
             media_type="text/event-stream",
         )
     if step == 2:
-        compiled = json.loads(results[-1])
+        compiled = _json_result(results)
         return StreamingResponse(
             stream_tool(
                 tool_name(tools, "validate_sql"),
-                {
-                    "sql": compiled.get("sql", ""),
-                    "metric_id": "metric_loan_balance",
-                },
+                {"sql": compiled.get("sql", ""), "metric_id": "metric_loan_balance"},
             ),
             media_type="text/event-stream",
         )
