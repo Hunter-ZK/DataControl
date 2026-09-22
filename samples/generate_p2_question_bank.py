@@ -44,8 +44,16 @@ def build() -> list[dict]:
         case("single_metric", "本期支付交易金额按机构统计", metrics=["metric_payment_amount"], dimensions=["org_code"]),
         case("single_metric", "最新一期各地区风险敞口", metrics=["metric_risk_exposure"], dimensions=["region_code"]),
 
-        # Multi-metric planning.
-        case("multi_metric", "本期按地区同时看贷款余额和存款余额", metrics=["metric_loan_balance", "metric_deposit_balance"], dimensions=["region_code"], note="若来源不兼容，应澄清或拆分，不得强行拼接。"),
+        # Multi-metric planning. Cross-source requests deliberately fail closed.
+        case(
+            "multi_metric",
+            "本期按地区同时看贷款余额和存款余额",
+            metrics=["metric_loan_balance", "metric_deposit_balance"],
+            dimensions=["region_code"],
+            status="clarification_required",
+            sql=False,
+            note="两个指标来自不同受治理来源；当前 P2 不得臆造 JOIN，应提示拆分查询或明确关联口径。",
+        ),
         case("multi_metric", "各地区贷款余额、新增贷款金额和贷款客户数", metrics=["metric_loan_balance", "metric_new_loan_amount", "metric_loan_customer_count"], dimensions=["region_code"]),
         case("multi_metric", "本期各机构支付交易金额和交易笔数", metrics=["metric_payment_amount", "metric_payment_count"], dimensions=["org_code"]),
         case("multi_metric", "各地区企业存款余额和住户存款余额", metrics=["metric_corporate_deposit_balance", "metric_household_deposit_balance"], dimensions=["region_code"]),
@@ -86,12 +94,12 @@ def build() -> list[dict]:
         case("code_value", "东莞市人民币支付交易金额", metrics=["metric_payment_amount"], codes={"东莞市": "441900", "人民币": "CNY"}),
         case("code_value", "惠州市人民币资管产品余额", metrics=["metric_aum_balance"], codes={"惠州市": "441300", "人民币": "CNY"}),
 
-        # Multiple filters must resolve independently.
+        # Multiple filters must resolve independently and exist on the governed source schema.
         case("multi_filter", "广州市企业客户人民币贷款余额", metrics=["metric_loan_balance"], codes={"广州市": "440100", "企业": "CORP", "人民币": "CNY"}),
         case("multi_filter", "深圳市普惠贷款中小微企业客户余额", metrics=["metric_inclusive_loan_balance"], codes={"深圳市": "440300", "小微企业": "SME"}),
         case("multi_filter", "广州市人民币企业存款余额", metrics=["metric_corporate_deposit_balance"], codes={"广州市": "440100", "人民币": "CNY"}),
         case("multi_filter", "东莞市较高风险企业的风险敞口", metrics=["metric_risk_exposure"], codes={"东莞市": "441900", "较高风险": "D"}),
-        case("multi_filter", "佛山市手机银行人民币支付交易金额", metrics=["metric_payment_amount"], codes={"佛山市": "440600", "人民币": "CNY", "手机银行": "MOBILE"}),
+        case("multi_filter", "广州市广州分行人民币支付交易金额", metrics=["metric_payment_amount"], codes={"广州市": "440100", "广州分行": "ORG002", "人民币": "CNY"}),
 
         # Ambiguous business wording must stop for a user choice.
         case("ambiguity", "今年贷款增长怎么样？", status="clarification_required", sql=False, note="余额同比 vs 新增贷款金额"),
