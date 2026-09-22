@@ -41,6 +41,7 @@ fi
 .venv/bin/python samples/enrich_p1_data.py
 .venv/bin/python samples/enrich_p3_reference.py
 .venv/bin/python samples/enrich_next_p1_lineage.py
+.venv/bin/python samples/enrich_next_p2_semantics.py
 .venv/bin/python samples/rebuild_search_index.py
 .venv/bin/python samples/generate_p3_question_bank.py
 (cd web && npm install)
@@ -54,4 +55,5 @@ fi
 
 echo "Setup complete. Python: $(.venv/bin/python --version 2>&1)"
 echo "P3 question bank: .local/p3-question-bank.json"
+echo "Next-P2 semantic fixtures: READY"
 echo "Run ./scripts/start-dev.sh"
