@@ -5,7 +5,7 @@
         <div>
           <span class="dc-eyebrow">INTELLIGENT DATA Q&A</span>
           <h1>智能问数</h1>
-          <p>面向数据查询与开发场景检索指标、资产和口径，生成经过静态校验的 MaxCompute SQL。系统只生成和校验，不执行生产 SQL。</p>
+          <p>面向数据查询与开发场景检索内部可信指标、资产和口径；存在业务分歧时先让你选择，再生成经过静态校验的 MaxCompute SQL。系统不执行生产 SQL，也不访问外部网络补全口径。</p>
         </div>
         <span class="service-status" :class="{ ready: status?.ready }"><i></i>{{ status?.ready ? '服务正常' : '服务未就绪' }}</span>
       </header>
@@ -36,17 +36,22 @@
             <div v-if="messages.length === 0" class="welcome">
               <div class="welcome-icon"><Sparkles :size="26" /></div>
               <h2>想查什么数据？</h2>
-              <p>我会先检索可信事实，再确认指标、资产和统计口径；需要 SQL 时会给出静态校验结果。</p>
+              <p>我会先解析内部可信语义；如果一个问题对应多个统计口径，会直接给出选项让你确认。</p>
               <div class="prompt-grid">
                 <button v-for="item in quickPrompts" :key="item" @click="usePrompt(item)">{{ item }}<ArrowUpRight :size="15" /></button>
               </div>
             </div>
 
-            <AgentMessageView v-for="(item, index) in messages" :key="index" :message="item" />
+            <AgentMessageView
+              v-for="(item, index) in messages"
+              :key="index"
+              :message="item"
+              @clarify="submitClarification(index, $event)"
+            />
 
             <article v-if="loading" class="loading-answer">
               <div class="loading-label"><span class="agent-avatar"><LoaderCircle class="spin" :size="16" /></span><b>DataAgent 正在分析</b></div>
-              <p>正在处理当前问题。完成后会展示真实工具调用、数据证据、SQL 与校验结果。</p>
+              <p>正在处理当前问题。完成后会展示真实工具调用、内部数据证据、SQL 与校验结果。</p>
             </article>
           </div>
 
@@ -57,13 +62,13 @@
                 v-model="question"
                 rows="1"
                 :disabled="!status?.ready || loading"
-                placeholder="输入你的问题，例如：本期各地区贷款余额是多少？"
+                placeholder="输入你的问题，例如：今年贷款增长怎么样？"
                 @input="resizeComposer"
                 @keydown.enter.exact.prevent="submit"
               />
               <button class="send" :disabled="!status?.ready || loading || !question.trim()" @click="submit"><Send :size="19" /></button>
             </div>
-            <div class="composer-hint"><span>Enter 发送 · Shift+Enter 换行</span><span><ShieldCheck :size="14" />静态校验 · 生产 SQL 不执行</span></div>
+            <div class="composer-hint"><span>Enter 发送 · Shift+Enter 换行</span><span><ShieldCheck :size="14" />内部证据 · 静态校验 · 不执行生产 SQL</span></div>
           </div>
         </section>
       </section>
@@ -110,11 +115,11 @@ const {
 } = useAgentConversations()
 
 const quickPrompts = [
+  '今年贷款增长怎么样？',
   '本期各地区贷款余额是多少？',
-  '本期各机构普惠贷款余额',
-  '本期不良贷款余额怎么统计？',
-  '帮我生成贷款快照表的 MaxCompute 查询 SQL',
-  'region_code 是什么字段？',
+  '各地区不良贷款率是多少？',
+  '贷款余额最高的前 10 个地区',
+  '广东省人民币贷款余额怎么统计？',
   '贷款余额使用哪张数据表？',
 ]
 
@@ -189,21 +194,33 @@ function resizeComposer() {
   element.style.height = `${Math.min(element.scrollHeight, 160)}px`
 }
 
-async function submit() {
-  const userQuestion = question.value.trim()
-  if (!userQuestion || !status.value?.ready || loading.value) return
-  if (!activeConversationId.value) createConversation(userQuestion, contextAsset.value)
-  messages.value.push({ role: 'user', text: userQuestion })
-  syncActive(messages.value, sessionId.value, contextAsset.value)
-  question.value = ''; resizeComposer(); loading.value = true; await scrollBottom()
+function assistantMessage(result: AgentResult): AgentMessage {
+  return {
+    role: 'assistant',
+    text: result.answer || '分析完成。',
+    summary: result.summary,
+    sql: result.sql,
+    validation: result.validation,
+    validationState: result.validationState,
+    events: result.events,
+    evidence: result.evidence,
+    clarification: result.clarification,
+    clarificationResolved: false,
+    clarificationSelection: [],
+  }
+}
 
-  const prompt = contextAsset.value
-    ? `当前问题针对 DataControl 数据资产：${contextAsset.value.bizName || contextAsset.value.tableName}（asset_id=${contextAsset.value.assetId}，table=${contextAsset.value.tableName}）。请优先通过 Agent3 MCP 读取该资产及关联事实后回答，不要凭空猜测。\n用户问题：${userQuestion}`
-    : userQuestion
+async function runAgentTurn(displayText: string, prompt: string, createTitle?: string) {
+  if (!status.value?.ready || loading.value) return
+  if (!activeConversationId.value) createConversation(createTitle || displayText, contextAsset.value)
+  messages.value.push({ role: 'user', text: displayText })
+  syncActive(messages.value, sessionId.value, contextAsset.value)
+  loading.value = true
+  await scrollBottom()
   try {
-    const result: AgentResult = await agentApi.query(prompt, sessionId.value)
+    const result = await agentApi.query(prompt, sessionId.value)
     if (result.sessionId) sessionId.value = result.sessionId
-    messages.value.push({ role: 'assistant', text: result.answer || '分析完成。', summary: result.summary, sql: result.sql, validation: result.validation, validationState: result.validationState, events: result.events, evidence: result.evidence })
+    messages.value.push(assistantMessage(result))
     syncActive(messages.value, sessionId.value, contextAsset.value)
     await scrollBottom()
   } catch (error) {
@@ -211,7 +228,42 @@ async function submit() {
     ElMessage.error('智能问数本次未完成，请确认 Agent 服务状态后重试。')
     await refreshStatus()
     syncActive(messages.value, sessionId.value, contextAsset.value)
-  } finally { loading.value = false; await scrollBottom() }
+  } finally {
+    loading.value = false
+    await scrollBottom()
+  }
+}
+
+async function submit() {
+  const userQuestion = question.value.trim()
+  if (!userQuestion || !status.value?.ready || loading.value) return
+  question.value = ''
+  resizeComposer()
+  const prompt = contextAsset.value
+    ? `当前问题针对 DataControl 数据资产：${contextAsset.value.bizName || contextAsset.value.tableName}（asset_id=${contextAsset.value.assetId}，table=${contextAsset.value.tableName}）。请优先通过 Agent3 MCP 读取该资产及关联内部事实后回答，不要凭空猜测，不使用外部网络。\n用户问题：${userQuestion}`
+    : userQuestion
+  await runAgentTurn(userQuestion, prompt, userQuestion)
+}
+
+async function submitClarification(
+  messageIndex: number,
+  payload: { values: string[]; labels: string[]; custom?: string },
+) {
+  if (loading.value || !status.value?.ready) return
+  const message = messages.value[messageIndex]
+  if (!message || message.role !== 'assistant' || !message.clarification || message.clarificationResolved) return
+
+  message.clarificationResolved = true
+  message.clarificationSelection = [...payload.values]
+  syncActive(messages.value, sessionId.value, contextAsset.value)
+
+  const displayText = payload.custom
+    ? `补充口径：${payload.custom}`
+    : `选择口径：${payload.labels.join('、')}`
+  const technicalChoice = payload.custom
+    ? `用户对上一轮澄清补充了业务口径：“${payload.custom}”。请仅使用 DataControl 内部可信证据继续原问题；证据仍不足时继续结构化澄清，不要访问外部网络。`
+    : `用户已选择上一轮结构化澄清选项：${payload.labels.map((label, index) => `${label}（metric_id=${payload.values[index]}）`).join('；')}。请把所选 value 作为受治理指标 ID，继续上一问题的规划、生成和校验；不要再次要求用户重述原问题，也不要访问外部网络。`
+  await runAgentTurn(displayText, technicalChoice)
 }
 
 onMounted(async () => {
@@ -236,7 +288,7 @@ onMounted(async () => {
 .agent-page { height: 100%; display: flex; flex-direction: column; max-width: 1420px; }
 .agent-head { flex: none; display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; padding: 0 4px 16px; }
 .agent-head h1 { font-size: 38px; letter-spacing: -.035em; margin: 5px 0 7px; color: #0f3b53; }
-.agent-head p { font-size: 15px; line-height: 1.7; margin: 0; color: #3c6277; max-width: 820px; }
+.agent-head p { font-size: 15px; line-height: 1.7; margin: 0; color: #3c6277; max-width: 900px; }
 .service-status { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 999px; background: #ffeab7; border: 1px solid #d49e35; font-size: 13px; font-weight: 750; color: #70480a; }
 .service-status i { width: 9px; height: 9px; border-radius: 50%; background: #bd7410; }
 .service-status.ready { background: #d8efe4; border-color: #61aa84; color: #126546; }
