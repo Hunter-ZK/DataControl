@@ -137,6 +137,14 @@ class Metric(Base):
     time_additivity: Mapped[str] = mapped_column(String(16), default="ADDITIVE")
     caliber_desc: Mapped[str | None] = mapped_column(Text)
     valid_dimensions: Mapped[str | None] = mapped_column(String(500))
+    metric_kind: Mapped[str] = mapped_column(String(16), default="BASE")
+    numerator_metric_code: Mapped[str | None] = mapped_column(String(64))
+    denominator_metric_code: Mapped[str | None] = mapped_column(String(64))
+    formula: Mapped[str | None] = mapped_column(Text)
+    time_grain: Mapped[str | None] = mapped_column(String(16))
+    latest_strategy: Mapped[str] = mapped_column(String(32), default="MAX")
+    mandatory_filters: Mapped[str | None] = mapped_column(Text)
+    semantic_notes: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(16), default="ONLINE")
 
 
