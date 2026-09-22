@@ -17,6 +17,7 @@ from agent3.semantic.models import (
     SelectionMode,
 )
 from agent3.semantic.registry import SemanticRegistry
+from agent3.semantic.validator import SemanticPlanValidator
 from agent3.sql.analysis.analyzer import SQLAnalysisError, SQLAnalyzer
 from agent3.sql.validation.validator import SQLValidator
 
@@ -35,6 +36,7 @@ class Agent3Core:
         self.semantics = semantics
         self.verified_sql = verified_sql or InMemoryVerifiedSQLStore()
         self.validator = SQLValidator(metadata, semantics)
+        self.semantic_validator = SemanticPlanValidator(semantics, metadata)
         self.analyzer = SQLAnalyzer()
         self.compiler = SemanticCompiler(semantics, metadata)
 
@@ -229,21 +231,19 @@ class Agent3Core:
         }
 
     def compile_query(self, authz: AuthzContext, ir: QueryIR) -> dict[str, Any]:
+        semantic_validation = self.semantic_validator.validate(authz, ir)
+        if not semantic_validation.valid:
+            summary = "; ".join(issue.message for issue in semantic_validation.issues)
+            raise ValueError(f"semantic query plan rejected: {summary}")
+
         metric_ids = ir.all_metric_ids()
         metrics = [self.semantics.get(authz, metric_id) for metric_id in metric_ids]
-        if any(metric is None for metric in metrics):
-            missing = [
-                metric_id
-                for metric_id, metric in zip(metric_ids, metrics, strict=True)
-                if metric is None
-            ]
-            raise ValueError(f"unknown metric(s): {', '.join(missing)}")
-
         sql = self.compiler.compile(authz, ir)
-        # The deterministic semantic compiler itself enforces governed metric,
-        # dimension, filter, time, ratio and comparison contracts. The SQL
-        # validator then checks syntax/metadata/risk. For the legacy single BASE
-        # metric path we additionally retain metric-shape validation.
+
+        # The deterministic semantic compiler + semantic validator enforce metric,
+        # dimension, filter, time, ratio and comparison contracts. SQL validation
+        # then checks syntax/metadata/risk. For the legacy single BASE metric path
+        # we additionally retain metric-shape validation inside SQLValidator.
         single_base = (
             len(metric_ids) == 1
             and metrics[0] is not None
@@ -258,6 +258,7 @@ class Agent3Core:
         return {
             "sql": sql,
             "validation": validation.to_dict(),
+            "semanticValidation": semantic_validation.to_dict(),
             "semanticPlan": {
                 "metrics": list(metric_ids),
                 "dimensions": list(ir.dimensions),
