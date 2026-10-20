@@ -10,11 +10,11 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { ArrowRight } from 'lucide-vue-next'
 import { assetApi, type DatasetBrief } from '@/api/client'
 
-const keyword=ref(''); const selected=ref(''); const catalogs=ref<any[]>([]); const rows=ref<DatasetBrief[]>([]); const total=ref(0); const page=ref(1); const pageSize=20; const loading=ref(false)
+const route=useRoute(); const keyword=ref(''); const selected=ref(typeof route.query.catalog==='string'?route.query.catalog:''); const catalogs=ref<any[]>([]); const rows=ref<DatasetBrief[]>([]); const total=ref(0); const page=ref(1); const pageSize=20; const loading=ref(false)
 const totalPages=computed(()=>Math.max(1,Math.ceil(total.value/pageSize)))
 const startRow=computed(()=>total.value?(page.value-1)*pageSize+1:0)
 const endRow=computed(()=>Math.min(page.value*pageSize,total.value))
