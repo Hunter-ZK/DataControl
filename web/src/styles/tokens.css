@@ -11,6 +11,10 @@
   --dc-primary-strong: #09111f;
   --dc-primary-soft: #eef0f3;
   --dc-accent: #6867e8;
+  --dc-ai: #7c67f2;
+  --dc-ai-strong: #5d47df;
+  --dc-ai-soft: #f0edff;
+  --dc-ai-glow: rgba(124, 103, 242, 0.22);
   --dc-success: #2f8f69;
   --dc-warning: #c37a24;
   --dc-danger: #cf4f52;
