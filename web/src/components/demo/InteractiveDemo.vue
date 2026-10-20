@@ -46,7 +46,7 @@
           </div>
           <div class="trend-top">
             <div><small>当前选中月份余额</small><strong>{{ activePoint.value.toFixed(1) }}<span>亿元</span></strong></div>
-            <div class="trend-delta"><small>环比上月</small><strong :class="activeDelta>=0?'positive':'negative'">{{ activeDelta >= 0 ? '+' : '' }}{{ activeDelta.toFixed(1) }}%</strong></div>
+            <div class="trend-delta"><small>环比上月</small><strong :class="activeDelta>=0?'positive':'negative'">{{ activeMonth === 0 ? '—' : (activeDelta >= 0 ? '+' : '') + activeDelta.toFixed(1) + '%' }}</strong></div>
           </div>
           <div class="bar-chart" role="group" aria-label="点击柱形查看贷款余额月份数据">
             <div class="chart-scale"><span>150</span><span>130</span><span>110</span><span>90</span></div>
