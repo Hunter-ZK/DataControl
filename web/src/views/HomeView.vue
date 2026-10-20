@@ -265,9 +265,9 @@ GROUP BY org_name;</pre>
               <p>演示数据</p>
             </div>
           </div>
-          <div class="health-number"><strong>92%</strong><span>核心资产有完整口径</span></div>
-          <div class="health-bar"><i class="good" style="width:68%"></i><i class="warn" style="width:18%"></i><i class="risk" style="width:6%"></i></div>
-          <div class="health-legend"><span><i class="good"></i>完整 68%</span><span><i class="warn"></i>待完善 18%</span><span><i class="risk"></i>异常 6%</span></div>
+          <div class="health-number"><strong>68%</strong><span>口径信息完整（演示）</span></div>
+          <div class="health-bar"><i class="good" style="width:68%"></i><i class="warn" style="width:18%"></i><i class="risk" style="width:6%"></i><i class="unknown" style="width:8%"></i></div>
+          <div class="health-legend"><span><i class="good"></i>完整 68%</span><span><i class="warn"></i>待完善 18%</span><span><i class="risk"></i>异常 6%</span><span><i class="unknown"></i>未分类 8%</span></div>
         </article>
       </section>
     </div>
@@ -337,9 +337,9 @@ const scenarios: Record<ScenarioKey, {
     badge: '+8.4%',
     title: '8 月后贷款余额增速明显抬升',
     summary: '演示数据中 9 月余额达到 146.8 亿元，较 4 月提升 8.4%。建议继续按机构、客户类型拆分，确认增长来自哪些业务分组。',
-    primary: '查看指标详情',
+    primary: '浏览指标目录',
     actions: [
-      { label: '按机构拆分', desc: '定位贡献最大的机构', type: 'scenario', value: 'assets' },
+      { label: '查看相关数据资产', desc: '切换到示例资产关系图', type: 'scenario', value: 'assets' },
       { label: '查看贷款余额口径', desc: '确认是否包含表外业务', type: 'metrics' },
       { label: '生成趋势查询 SQL', desc: '按月生成聚合 SQL', type: 'scenario', value: 'sql' },
     ],
@@ -359,8 +359,8 @@ const scenarios: Record<ScenarioKey, {
   sql: {
     meta: 'Text2SQL · 静态校验',
     badge: '已校验',
-    title: 'SQL 已绑定到推荐数据资产',
-    summary: '查询使用 ADS 企业贷款月度汇总，并将“深圳分行”“2026 年 9 月”解析为机构与月份过滤条件。演示 SQL 不执行生产查询。',
+    title: 'SQL 规划过程预览',
+    summary: '以下仅用于展示：假设使用 ADS 企业贷款月度汇总，按深圳分行和 2026 年 9 月筛选。未对真实库表或 SQL 执行校验。',
     primary: '查看贷款数据资产',
     actions: [
       { label: '检查字段来源', desc: '查看 loan_balance 的字段血缘', type: 'catalog', value: 'loan_balance' },
@@ -568,16 +568,16 @@ onMounted(async () => {
 .analysis-panel{min-height:520px;padding:22px;border-radius:15px;background:#08111e;color:#fff;box-shadow:0 18px 44px rgba(8,17,30,.16);overflow:hidden}
 .analysis-head{display:flex;align-items:center;justify-content:space-between;gap:14px}
 .analysis-head>div{display:flex;align-items:center;gap:8px}
-.agent-chip,.demo-chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;font-size:9px;font-weight:800}
+.agent-chip,.demo-chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;font-size:11px;font-weight:800}
 .agent-chip{padding:6px 9px;background:#2a204f;color:#cbbdff}
 .demo-chip{padding:5px 8px;background:#151f2d;color:#8591a2;border:1px solid #2a3544}
-.analysis-meta{font-size:9px;color:#7e8998}
+.analysis-meta{font-size:11px;color:#a1adbb}
 
 .viz{height:100%;display:flex;flex-direction:column}
 .viz-copy{max-width:690px;margin-top:24px}
-.viz-kicker{font-size:8px;letter-spacing:.15em;color:#657082;font-weight:800}
+.viz-kicker{font-size:10px;letter-spacing:.11em;color:#a8a0eb;font-weight:800}
 .viz-copy h2{margin:7px 0 5px;font-size:27px;letter-spacing:-.03em}
-.viz-copy p{margin:0;color:#9da7b5;font-size:11px;line-height:1.6}
+.viz-copy p{margin:0;color:#b4bdc9;font-size:13px;line-height:1.6}
 
 .network{width:100%;height:310px;margin-top:2px}
 .edge{fill:none;stroke:#3e4b5c;stroke-width:2}
@@ -586,8 +586,8 @@ onMounted(async () => {
 .center-sub{fill:#d6ccff;font-size:8px}
 .node rect{fill:#141e2b;stroke:#2b3747;stroke-width:1}
 .node.recommended rect{fill:#151d2c;stroke:#7c67f2;stroke-width:1.5}
-.node-title{fill:#edf1f7;font-size:11px;font-weight:700}
-.node-sub{fill:#7e8998;font-size:8px}
+.node-title{fill:#edf1f7;font-size:13px;font-weight:700}
+.node-sub{fill:#a1acbd;font-size:11px}
 .signal{stroke:#0b111b;stroke-width:3}
 .signal.purple{fill:#7c67f2}
 .signal.orange{fill:#f09a4f}
@@ -633,11 +633,11 @@ onMounted(async () => {
 .purple-dot{width:7px;height:7px;border-radius:50%;background:var(--dc-ai)}
 .action-head small{padding:4px 7px;border-radius:999px;background:var(--dc-ai-soft);color:var(--dc-ai-strong);font-size:8px;font-weight:800}
 .action-panel h2{margin:24px 0 8px;font-size:21px;letter-spacing:-.03em;color:#171c24}
-.action-panel>p{margin:0;color:#6f7680;font-size:11px;line-height:1.65}
+.action-panel>p{margin:0;color:#616a76;font-size:13px;line-height:1.65}
 .action-list{display:grid;margin-top:24px;border-top:1px solid #ebedef}
 .action-list button{position:relative;display:grid;gap:4px;padding:14px 22px 14px 0;border:0;border-bottom:1px solid #ebedef;background:transparent;text-align:left;cursor:pointer}
-.action-list button span{font-size:11px;font-weight:700;color:#222831}
-.action-list button small{font-size:9px;color:#8a9199}
+.action-list button span{font-size:13px;font-weight:700;color:#222831}
+.action-list button small{font-size:11px;color:#78808c}
 .action-list button svg{position:absolute;right:0;top:16px;color:#8c939d}
 .action-footer{margin-top:auto;padding-top:22px;display:flex;align-items:center;gap:12px}
 .primary-action{border:0;border-radius:9px;background:#111823;color:#fff;padding:10px 14px;font-size:10px;font-weight:800;cursor:pointer}
@@ -658,8 +658,8 @@ onMounted(async () => {
 .recent-item b{display:block;font-size:12px;color:#232932}.recent-item small{display:block;margin-top:4px;font-size:10px;color:#808994}
 
 .health-number{display:flex;align-items:flex-end;gap:8px;margin-top:26px}.health-number strong{font-size:34px;letter-spacing:-.04em;color:#171c24}.health-number span{padding-bottom:5px;font-size:9px;color:#8a9199}
-.health-bar{display:flex;height:7px;border-radius:999px;overflow:hidden;background:#eceef0;margin-top:18px}.health-bar i.good{background:#2f8f69}.health-bar i.warn{background:#d7923f}.health-bar i.risk{background:#d35b62}
-.health-legend{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px;font-size:10px;color:#7a838e}.health-legend i{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px}.health-legend i.good{background:#2f8f69}.health-legend i.warn{background:#d7923f}.health-legend i.risk{background:#d35b62}
+.health-bar{display:flex;height:7px;border-radius:999px;overflow:hidden;background:#eceef0;margin-top:18px}.health-bar i.good{background:#2f8f69}.health-bar i.warn{background:#d7923f}.health-bar i.risk{background:#d35b62}.health-bar i.unknown{background:#b1b7c0}
+.health-legend{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px;font-size:10px;color:#7a838e}.health-legend i{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px}.health-legend i.good{background:#2f8f69}.health-legend i.warn{background:#d7923f}.health-legend i.risk{background:#d35b62}.health-legend i.unknown{background:#b1b7c0}
 
 @media(max-width:1180px){.workspace-grid{grid-template-columns:1fr}.analysis-panel{min-height:500px}.insight-grid{grid-template-columns:1fr 1fr}.health-panel{grid-column:1/-1}}
 @media(max-width:760px){
