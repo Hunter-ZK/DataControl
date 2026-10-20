@@ -7,7 +7,7 @@
     </section>
     <div v-if="data" class="detail-grid">
       <section class="dc-card panel">
-        <span class="dc-eyebrow">DEFINITION</span><h2>{{config.sectionTitle}}</h2><p>{{descriptionOf(data)}}</p>
+        <h2>{{config.sectionTitle}}</h2><p>{{descriptionOf(data)}}</p>
         <div class="kv-grid">
           <template v-if="kind==='word-roots'">
             <div><span>英文词根</span><code class="dc-tech">{{data.root}}</code></div><div><span>英文全称</span><b>{{data.enFull||'—'}}</b></div><div><span>中文名称</span><b>{{data.cnName||'—'}}</b></div><div><span>同义词</span><b>{{data.synonyms||'—'}}</b></div>
@@ -20,7 +20,7 @@
           </template>
         </div>
       </section>
-      <aside class="dc-card panel side"><span class="dc-eyebrow">IDENTITY</span><h3>资产身份</h3><div><span>稳定标识</span><code class="dc-tech">{{data.assetId||'—'}}</code></div><div><span>状态</span><b>{{data.status||'VALID'}}</b></div></aside>
+      <aside class="dc-card panel side"><h3>资产身份</h3><div><span>稳定标识</span><code class="dc-tech">{{data.assetId||'—'}}</code></div><div><span>状态</span><b>{{data.status||'VALID'}}</b></div></aside>
     </div>
     <div v-else-if="loading" class="dc-empty">正在加载资产详情…</div><div v-else class="dc-empty">未找到该资产。</div>
   </div></div>

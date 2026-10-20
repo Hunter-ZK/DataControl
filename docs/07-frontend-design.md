@@ -30,16 +30,10 @@ Home is a search portal, not a dashboard.
 Priority order:
 1. search proposition and large search field
 2. common searches
-3. module launchers
-4. recent work
-5. only a lightweight asset overview entry
+3. recent work
+4. only a lightweight asset overview entry
 
-Primary launchers:
-- Asset Catalog
-- Standards & Code Tables
-- Word Roots
-- Metrics & Statistical Systems
-- Intelligent Q&A
+Persistent modules remain in the left navigation and are not duplicated as a launcher-card row on Home. On wide layouts, concise hover guidance may explain each sidebar module without consuming Home content space.
 
 ## Search
 

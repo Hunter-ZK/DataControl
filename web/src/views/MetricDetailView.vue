@@ -19,7 +19,7 @@
       <div class="metric-layout">
         <main class="metric-main">
           <section class="formula-card dc-card">
-            <div class="section-head"><div><span class="dc-eyebrow">SEMANTIC MODEL</span><h2>计算语义</h2></div><span class="kind-badge">{{ metric.metricKind }}</span></div>
+            <div class="section-head"><div><h2>计算语义</h2></div><span class="kind-badge">{{ metric.metricKind }}</span></div>
             <div class="formula-grid">
               <div class="formula-main"><span>计算表达式</span><strong>{{ formulaText }}</strong><small v-if="metric.metricKind === 'BASE'">{{ metric.aggregation.toUpperCase() }} · {{ metric.measureColumn }}</small><small v-else>{{ dependencyText }}</small></div>
               <div><span>聚合方式</span><b>{{ metric.aggregation.toUpperCase() }}</b></div>
@@ -29,7 +29,7 @@
           </section>
 
           <section class="dc-card source-card">
-            <div class="section-head"><div><span class="dc-eyebrow">SOURCE & TIME</span><h2>数据来源与统计周期</h2></div></div>
+            <div class="section-head"><div><h2>数据来源与统计周期</h2></div></div>
             <RouterLink :to="`/datasets/${metric.source.assetId}`" class="source-row">
               <span class="layer-chip" :data-layer="metric.source.layerCode">{{ metric.source.layerCode || 'TABLE' }}</span>
               <div><b>{{ metric.source.name }}</b><code>{{ metric.source.tableName }}</code></div>
@@ -44,7 +44,7 @@
           </section>
 
           <section class="dc-card dimension-card">
-            <div class="section-head"><div><span class="dc-eyebrow">DIMENSIONS</span><h2>可用维度与码值</h2></div><span>{{ metric.validDimensions.length }} 个维度</span></div>
+            <div class="section-head"><div><h2>可用维度与码值</h2></div><span>{{ metric.validDimensions.length }} 个维度</span></div>
             <div class="dimension-list">
               <article v-for="dimension in metric.validDimensions" :key="dimension.name">
                 <div><b>{{ dimension.label }}</b><code>{{ dimension.name }}</code></div>
@@ -57,7 +57,7 @@
           </section>
 
           <section class="dc-card governance-card">
-            <div class="section-head"><div><span class="dc-eyebrow">GOVERNANCE</span><h2>口径约束</h2></div></div>
+            <div class="section-head"><div><h2>口径约束</h2></div></div>
             <div v-if="metric.mandatoryFilters.length" class="filter-list">
               <article v-for="(filter,index) in metric.mandatoryFilters" :key="index"><span>必选过滤</span><code>{{ filterText(filter) }}</code></article>
             </div>
@@ -68,9 +68,9 @@
         </main>
 
         <aside class="metric-side">
-          <section class="dc-card side-card"><span class="dc-eyebrow">ALIASES</span><h3>同义词</h3><div class="tag-list"><span v-for="alias in metric.aliases" :key="alias">{{ alias }}</span><em v-if="!metric.aliases.length">未登记</em></div></section>
-          <section class="dc-card side-card"><span class="dc-eyebrow">STATISTICAL SYSTEM</span><h3>治理归属</h3><dl><div><dt>统计制度</dt><dd>{{ metric.statSystemCode || '—' }}</dd></div><div><dt>Asset ID</dt><dd><code>{{ metric.assetId }}</code></dd></div><div><dt>研究策略</dt><dd>内部证据优先，不使用外部网络</dd></div></dl></section>
-          <section class="dc-card yaml-card"><span class="dc-eyebrow">MODEL PREVIEW</span><h3>语义模型</h3><pre>{{ modelPreview }}</pre></section>
+          <section class="dc-card side-card"><h3>同义词</h3><div class="tag-list"><span v-for="alias in metric.aliases" :key="alias">{{ alias }}</span><em v-if="!metric.aliases.length">未登记</em></div></section>
+          <section class="dc-card side-card"><h3>治理归属</h3><dl><div><dt>统计制度</dt><dd>{{ metric.statSystemCode || '—' }}</dd></div><div><dt>Asset ID</dt><dd><code>{{ metric.assetId }}</code></dd></div><div><dt>研究策略</dt><dd>内部证据优先，不使用外部网络</dd></div></dl></section>
+          <section class="dc-card yaml-card"><h3>语义模型</h3><pre>{{ modelPreview }}</pre></section>
         </aside>
       </div>
     </template>
