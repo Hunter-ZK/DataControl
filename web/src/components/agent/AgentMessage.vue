@@ -47,10 +47,10 @@ const summaryText = computed(() => {
 <style scoped>
 .message { margin: 0 0 28px; }
 .message.user { display: flex; justify-content: flex-end; }
-.user-bubble { max-width: 74%; padding: 12px 16px; border-radius: 16px 16px 4px 16px; background: #126f9b; color: #fff; font-size: 15px; line-height: 1.68; box-shadow: 0 8px 22px rgba(20,105,147,.2); white-space: pre-wrap; }
+.user-bubble { max-width: 74%; padding: 12px 16px; border-radius: 14px 14px 4px 14px; background: #252b38; color: #fff; font-size: 14px; line-height: 1.68; box-shadow: 0 6px 18px rgba(17,25,39,.09); white-space: pre-wrap; }
 .assistant-answer { max-width: 980px; }
-.answer-label { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; color: #174f69; font-size: 14px; }
-.agent-avatar { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: #c8e6f2; color: #0b6a94; }
-.answer-summary { padding: 2px 0 2px 13px; border-left: 4px solid #1f83af; font-size: 18px; line-height: 1.72; font-weight: 750; color: #143e52; }
+.answer-label { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; color: #5d47df; font-size: 14px; }
+.agent-avatar { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: #f0edff; color: #5d47df; }
+.answer-summary { padding: 2px 0 2px 13px; border-left: 3px solid #7c67f2; font-size: 17px; line-height: 1.72; font-weight: 750; color: #252b36; }
 @media(max-width:760px){.user-bubble{max-width:90%}.answer-summary{font-size:17px}}
 </style>
