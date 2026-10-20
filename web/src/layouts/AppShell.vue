@@ -63,14 +63,14 @@
           <span class="crumb">{{ route.meta.title || 'DataControl' }}</span>
         </div>
 
-        <button class="command" title="打开全局资产检索" @click="goSearch">
+        <button v-if="route.name !== 'home'" class="command" title="打开全局资产检索" @click="goSearch">
           <Search :size="17" />
           <span>搜索数据集、字段、指标、标准…</span>
           <kbd>{{ shortcutLabel }}</kbd>
         </button>
 
-        <div class="top-actions">
-          <RouterLink to="/agent" class="soft-action" title="进入智能问数">
+        <div class="top-actions" :class="{ 'home-actions': route.name === 'home' }">
+          <RouterLink v-if="route.name !== 'home'" to="/agent" class="soft-action" title="进入智能问数">
             <Sparkles :size="17" />智能问数
           </RouterLink>
           <RouterLink to="/profile" class="avatar" title="个人中心">H</RouterLink>
@@ -194,6 +194,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', shortcut))
 .command span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .command kbd{margin-left:auto;padding:2px 6px;border-radius:6px;background:#fff;border:1px solid #dce8ef;color:#78909e;font-size:10px}
 .top-actions{display:flex;align-items:center;gap:9px}
+.top-actions.home-actions{margin-left:auto}
 .soft-action{display:flex;align-items:center;gap:6px;font-size:12px;color:#2d7696;background:#eef8fc;padding:8px 11px;border-radius:9px}
 .avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#dff1f8;color:#2d7898;font-weight:800}
 @media(max-width:1080px){
