@@ -21,10 +21,6 @@
             <button v-for="x in hot" :key="x" @click="quick(x)">{{ x }}</button>
           </div>
         </div>
-        <div class="hero-orbit" aria-hidden="true">
-          <div class="orb orb-a" />
-          <div class="grid-dot" />
-        </div>
       </section>
 
       <section class="home-row">
@@ -112,19 +108,19 @@ onMounted(async () => {
 <style scoped>
 .hero{
   position:relative;
-  min-height:260px;
+  min-height:auto;
   overflow:hidden;
   border:1px solid #dce8ee;
   border-radius:14px;
   background:#fff;
-  padding:38px 42px;
+  padding:32px 40px;
   box-shadow:0 8px 24px rgba(38,94,126,.05)
 }
 .hero-copy{position:relative;z-index:2;max-width:820px}
 .hero h1{font-size:34px;line-height:1.18;letter-spacing:-.025em;margin:0 0 10px}
 .hero p{font-size:14px;color:var(--dc-text-2);margin:0}
 .hero-search{
-  margin-top:24px;
+  margin-top:20px;
   height:54px;
   display:flex;
   align-items:center;
@@ -141,10 +137,6 @@ onMounted(async () => {
 .hero-search button{height:42px;padding:0 24px;border:0;border-radius:8px;background:#2787ae;color:#fff;font-weight:700;cursor:pointer}
 .hot{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:11px;font-size:11px;color:#89a0af}
 .hot button{border:0;background:transparent;color:#4e8eab;cursor:pointer;padding:3px 5px}
-.hero-orbit{position:absolute;right:0;top:0;width:31%;height:100%;opacity:.7}
-.orb{position:absolute;border-radius:50%}
-.orb-a{width:180px;height:180px;right:38px;top:24px;background:radial-gradient(circle at 35% 35%,rgba(123,207,226,.22),rgba(109,171,213,.02) 70%)}
-.grid-dot{position:absolute;inset:0;background-image:radial-gradient(rgba(69,143,180,.11) 1px,transparent 1px);background-size:18px 18px;mask-image:linear-gradient(to left,#000,transparent)}
 .home-row{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(300px,.8fr);gap:18px;margin-top:18px}
 .recent-panel,.overview-panel{padding:22px}
 .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
@@ -165,7 +157,6 @@ onMounted(async () => {
 @media(max-width:760px){
   .hero{padding:30px 24px;min-height:auto}
   .hero h1{font-size:30px}
-  .hero-orbit{opacity:.35;width:42%}
   .recent-grid{grid-template-columns:1fr}
 }
 @media(max-width:520px){
