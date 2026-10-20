@@ -11,12 +11,12 @@
         <RouterLink to="/catalog" :class="{ active: isDataActive }">数据资产</RouterLink>
         <RouterLink to="/relations" :class="{ active: isRelationActive }">关系分析</RouterLink>
 
-        <details class="nav-group" :class="{ active: isStandardActive }">
+        <details ref="standardsMenu" class="nav-group" :class="{ active: isStandardActive }">
           <summary>标准规范</summary>
           <div class="nav-menu">
-            <RouterLink to="/code-tables"><span>标准与码值</span><small>标准定义、码表与引用</small></RouterLink>
-            <RouterLink to="/word-roots"><span>词根索引</span><small>字段命名词根与规范</small></RouterLink>
-            <RouterLink to="/metrics"><span>指标与制度</span><small>指标口径与制度依据</small></RouterLink>
+            <RouterLink to="/code-tables" @click="closeStandardsMenu"><span>标准与码值</span><small>标准定义、码表与引用</small></RouterLink>
+            <RouterLink to="/word-roots" @click="closeStandardsMenu"><span>词根索引</span><small>字段命名词根与规范</small></RouterLink>
+            <RouterLink to="/metrics" @click="closeStandardsMenu"><span>指标与制度</span><small>指标口径与制度依据</small></RouterLink>
           </div>
         </details>
 
@@ -44,12 +44,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { Search, Sparkles } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()
+const standardsMenu = ref<HTMLDetailsElement | null>(null)
+function closeStandardsMenu() { if (standardsMenu.value) standardsMenu.value.open = false }
+watch(() => route.fullPath, closeStandardsMenu)
 const shortcutLabel = navigator.userAgent.includes('Mac') ? '⌘K' : 'Ctrl K'
 
 const isDataActive = computed(() =>
@@ -112,7 +115,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', shortcut))
 .nav-capsule>a,.nav-group>summary{
   min-height:34px;padding:0 15px;border-radius:999px;
   display:flex;align-items:center;justify-content:center;
-  color:#a9b0ba;font-size:11px;font-weight:650;white-space:nowrap;cursor:pointer;
+  color:#a9b0ba;font-size:12px;font-weight:650;white-space:nowrap;cursor:pointer;
   list-style:none;transition:.15s ease
 }
 .nav-group>summary::-webkit-details-marker{display:none}
@@ -130,12 +133,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', shortcut))
 .nav-menu a{display:grid;gap:3px;padding:11px 12px;border-radius:9px}
 .nav-menu a:hover{background:#f4f4f6}
 .nav-menu span{font-size:12px;font-weight:700;color:#1b2028}
-.nav-menu small{font-size:9px;color:#8b929b}
+.nav-menu small{font-size:11px;color:#7a838e}
 
 .top-actions{justify-self:end;display:flex;align-items:center;gap:8px}
 .search-command,.agent-action{
   height:36px;border-radius:9px;display:flex;align-items:center;gap:7px;
-  padding:0 11px;font-size:10px;font-weight:700;cursor:pointer
+  padding:0 11px;font-size:12px;font-weight:700;cursor:pointer
 }
 .search-command{border:1px solid #e0e2e5;background:#f8f8f7;color:#626a74}
 .search-command kbd{
