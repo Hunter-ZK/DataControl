@@ -3,7 +3,7 @@
     <div class="dc-container agent-page">
       <header class="agent-head">
         <div>
-          <span class="dc-eyebrow">INTELLIGENT DATA Q&A</span>
+          
           <h1>智能问数</h1>
           <p>面向数据查询与开发场景检索内部可信指标、资产和口径；存在业务分歧时先让你选择，再生成经过静态校验的 MaxCompute SQL。系统不执行生产 SQL，也不访问外部网络补全口径。</p>
         </div>

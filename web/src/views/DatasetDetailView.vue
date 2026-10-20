@@ -13,7 +13,7 @@
     <div v-if="data" class="detail-layout">
       <section class="dc-card detail-main">
         <el-tabs v-model="tab">
-          <el-tab-pane label="基本信息" name="overview"><div class="section-block"><span class="dc-eyebrow">OVERVIEW</span><h2>资产定义</h2><p>{{data.bizDefinition||'暂无业务定义。'}}</p><div class="caliber"><b>统计口径</b><p>{{data.statCaliber||'暂无统计口径。'}}</p></div><div class="kv-grid"><div><span>数据粒度</span><b>{{data.grain||'—'}}</b></div><div><span>数据来源</span><b>{{data.dataSourceDesc||'—'}}</b></div><div><span>使用说明</span><b>{{data.usageNotes||'—'}}</b></div><div><span>所属目录</span><b>{{data.catalogCode||'—'}}</b></div></div></div></el-tab-pane>
+          <el-tab-pane label="基本信息" name="overview"><div class="section-block"><h2>资产定义</h2><p>{{data.bizDefinition||'暂无业务定义。'}}</p><div class="caliber"><b>统计口径</b><p>{{data.statCaliber||'暂无统计口径。'}}</p></div><div class="kv-grid"><div><span>数据粒度</span><b>{{data.grain||'—'}}</b></div><div><span>数据来源</span><b>{{data.dataSourceDesc||'—'}}</b></div><div><span>使用说明</span><b>{{data.usageNotes||'—'}}</b></div><div><span>所属目录</span><b>{{data.catalogCode||'—'}}</b></div></div></div></el-tab-pane>
           <el-tab-pane label="字段信息" name="columns"><div class="table-actions"><b>{{columns.length}} 个字段</b><el-input v-model="columnKeyword" clearable placeholder="搜索字段"/></div><div class="dc-table-wrap"><table class="dc-table"><thead><tr><th>序号</th><th>字段名</th><th>中文名</th><th>类型</th><th>业务定义</th><th>标准/码表</th></tr></thead><tbody><tr v-for="c in filteredColumns" :key="c.assetId"><td>{{c.ordinalNo}}</td><td><RouterLink class="field-link" :to="`/fields/${c.assetId}`"><code class="dc-tech">{{c.columnName}}</code></RouterLink></td><td><RouterLink class="field-link" :to="`/fields/${c.assetId}`">{{c.cnName||'—'}}</RouterLink></td><td>{{c.dataType}}</td><td>{{c.bizDefinition||'—'}}</td><td><RouterLink v-if="c.standardNo" :to="`/standards/${c.standardNo}`" class="dc-chip">{{c.standardNo}}</RouterLink><RouterLink v-else-if="c.codeTableNo" :to="`/code-tables/${c.codeTableNo}`" class="dc-chip">{{c.codeTableNo}}</RouterLink><span v-else>—</span></td></tr></tbody></table></div></el-tab-pane>
           <el-tab-pane label="关系与血缘" name="relations"><DatasetRelationPanel :dataset-id="data.assetId" /></el-tab-pane>
           <el-tab-pane label="常用 SQL" name="sql"><div v-if="sqlRows.length" class="sql-list"><article v-for="x in sqlRows" :key="x.sqlCode"><div><span class="dc-chip">{{x.dialect}}</span><h3>{{x.title}}</h3><p>{{x.question}}</p></div><pre>{{x.sqlText}}</pre></article></div><div v-else class="dc-empty">暂无常用 SQL。</div></el-tab-pane>
@@ -23,9 +23,9 @@
       </section>
 
       <aside class="detail-side">
-        <section class="dc-card side-card"><span class="dc-eyebrow">IDENTITY</span><h3>稳定身份</h3><dl><div><dt>Asset ID</dt><dd>{{data.assetId}}</dd></div><div><dt>物理表名</dt><dd class="dc-tech">{{data.tableName}}</dd></div><div><dt>生命周期</dt><dd>{{data.status}}</dd></div></dl></section>
-        <section class="dc-card side-card"><span class="dc-eyebrow">TAGS</span><h3>资产标签</h3><div class="tag-wrap"><span v-for="x in tags" :key="x.code" class="dc-chip">{{x.name}}</span><span v-if="!tags.length" class="dc-muted">暂无标签</span></div></section>
-        <section class="dc-card side-card lineage-entry"><span class="dc-eyebrow">RELATIONS</span><h3>关系指引</h3><p>关系能力属于资产详情的一部分。这里查看当前表的上下游与字段血缘，需要多层分析时再进入完整工作区。</p><button @click="tab='relations'"><GitFork :size="14"/>查看关系与血缘</button></section>
+        <section class="dc-card side-card"><h3>稳定身份</h3><dl><div><dt>Asset ID</dt><dd>{{data.assetId}}</dd></div><div><dt>物理表名</dt><dd class="dc-tech">{{data.tableName}}</dd></div><div><dt>生命周期</dt><dd>{{data.status}}</dd></div></dl></section>
+        <section class="dc-card side-card"><h3>资产标签</h3><div class="tag-wrap"><span v-for="x in tags" :key="x.code" class="dc-chip">{{x.name}}</span><span v-if="!tags.length" class="dc-muted">暂无标签</span></div></section>
+        <section class="dc-card side-card lineage-entry"><h3>关系指引</h3><p>关系能力属于资产详情的一部分。这里查看当前表的上下游与字段血缘，需要多层分析时再进入完整工作区。</p><button @click="tab='relations'"><GitFork :size="14"/>查看关系与血缘</button></section>
       </aside>
     </div>
     <div v-else class="dc-empty">正在加载数据集详情…</div>
