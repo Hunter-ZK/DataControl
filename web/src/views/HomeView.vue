@@ -3,21 +3,21 @@
     <div class="dc-container">
       <header class="home-head">
         <div>
-          <p class="eyebrow">TUESDAY · DATA WORKSPACE</p>
-          <h1>早上好，Hanna</h1>
-          <p>直接把业务问题交给 DataAgent，或从数仓资产继续工作。</p>
+          <p class="eyebrow">数据资产工作台</p>
+          <h1>今天想了解哪些数据？</h1>
+          <p>先看数仓有哪些数据，再通过 DataAgent 解读字段、口径与 SQL。</p>
         </div>
         <div class="agent-status">
           <span class="status-dot"></span>
-          <span>{{ agentReady ? 'DataAgent 已就绪' : '演示模式' }}</span>
-          <b>3 项智能能力</b>
+          <span>{{ agentReady ? 'Agent 服务可连接' : 'Agent 暂未就绪' }}</span>
+          <b>{{ agentReady ? '可以提问' : '下方可体验演示' }}</b>
         </div>
       </header>
 
       <section id="home-agent" class="agent-command-card dc-card">
         <div class="command-icon"><Sparkles :size="18" /></div>
         <div class="command-main">
-          <label for="home-agent-input">问 DataAgent</label>
+          <label for="home-agent-input">问 DataAgent <span class="input-hint">输入问题将调用本地 Agent；下方示例仅用于预览界面</span></label>
           <textarea
             id="home-agent-input"
             v-model="question"
@@ -26,22 +26,42 @@
             @keydown.enter.exact.prevent="runQuestion"
           />
           <div class="prompt-row">
-            <button v-for="item in prompts" :key="item.label" @click="selectPrompt(item)">
-              {{ item.label }}
+            <button v-for="item in prompts" :key="item.label" type="button" @click="selectPrompt(item)" :aria-pressed="activeScenario === item.scenario && !liveMessages.length">
+              演示 · {{ item.label }}
             </button>
           </div>
         </div>
-        <button class="command-send" :disabled="!question.trim()" @click="runQuestion">
+        <button class="command-send" type="button" :disabled="!question.trim() || agentLoading" @click="runQuestion" :title="agentLoading ? '正在等待 Agent 返回' : '发送问题给 DataAgent'" aria-label="发送问题">
           <ArrowUpRight :size="19" />
         </button>
+      </section>
+
+      <section v-if="liveMessages.length || agentNotice" class="live-answer dc-card" aria-label="DataAgent 实际回答">
+        <div class="live-head">
+          <div><span class="agent-chip"><Sparkles :size="14" /> 实际问答</span><span class="live-source">{{ agentStatus?.realModelAccepted ? '真实模型接口' : '本地 Agent 接口（可能为测试服务）' }}</span></div>
+          <RouterLink to="/agent">在完整会话中继续 <ArrowRight :size="14" /></RouterLink>
+        </div>
+        <p v-if="agentNotice" class="agent-notice" role="status">{{ agentNotice }}</p>
+        <AgentMessageView
+          v-for="(message,index) in liveMessages"
+          :key="index"
+          :message="message"
+          @clarify="submitHomeClarification(index, $event)"
+        />
+        <p v-if="agentLoading" class="agent-loading" role="status">DataAgent 正在检索内部证据并生成回答……</p>
+      </section>
+
+      <section class="demo-section-heading">
+        <div><h2>交互效果预览</h2><p>以下关系图、趋势、字段命名和 SQL 均为模拟数据，不代表真实查询或校验结果。</p></div>
+        <span>演示模式</span>
       </section>
 
       <section class="workspace-grid">
         <article class="analysis-panel">
           <div class="analysis-head">
             <div>
-              <span class="agent-chip"><Sparkles :size="14" /> DataAgent</span>
-              <span class="demo-chip">演示数据</span>
+              <span class="agent-chip"><Sparkles :size="14" /> 分析样例</span>
+              <span class="demo-chip">模拟数据 · 非真实结果</span>
             </div>
             <span class="analysis-meta">{{ currentScenario.meta }}</span>
           </div>
@@ -162,7 +182,7 @@
               <div><span>过滤</span><b>深圳分行 · 202609</b></div>
             </div>
             <div class="sql-code">
-              <div class="sql-head"><span>MaxCompute SQL</span><span class="validation">✓ 静态校验通过</span></div>
+              <div class="sql-head"><span>MaxCompute SQL · 示例</span><span class="validation">仅供展示 · 未实际校验</span></div>
               <pre>SELECT org_name, SUM(loan_balance) AS loan_balance
 FROM stat_prod.ads_corp_loan_month
 WHERE stat_month = '202609'
@@ -176,7 +196,7 @@ GROUP BY org_name;</pre>
           <div class="action-head">
             <div>
               <span class="purple-dot"></span>
-              <span>DataAgent 建议</span>
+              <span>示例分析建议</span>
             </div>
             <small>{{ currentScenario.badge }}</small>
           </div>
@@ -184,7 +204,7 @@ GROUP BY org_name;</pre>
           <p>{{ currentScenario.summary }}</p>
 
           <div class="action-list">
-            <button v-for="(action,index) in currentScenario.actions" :key="action.label" @click="handleAction(action)">
+            <button v-for="action in currentScenario.actions" :key="action.label" @click="handleAction(action)">
               <span>{{ action.label }}</span>
               <small>{{ action.desc }}</small>
               <ArrowUpRight :size="15" />
@@ -224,8 +244,8 @@ GROUP BY org_name;</pre>
         <article class="dc-card recent-panel">
           <div class="panel-head">
             <div>
-              <h2>最近工作</h2>
-              <p>继续上次的数据分析</p>
+              <h2>示例工作入口</h2>
+              <p>演示路径，不代表你的真实访问记录</p>
             </div>
             <RouterLink to="/profile">查看全部</RouterLink>
           </div>
@@ -265,16 +285,25 @@ import {
   FileText,
   Sparkles,
 } from 'lucide-vue-next'
-import { agentApi, assetApi, type AgentStatus } from '@/api/client'
+import { agentApi, assetApi, type AgentStatus, type AgentResult } from '@/api/client'
+import AgentMessageView from '@/components/agent/AgentMessage.vue'
+import type { AgentMessage } from '@/components/agent/types'
+import { useAgentConversations } from '@/composables/useAgentConversations'
 
 type ScenarioKey = 'assets' | 'trend' | 'naming' | 'sql'
-type DemoAction = { label: string; desc: string; type: 'catalog' | 'metrics' | 'roots' | 'scenario'; value?: string }
+type DemoAction = { label: string; desc: string; type: 'catalog' | 'metrics' | 'roots' | 'scenario' | 'agent'; value?: string }
 
 const router = useRouter()
 const route = useRoute()
-const question = ref('哪些表可以分析企业贷款余额？')
+const question = ref('')
 const activeScenario = ref<ScenarioKey>('assets')
 const agentStatus = ref<AgentStatus | null>(null)
+const agentLoading = ref(false)
+const agentNotice = ref('')
+const liveMessages = ref<AgentMessage[]>([])
+const sessionId = ref<string | null>(null)
+const homeConversationStarted = ref(false)
+const { load: loadConversations, create: createConversation, syncActive } = useAgentConversations()
 
 const prompts = [
   { label: '哪些表可以分析贷款余额？', scenario: 'assets' as ScenarioKey },
@@ -336,7 +365,7 @@ const scenarios: Record<ScenarioKey, {
     actions: [
       { label: '检查字段来源', desc: '查看 loan_balance 的字段血缘', type: 'catalog', value: 'loan_balance' },
       { label: '修改统计口径', desc: '重新选择指标定义', type: 'metrics' },
-      { label: '查看完整会话', desc: '进入 Agent 会话与证据详情', type: 'scenario', value: 'assets' },
+      { label: '查看完整会话', desc: '在完整工作区管理问答与证据', type: 'agent' },
     ],
   },
 }
@@ -369,26 +398,83 @@ const recentCards = [
   { title: '资产分层概览', meta: '数据概览 · 昨天', to: '/overview', icon: BarChart3, kind: 'overview' },
 ]
 
-function inferScenario(value: string): ScenarioKey {
-  const normalized = value.toLowerCase()
-  if (normalized.includes('命名') || normalized.includes('字段') && normalized.includes('规范')) return 'naming'
-  if (normalized.includes('sql') || normalized.includes('查询')) return 'sql'
-  if (normalized.includes('趋势') || normalized.includes('增长') || normalized.includes('走势')) return 'trend'
-  return 'assets'
+function toAssistantMessage(result: AgentResult): AgentMessage {
+  return {
+    role: 'assistant', text: result.answer || '分析完成。',
+    summary: result.summary, sql: result.sql, validation: result.validation,
+    validationState: result.validationState, events: result.events,
+    evidence: result.evidence, clarification: result.clarification,
+    clarificationResolved: false, clarificationSelection: [],
+  }
 }
 
-function runQuestion() {
+async function sendHomeTurn(displayText: string, prompt = displayText) {
+  if (agentLoading.value) return
+  if (!agentReady.value) {
+    agentNotice.value = '本地 DataAgent 尚未就绪，没有提交问题。你可以先点下方的演示问题查看交互效果。'
+    return
+  }
+  agentNotice.value = ''
+  if (!homeConversationStarted.value) {
+    createConversation(displayText)
+    homeConversationStarted.value = true
+  }
+  liveMessages.value.push({ role: 'user', text: displayText })
+  syncActive(liveMessages.value, sessionId.value, null)
+  agentLoading.value = true
+  try {
+    const result = await agentApi.query(prompt, sessionId.value)
+    sessionId.value = result.sessionId || sessionId.value
+    liveMessages.value.push(toAssistantMessage(result))
+    syncActive(liveMessages.value, sessionId.value, null)
+  } catch {
+    agentNotice.value = '本次 Agent 请求没有完成，请检查本地 Agent 服务状态；之前的消息已保留。'
+    try { agentStatus.value = await agentApi.status() } catch { agentStatus.value = null }
+  } finally {
+    agentLoading.value = false
+  }
+}
+
+async function runQuestion() {
   const value = question.value.trim()
-  if (!value) return
-  activeScenario.value = inferScenario(value)
+  if (!value || agentLoading.value) return
+  if (!agentReady.value) {
+    agentNotice.value = 'Agent 服务未就绪，未发送问题。可点击下方的“演示”问题预览页面。'
+    return
+  }
+  question.value = ''
+  await sendHomeTurn(value)
+}
+
+async function submitHomeClarification(
+  messageIndex: number,
+  payload: { values: string[]; labels: string[]; custom?: string },
+) {
+  if (agentLoading.value || !agentReady.value) return
+  const message = liveMessages.value[messageIndex]
+  if (!message || message.role !== 'assistant' || !message.clarification || message.clarificationResolved) return
+  message.clarificationResolved = true
+  message.clarificationSelection = [...payload.values]
+  syncActive(liveMessages.value, sessionId.value, null)
+  const displayText = payload.custom
+    ? `补充口径：${payload.custom}`
+    : `选择口径：${payload.labels.join('、')}`
+  const prompt = payload.custom
+    ? `用户对上一轮问题补充了业务口径：“${payload.custom}”。请基于内部证据继续回答。`
+    : `用户已选择上一轮澄清选项：${payload.labels.map((label, index) => `${label}（metric_id=${payload.values[index]}）`).join('；')}。请继续原问题，不要重新要求用户输入。`
+  await sendHomeTurn(displayText, prompt)
 }
 
 function selectPrompt(item: { label: string; scenario: ScenarioKey }) {
-  question.value = item.label
   activeScenario.value = item.scenario
+  document.querySelector('.demo-section-heading')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
 }
 
 function handleAction(action: DemoAction) {
+  if (action.type === 'agent') {
+    router.push('/agent')
+    return
+  }
   if (action.type === 'scenario' && action.value) {
     activeScenario.value = action.value as ScenarioKey
     const prompt = prompts.find((item) => item.scenario === activeScenario.value)
@@ -433,6 +519,7 @@ async function hydrateCatalogs() {
 }
 
 onMounted(async () => {
+  loadConversations()
   try { agentStatus.value = await agentApi.status() } catch { agentStatus.value = null }
   await hydrateCatalogs()
   if (route.hash === '#home-agent') {
@@ -455,15 +542,28 @@ onMounted(async () => {
 .agent-command-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:start;padding:16px 18px;margin-bottom:16px;border-color:#dedfe4;box-shadow:none}
 .command-icon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--dc-ai-soft);color:var(--dc-ai-strong)}
 .command-main{min-width:0}
-.command-main label{display:block;font-size:10px;font-weight:800;color:#343a44;margin-bottom:3px}
+.command-main label{display:block;font-size:13px;font-weight:800;color:#343a44;margin-bottom:5px}
+.input-hint{margin-left:10px;font-weight:400;color:#7b828d;font-size:11px}
 .command-main textarea{width:100%;min-height:30px;max-height:90px;border:0;outline:0;resize:none;background:transparent;font-size:14px;color:#171c24;line-height:1.5}
 .command-main textarea::placeholder{color:#9ca2aa}
 .prompt-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
-.prompt-row button{border:1px solid #e1e2e5;background:#f7f7f7;border-radius:999px;padding:5px 8px;color:#737a84;font-size:9px;cursor:pointer}
+.prompt-row button{border:1px solid #e1e2e5;background:#f7f7f7;border-radius:999px;padding:7px 11px;color:#515965;font-size:11px;cursor:pointer}
+.prompt-row button[aria-pressed="true"]{border-color:#b7aaf8;background:#f1eeff;color:#5d47df}
 .prompt-row button:hover{border-color:#cfc8ff;color:var(--dc-ai-strong);background:#f4f1ff}
 .command-send{width:38px;height:38px;border:0;border-radius:10px;background:#111823;color:#fff;display:grid;place-items:center;cursor:pointer}
 .command-send:disabled{opacity:.35;cursor:not-allowed}
 
+.live-answer{margin:16px 0;padding:22px 26px;border:1px solid #ded9fc;box-shadow:0 5px 22px rgba(34,28,79,.06)}
+.live-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+.live-head>div{display:flex;align-items:center;gap:10px}
+.live-head a{display:flex;align-items:center;gap:6px;font-size:12px;color:#5d47df}
+.live-source{font-size:11px;color:#677082}
+.agent-notice,.agent-loading{margin:12px 0;padding:12px 14px;border-radius:9px;background:#faf8ed;color:#715823;font-size:13px}
+.agent-loading{background:#f1eeff;color:#5d47df}
+.demo-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 10px}
+.demo-section-heading h2{margin:0;font-size:17px;color:#222831}
+.demo-section-heading p{margin:4px 0 0;font-size:12px;color:#737c86}
+.demo-section-heading>span{padding:5px 9px;border-radius:999px;background:#eae8ef;color:#6b657b;font-size:11px;white-space:nowrap}
 .workspace-grid{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(300px,.65fr);gap:16px}
 .analysis-panel{min-height:520px;padding:22px;border-radius:15px;background:#08111e;color:#fff;box-shadow:0 18px 44px rgba(8,17,30,.16);overflow:hidden}
 .analysis-head{display:flex;align-items:center;justify-content:space-between;gap:14px}
@@ -546,20 +646,20 @@ onMounted(async () => {
 .insight-grid{display:grid;grid-template-columns:1.45fr .85fr .7fr;gap:16px;margin-top:16px}
 .warehouse-panel,.recent-panel,.health-panel{padding:19px;border-color:#e1e3e6;box-shadow:0 8px 24px rgba(17,25,39,.035)}
 .panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}
-.panel-head h2{margin:0;font-size:16px;color:#171c24}.panel-head p{margin:4px 0 0;font-size:9px;color:#8b929b}.panel-head a{font-size:9px;color:#666e78}
+.panel-head h2{margin:0;font-size:16px;color:#171c24}.panel-head p{margin:4px 0 0;font-size:11px;color:#727b86}.panel-head a{font-size:11px;color:#565f6b}
 .catalog-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .catalog-card{padding:12px;border-radius:10px;border:1px solid #e8e9eb;background:#fafaf9}
 .catalog-top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.catalog-top span{font-size:10px;font-weight:700;color:#242a33}.catalog-top strong{font-size:14px;color:#1b2028}
 .catalog-bar{height:4px;border-radius:999px;background:#eceef0;margin:10px 0 7px;overflow:hidden}.catalog-bar i{display:block;height:100%;border-radius:inherit;background:#1a2230}
-.catalog-card small{font-size:8px;color:#989ea5}
+.catalog-card small{font-size:10px;color:#818995}
 
 .recent-list{display:grid}.recent-item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 0;border-top:1px solid #eceef0}.recent-item:first-child{border-top:0}
 .recent-icon{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:#f1f2f3;color:#656d77}.recent-icon.agent{background:var(--dc-ai-soft);color:var(--dc-ai-strong)}
-.recent-item b{display:block;font-size:10px;color:#232932}.recent-item small{display:block;margin-top:3px;font-size:8px;color:#949aa2}
+.recent-item b{display:block;font-size:12px;color:#232932}.recent-item small{display:block;margin-top:4px;font-size:10px;color:#808994}
 
 .health-number{display:flex;align-items:flex-end;gap:8px;margin-top:26px}.health-number strong{font-size:34px;letter-spacing:-.04em;color:#171c24}.health-number span{padding-bottom:5px;font-size:9px;color:#8a9199}
 .health-bar{display:flex;height:7px;border-radius:999px;overflow:hidden;background:#eceef0;margin-top:18px}.health-bar i.good{background:#2f8f69}.health-bar i.warn{background:#d7923f}.health-bar i.risk{background:#d35b62}
-.health-legend{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px;font-size:8px;color:#8b929a}.health-legend i{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px}.health-legend i.good{background:#2f8f69}.health-legend i.warn{background:#d7923f}.health-legend i.risk{background:#d35b62}
+.health-legend{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px;font-size:10px;color:#7a838e}.health-legend i{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px}.health-legend i.good{background:#2f8f69}.health-legend i.warn{background:#d7923f}.health-legend i.risk{background:#d35b62}
 
 @media(max-width:1180px){.workspace-grid{grid-template-columns:1fr}.analysis-panel{min-height:500px}.insight-grid{grid-template-columns:1fr 1fr}.health-panel{grid-column:1/-1}}
 @media(max-width:760px){
