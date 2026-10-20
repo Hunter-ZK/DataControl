@@ -1,8 +1,8 @@
 <template>
   <div class="login-page">
     <div class="login-shell">
-      <section class="login-brand"><span class="brand-mark">D</span><div><h1>DataControl</h1><p>统一的数据资产服务入口。搜索、理解、追踪并安全使用数据资产。</p></div></section>
-      <section class="login-card dc-card"><h2>登录数据资产服务平台</h2><p>当前为开发验证登录，生产环境认证将在 P4 接入。</p><el-form label-position="top" @submit.prevent="submit"><el-form-item label="用户名"><el-input v-model="username" autocomplete="username"/></el-form-item><el-form-item label="密码"><el-input v-model="password" type="password" show-password autocomplete="current-password" @keyup.enter="submit"/></el-form-item><el-button type="primary" class="submit" :loading="loading" @click="submit">登录</el-button></el-form><div class="demo"><b>演示账号</b><span>demo / DataControl123!</span><span>admin / DataControlAdmin123!</span></div></section>
+      <section class="login-brand"><span class="brand-mark">D</span><div><span class="dc-eyebrow">DATA ASSET PORTAL</span><h1>DataControl</h1><p>统一的数据资产服务入口。搜索、理解、追踪并安全使用数据资产。</p></div></section>
+      <section class="login-card dc-card"><span class="dc-eyebrow">SIGN IN</span><h2>登录数据资产服务平台</h2><p>当前为开发验证登录，生产环境认证将在 P4 接入。</p><el-form label-position="top" @submit.prevent="submit"><el-form-item label="用户名"><el-input v-model="username" autocomplete="username"/></el-form-item><el-form-item label="密码"><el-input v-model="password" type="password" show-password autocomplete="current-password" @keyup.enter="submit"/></el-form-item><el-button type="primary" class="submit" :loading="loading" @click="submit">登录</el-button></el-form><div class="demo"><b>演示账号</b><span>demo / DataControl123!</span><span>admin / DataControlAdmin123!</span></div></section>
     </div>
   </div>
 </template>

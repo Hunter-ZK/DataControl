@@ -1,12 +1,12 @@
 <template>
   <div class="dc-page"><div class="dc-container">
-    <section class="dc-page-head"><div><h1 class="dc-title">数据资产概览</h1><p class="dc-subtitle">从资产规模、数仓分层和业务目录查看整体数据资产情况。</p></div></section>
+    <section class="dc-page-head"><div><span class="dc-eyebrow">DATA OVERVIEW</span><h1 class="dc-title">数据资产概览</h1><p class="dc-subtitle">从资产规模、数仓分层和业务目录查看整体数据资产情况。</p></div></section>
     <section class="dc-grid-4"><article class="dc-card dc-stat"><small>数据集</small><strong>{{fmt(data.tableCount)}}</strong><span>已登记资产表</span></article><article class="dc-card dc-stat"><small>字段</small><strong>{{fmt(data.columnCount)}}</strong><span>字段级元数据</span></article><article class="dc-card dc-stat"><small>业务指标</small><strong>{{fmt(data.metricCount)}}</strong><span>已定义指标口径</span></article><article class="dc-card dc-stat"><small>标准码表</small><strong>{{fmt(data.codeTableCount)}}</strong><span>统一标准与码值</span></article></section>
     <div class="overview-grid">
-      <section class="dc-card panel"><div class="panel-head"><div><h2>业务目录分布</h2></div><RouterLink to="/catalog">进入资产目录</RouterLink></div><div class="catalog-grid"><article v-for="c in data.topCatalogs||[]" :key="c.code"><div><b>{{c.name}}</b><code>{{c.code}}</code></div><strong>{{c.tableCount}}</strong></article></div></section>
-      <section class="dc-card panel"><h2>数仓分层</h2><div class="layers"><div v-for="x in data.layers||[]" :key="x.layerCode"><span><b>{{x.layerCode}}</b><em>{{x.tableCount}} 个数据集</em></span><div class="bar"><i :style="{width:bar(x.tableCount)}"/></div></div></div></section>
+      <section class="dc-card panel"><div class="panel-head"><div><span class="dc-eyebrow">BUSINESS CATALOG</span><h2>业务目录分布</h2></div><RouterLink to="/catalog">进入资产目录</RouterLink></div><div class="catalog-grid"><article v-for="c in data.topCatalogs||[]" :key="c.code"><div><b>{{c.name}}</b><code>{{c.code}}</code></div><strong>{{c.tableCount}}</strong></article></div></section>
+      <section class="dc-card panel"><span class="dc-eyebrow">WAREHOUSE LAYERS</span><h2>数仓分层</h2><div class="layers"><div v-for="x in data.layers||[]" :key="x.layerCode"><span><b>{{x.layerCode}}</b><em>{{x.tableCount}} 个数据集</em></span><div class="bar"><i :style="{width:bar(x.tableCount)}"/></div></div></div></section>
     </div>
-    <section class="dc-card standards"><h2>标准资产规模</h2><div class="reference-stats"><RouterLink to="/standards"><strong>{{fmt(data.standardCount)}}</strong><span>数据标准</span></RouterLink><RouterLink to="/word-roots"><strong>{{fmt(data.wordRootCount)}}</strong><span>词根</span></RouterLink><RouterLink to="/stat-systems"><strong>{{fmt(data.statSystemCount)}}</strong><span>统计制度</span></RouterLink></div></section>
+    <section class="dc-card standards"><span class="dc-eyebrow">REFERENCE ASSETS</span><h2>标准资产规模</h2><div class="reference-stats"><RouterLink to="/standards"><strong>{{fmt(data.standardCount)}}</strong><span>数据标准</span></RouterLink><RouterLink to="/word-roots"><strong>{{fmt(data.wordRootCount)}}</strong><span>词根</span></RouterLink><RouterLink to="/stat-systems"><strong>{{fmt(data.statSystemCount)}}</strong><span>统计制度</span></RouterLink></div></section>
   </div></div>
 </template>
 <script setup lang="ts">
