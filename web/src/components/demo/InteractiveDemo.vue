@@ -198,7 +198,7 @@ const mockSql=computed(()=>`-- 模拟 SQL，未进行真实校验
 SELECT org_code, SUM(loan_balance) AS loan_balance
 FROM demo_ads_corp_loan_month
 WHERE stat_month = '${sqlMonth.value}'
-  AND org_name = '${sqlOrg.value}'
+  AND org_code = '${sqlOrg.value === '深圳分行' ? 'DEMO_SZ' : 'DEMO_GZ'}'
 GROUP BY org_code;`)
 const copied=ref(false)
 async function copyText(value:string) {
