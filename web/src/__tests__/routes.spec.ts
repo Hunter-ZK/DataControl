@@ -8,7 +8,7 @@ describe('P2 product routes', () => {
       '/', '/catalog', '/search', '/datasets/:id', '/fields/:id',
       '/code-tables', '/code-tables/:no', '/standards', '/standards/:no',
       '/word-roots', '/word-roots/:root', '/metrics', '/metrics/:code',
-      '/stat-systems', '/stat-systems/:code', '/overview', '/profile', '/login',
+      '/stat-systems', '/stat-systems/:code', '/relations/:id?', '/agent', '/overview', '/profile', '/login',
     ]) expect(paths).toContain(path)
   })
 })

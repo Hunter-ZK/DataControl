@@ -12,6 +12,7 @@
           :key="item.to"
           :to="item.to"
           class="nav-item"
+          :class="{ active: isNavActive(item) }"
           :data-tip="item.desc"
         >
           <component :is="item.icon" :size="18" stroke-width="1.8" />
@@ -25,6 +26,7 @@
           :key="item.to"
           :to="item.to"
           class="nav-item"
+          :class="{ active: isNavActive(item) }"
           :data-tip="item.desc"
         >
           <component :is="item.icon" :size="18" stroke-width="1.8" />
@@ -38,6 +40,7 @@
           :key="item.to"
           :to="item.to"
           class="nav-item"
+          :class="{ active: isNavActive(item) }"
           :data-tip="item.desc"
         >
           <component :is="item.icon" :size="18" stroke-width="1.8" />
@@ -54,7 +57,7 @@
     <div class="workspace">
       <header class="topbar">
         <div class="top-left">
-          <button v-if="route.name !== 'home'" class="icon-button" title="返回上一页" @click="router.back()">
+          <button v-if="route.name !== 'home'" class="icon-button" title="返回上一页" @click="goBack()">
             <ArrowLeft :size="18" />
           </button>
           <span class="crumb">{{ route.meta.title || 'DataControl' }}</span>
@@ -108,7 +111,7 @@ const primary = [
 ]
 
 const reference = [
-  { to: '/code-tables', label: '标准码值', desc: '查询码表、数据标准及引用关系', icon: Boxes },
+  { to: '/code-tables', label: '标准与码值', desc: '查询码表、数据标准及引用关系', icon: Boxes },
   { to: '/word-roots', label: '词根索引', desc: '查看字段命名词根和规范用法', icon: Hash },
   { to: '/metrics', label: '指标与制度', desc: '查询指标口径、计算规则和制度依据', icon: BookOpenCheck },
 ]
@@ -117,6 +120,35 @@ const secondary = [
   { to: '/overview', label: '数据概览', desc: '查看资产规模、分层分布和近期变化', icon: BarChart3 },
   { to: '/profile', label: '个人中心', desc: '查看收藏、最近浏览和检索历史', icon: UserRound },
 ]
+
+function isNavActive(item: { to: string }) {
+  const path = route.path
+  if (item.to === '/') return route.name === 'home'
+  if (item.to === '/catalog') return path === '/catalog' || path.startsWith('/datasets/') || path.startsWith('/fields/')
+  if (item.to === '/code-tables') return path.startsWith('/code-tables') || path.startsWith('/standards')
+  if (item.to === '/metrics') return path.startsWith('/metrics') || path.startsWith('/stat-systems')
+  return path === item.to || path.startsWith(`${item.to}/`)
+}
+
+function fallbackRoute() {
+  const name = String(route.name || '')
+  if (name === 'dataset' || name === 'field') return { name: 'catalog' }
+  if (name === 'codeTable') return { name: 'codeTables' }
+  if (name === 'standard') return { name: 'standards' }
+  if (name === 'wordRoot') return { name: 'wordRoots' }
+  if (name === 'metric') return { name: 'metrics' }
+  if (name === 'statSystem') return { name: 'statSystems' }
+  return { name: 'home' }
+}
+
+function goBack() {
+  const previous = window.history.state?.back
+  if (typeof previous === 'string' && previous.startsWith('/')) {
+    router.back()
+    return
+  }
+  router.push(fallbackRoute())
+}
 
 function goSearch() {
   router.push({ name: 'search' })
@@ -144,7 +176,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', shortcut))
 .nav{margin-top:16px;display:grid;gap:4px;overflow:visible}
 .nav-item{position:relative;display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:#58798c;font-size:13px;transition:.16s ease}
 .nav-item:hover{background:rgba(255,255,255,.78);color:#2a708f}
-.nav-item.router-link-exact-active{background:#fff;color:#227da7;font-weight:700;box-shadow:0 6px 18px rgba(49,117,151,.07)}
+.nav-item.active,.nav-item.router-link-exact-active{background:#fff;color:#227da7;font-weight:700;box-shadow:0 6px 18px rgba(49,117,151,.07)}
 .nav-divider{height:1px;background:#d7e8f1;margin:9px 8px}
 .nav-item::after{content:attr(data-tip);position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%) translateX(-4px);width:max-content;max-width:250px;padding:8px 10px;border-radius:8px;background:#173846;color:#fff;font-size:11px;font-weight:400;line-height:1.5;white-space:normal;box-shadow:0 10px 28px rgba(20,55,72,.18);opacity:0;visibility:hidden;pointer-events:none;transition:.15s ease;z-index:100}
 .nav-item:hover::after{opacity:1;visibility:visible;transform:translateY(-50%) translateX(0)}

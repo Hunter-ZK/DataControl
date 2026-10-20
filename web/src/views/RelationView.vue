@@ -55,7 +55,7 @@ import { assetApi, relationApi, type RelationEdge, type RelationGraph, type Rela
 
 const route=useRoute(); const router=useRouter()
 const mode=ref<'table'|'field'>(route.query.mode==='field'?'field':'table')
-const centerId=ref(mode.value==='field'?String(route.query.field||''):String(route.params.id||route.query.id||'DS000004'))
+const centerId=ref(mode.value==='field'?String(route.query.field||''):String(route.params.id||route.query.id||''))
 const centerTech=ref(''); const pickerQuery=ref(''); const pickerRows=ref<SearchItem[]>([]); const showPicker=ref(false); let pickerSeq=0
 const depth=ref(3); const direction=ref('both'); const showConfirmed=ref(true); const showInferred=ref(true); const loading=ref(false); const zoom=ref(1)
 const graph=reactive<RelationGraph>({centerAssetId:'',depth:3,direction:'both',truncated:false,nodes:[],edges:[]})
@@ -87,7 +87,7 @@ async function loadGraph(){if(!centerId.value)return;loading.value=true;pathResu
 
 async function searchPicker(){const query=pickerQuery.value.trim();const seq=++pickerSeq;if(!query){pickerRows.value=[];return}try{const result=await assetApi.search(query,{asset_type:[mode.value==='table'?'TABLE':'COLUMN'],limit:8});if(seq===pickerSeq){pickerRows.value=result.items;showPicker.value=true}}catch{if(seq===pickerSeq)pickerRows.value=[]}}
 function chooseCenter(item:SearchItem){centerId.value=item.assetId;pickerQuery.value=item.title;centerTech.value=item.technicalName;pickerRows.value=[];showPicker.value=false;loadGraph()}
-function switchMode(value:'table'|'field'){if(mode.value===value)return;mode.value=value;centerId.value=value==='table'?'DS000004':'';pickerQuery.value='';centerTech.value='';Object.assign(graph,{centerAssetId:'',nodes:[],edges:[],truncated:false});if(centerId.value)loadGraph();else router.replace({name:'relations',query:{mode:'field'}})}
+function switchMode(value:'table'|'field'){if(mode.value===value)return;mode.value=value;centerId.value='';pickerQuery.value='';centerTech.value='';Object.assign(graph,{centerAssetId:'',nodes:[],edges:[],truncated:false});Object.assign(impact,{centerAssetId:'',nodes:[],edges:[],truncated:false,impactCount:0,impactByLayer:{}});pathResult.value=null;router.replace(value==='field'?{name:'relations',query:{mode:'field'}}:{name:'relations'})}
 
 async function searchTarget(){const query=targetQuery.value.trim();const seq=++targetSeq;pathTarget.value='';if(!query){targetRows.value=[];return}try{const result=await assetApi.search(query,{asset_type:['TABLE'],limit:6});if(seq===targetSeq)targetRows.value=result.items}catch{if(seq===targetSeq)targetRows.value=[]}}
 function chooseTarget(item:SearchItem){pathTarget.value=item.assetId;targetQuery.value=item.title;targetRows.value=[]}
