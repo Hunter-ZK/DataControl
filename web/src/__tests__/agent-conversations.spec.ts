@@ -3,25 +3,7 @@ import { useAgentConversations } from '@/composables/useAgentConversations'
 
 beforeEach(() => {
   localStorage.clear()
-  localStorage.setItem('datacontrol_user', JSON.stringify({ id: 1, username: 'demo' }))  it('does not expose user A browser history under user B', () => {
-    const userA = useAgentConversations()
-    userA.load()
-    const first = userA.create('用户 A 的问题')
-    userA.syncActive([{ role: 'user', text: '私有记录' }], null)
-
-    localStorage.setItem('datacontrol_user', JSON.stringify({ id: 2, username: 'admin' }))
-    const userB = useAgentConversations()
-    userB.load()
-    expect(userB.conversations.value).toHaveLength(0)
-    userB.create('用户 B 的问题')
-    expect(userB.conversations.value).toHaveLength(1)
-
-    localStorage.setItem('datacontrol_user', JSON.stringify({ id: 1, username: 'demo' }))
-    const restoredA = useAgentConversations()
-    restoredA.load()
-    expect(restoredA.conversations.value).toHaveLength(1)
-    expect(restoredA.conversations.value[0].id).toBe(first.id)
-  })
+  localStorage.setItem('datacontrol_user', JSON.stringify({ id: 1, username: 'demo' }))
 })
 
 describe('useAgentConversations', () => {
@@ -118,6 +100,25 @@ describe('useAgentConversations', () => {
     loaded.load()
     expect(loaded.conversations.value.find(c => c.id === local.id)?.serverId)
       .toBe('22222222-2222-4222-8222-222222222222')
+  })
+
+  it('keeps user A cached history separate from user B', () => {
+    const userA = useAgentConversations()
+    userA.load()
+    const first = userA.create('用户 A 的问题')
+    userA.syncActive([{ role: 'user', text: '私有记录' }], null)
+
+    localStorage.setItem('datacontrol_user', JSON.stringify({ id: 2, username: 'admin' }))
+    const userB = useAgentConversations()
+    userB.load()
+    expect(userB.conversations.value).toHaveLength(0)
+    userB.create('用户 B 的问题')
+
+    localStorage.setItem('datacontrol_user', JSON.stringify({ id: 1, username: 'demo' }))
+    const restored = useAgentConversations()
+    restored.load()
+    expect(restored.conversations.value).toHaveLength(1)
+    expect(restored.conversations.value[0].id).toBe(first.id)
   })
 
 })
