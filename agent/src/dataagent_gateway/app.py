@@ -65,6 +65,8 @@ async def query_stream(body: QueryRequest):
     run_id = str(body.runId)
     if run_id in ACTIVE_TURNS:
         raise HTTPException(409, detail="Agent run is already active")
+    if sum(not task.done() for task in ACTIVE_TURNS.values()) >= 4:
+        raise HTTPException(429, detail="Agent gateway is at its concurrent run limit")
     if body.modelMode == "free-test" and not body.publicGatewayConsent:
         raise HTTPException(403, detail="Public gateway requires explicit per-turn consent")
     runner = HeadlessHarnessRunner(model_mode=body.modelMode)
@@ -73,11 +75,20 @@ async def query_stream(body: QueryRequest):
     def on_activity(activity: dict[str, Any]) -> None:
         events.put_nowait({"type": "activity", "event": activity})
 
+    # Register eagerly: cancellation or a second request can arrive before the
+    # StreamingResponse iterator is first consumed.
+    task = asyncio.create_task(
+        runner.run(body.question.strip(), session_id=body.sessionId, on_activity=on_activity)
+    )
+    ACTIVE_TURNS[run_id] = task
+
+    def forget_done(done_task: asyncio.Task[dict[str, Any]]) -> None:
+        if ACTIVE_TURNS.get(run_id) is done_task:
+            ACTIVE_TURNS.pop(run_id, None)
+
+    task.add_done_callback(forget_done)
+
     async def stream():
-        task = asyncio.create_task(
-            runner.run(body.question.strip(), session_id=body.sessionId, on_activity=on_activity)
-        )
-        ACTIVE_TURNS[run_id] = task
         try:
             yield _json_line({"type": "started", "runId": run_id})
             while not task.done() or not events.empty():
@@ -98,7 +109,8 @@ async def query_stream(body: QueryRequest):
                 LOG.exception("[AgentStream:%s] unexpected failure", run_id[:8])
                 yield _json_line({"type": "error", "message": "Agent 处理异常，请查看服务端日志。"})
         finally:
-            ACTIVE_TURNS.pop(run_id, None)
+            if ACTIVE_TURNS.get(run_id) is task:
+                ACTIVE_TURNS.pop(run_id, None)
             if not task.done():
                 task.cancel()
             await asyncio.gather(task, return_exceptions=True)

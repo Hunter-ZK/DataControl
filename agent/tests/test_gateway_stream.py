@@ -166,3 +166,63 @@ def test_selected_model_uses_independent_harness_profile(monkeypatch):
     assert free.profile == "dataagent-headless-free"
     assert standard._command(None)[-3:] == ["--profile", "dataagent-headless", "--json"]
     assert free._command(None)[-3:] == ["--profile", "dataagent-headless-free", "--json"]
+
+
+def test_early_cancel_before_stream_iterator_consumed(monkeypatch):
+    from uuid import UUID
+    import dataagent_gateway.app as gateway_app
+
+    start = asyncio.Event()
+
+    class SlowRunner:
+        def __init__(self, *, model_mode=None):
+            pass
+
+        async def run(self, question, *, session_id=None, on_activity=None):
+            start.set()
+            await asyncio.Event().wait()
+            return {}
+
+    monkeypatch.setattr(gateway_app, "HeadlessHarnessRunner", SlowRunner)
+
+    async def scenario():
+        run_id = UUID("b2933fa8-ab90-4299-96c9-4e47be01f0ab")
+        response = await query_stream(QueryRequest(question="synthetic question", runId=run_id))
+        assert str(run_id) in ACTIVE_TURNS
+        assert await cancel_query(run_id) == {"cancelled": True}
+        chunks = [json.loads(line) async for line in response.body_iterator]
+        assert chunks[0]["type"] == "started"
+        assert chunks[-1]["type"] == "cancelled"
+        assert str(run_id) not in ACTIVE_TURNS
+
+    asyncio.run(scenario())
+
+
+def test_duplicate_run_is_rejected_before_stream_consumption(monkeypatch):
+    from uuid import UUID
+    from fastapi import HTTPException
+    import dataagent_gateway.app as gateway_app
+
+    class SlowRunner:
+        def __init__(self, *, model_mode=None):
+            pass
+
+        async def run(self, question, *, session_id=None, on_activity=None):
+            await asyncio.Event().wait()
+            return {}
+
+    monkeypatch.setattr(gateway_app, "HeadlessHarnessRunner", SlowRunner)
+
+    async def scenario():
+        run_id = UUID("b2933fa8-ab90-4299-96c9-4e47be01f0ac")
+        response = await query_stream(QueryRequest(question="synthetic question", runId=run_id))
+        try:
+            await query_stream(QueryRequest(question="synthetic question", runId=run_id))
+        except HTTPException as exc:
+            assert exc.status_code == 409
+        else:
+            raise AssertionError("duplicate runId must fail")
+        assert await cancel_query(run_id) == {"cancelled": True}
+        _ = [line async for line in response.body_iterator]
+
+    asyncio.run(scenario())

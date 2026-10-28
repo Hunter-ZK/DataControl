@@ -309,11 +309,16 @@ async function stopAgentTurn() {
   // The server endpoint cancels the actual Harness child; AbortController only
   // closes this browser's stream and must not be mistaken for a server-side stop.
   try {
-    await agentApi.cancel(runId)
-  } catch {
-    ElMessage.warning('停止请求未得到服务端确认，请查看 Agent 运行日志。')
-  } finally {
+    const outcome = await agentApi.cancel(runId)
+    if (!outcome.cancelled) {
+      stopRequested.value = false
+      ElMessage.warning('服务端未确认取消，正在等待任务最终状态；请勿将其视为已停止。')
+      return
+    }
     activeController?.abort()
+  } catch {
+    stopRequested.value = false
+    ElMessage.warning('停止请求失败，仍在等待服务端结果；请检查 Agent 日志。')
   }
 }
 
@@ -347,6 +352,10 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
       syncActive(messages.value, sessionId.value, contextAsset.value, modelMode.value)
     } else {
       console.error('DataAgent query failed', error)
+      // The dsh session may already contain an incomplete model turn.
+      // Do not resume it after a broken stream or unknown server outcome.
+      sessionId.value = null
+      messages.value.push({ role: 'assistant', text: '本轮请求未完成，服务端最终状态暂时无法确认。为避免沿用不完整上下文，已重置模型会话。' })
       ElMessage.error('智能问数本次未完成，请检查 Agent 服务与运行日志。')
       await refreshStatus()
       syncActive(messages.value, sessionId.value, contextAsset.value, modelMode.value)
