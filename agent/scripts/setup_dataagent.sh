@@ -24,9 +24,20 @@ fi
 export PATH="$DSH_BIN_DIR:$PATH"
 mkdir -p "$DSH_HOME"
 
+backup_profile() {
+  local profile="$1" name="$2"
+  local backups="$DSH_HOME/profile-backups"
+  mkdir -p "$backups"
+  local destination="$backups/$name-$(date +%Y%m%d-%H%M%S)-$"
+  mv "$profile" "$destination"
+  echo "Preserved incomplete or incompatible dsh profile at: $destination" >&2
+}
+
 setup_profile() {
   local name="$1" base="$2" patch="$3" profile="$DSH_HOME/profiles/$1"
-  if [ -d "$profile" ] && [ ! -f "$profile/package.json" ]; then rm -rf "$profile"; fi
+  if [ -d "$profile" ] && [ ! -f "$profile/package.json" ]; then
+    backup_profile "$profile" "$name"
+  fi
   if [ ! -f "$profile/package.json" ]; then
     (cd "$REPO_ROOT" && "$DSH_BIN" --profile "$name" --from-default-profile "$base" --dump-config >/dev/null)
   fi
@@ -34,7 +45,19 @@ setup_profile() {
   local out err
   out="$(mktemp)"; err="$(mktemp)"
   if ! (cd "$REPO_ROOT" && "$DSH_BIN" --profile "$name" --dump-config >"$out" 2>"$err"); then
-    cat "$err" >&2; rm -f "$out" "$err"; exit 1
+    if grep -Eq 'patch: entry .+ not found' "$err"; then
+      # Keep all existing sessions and profile files before rebuilding.
+      backup_profile "$profile" "$name"
+      if ! (cd "$REPO_ROOT" && "$DSH_BIN" --profile "$name" --from-default-profile "$base" --dump-config >"$out" 2>"$err"); then
+        cat "$err" >&2; rm -f "$out" "$err"; exit 1
+      fi
+      cp "$patch" "$profile/cordis.patch.yml"
+      if ! (cd "$REPO_ROOT" && "$DSH_BIN" --profile "$name" --dump-config >"$out" 2>"$err"); then
+        cat "$err" >&2; rm -f "$out" "$err"; exit 1
+      fi
+    else
+      cat "$err" >&2; rm -f "$out" "$err"; exit 1
+    fi
   fi
   for required in deepseek-official mcp-agent3 agent3-guard; do
     grep -q "$required" "$out" || { echo "DataAgent profile $name missing $required" >&2; rm -f "$out" "$err"; exit 1; }
@@ -56,4 +79,4 @@ setup_profile() {
 setup_profile dataagent web "$WEB_PATCH"
 setup_profile dataagent-headless headless "$HEADLESS_PATCH"
 setup_profile dataagent-headless-multi headless "$MULTI_PATCH"
-echo "DataAgent dsh profiles ready: dataagent + restricted dataagent-headless ($DSH_HOME)"
+echo "DataAgent dsh profiles ready: web + standard + multi ($DSH_HOME)"
