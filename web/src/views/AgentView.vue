@@ -347,7 +347,7 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
     const active = conversations.value.find((c) => c.id === activeConversationId.value)
     if (active && !active.serverId) {
       try {
-        const saved = await agentApi.createConversation(active.title, selectedMode)
+        const saved = await agentApi.createConversation(active.title, selectedMode, active.contextAsset || null)
         attachServerId(active.id, saved.id)
       } catch {
         ElMessage.warning('服务端会话不可用，本轮仍保存在当前浏览器。')
@@ -361,7 +361,7 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
   await scrollBottom()
   try {
     const serverId = conversations.value.find((c) => c.id === activeConversationId.value)?.serverId || null
-    const result = await agentApi.stream(prompt, sessionId.value, activeRunId, onAgentStreamEvent, activeController.signal, selectedMode, serverId)
+    const result = await agentApi.stream(prompt, sessionId.value, activeRunId, onAgentStreamEvent, activeController.signal, selectedMode, serverId, displayText)
     reportAgentDevtools(result)
     if (result.sessionId) sessionId.value = result.sessionId
     messages.value.push(assistantMessage(result))

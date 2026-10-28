@@ -228,6 +228,7 @@ export async function streamAgentTurn(
   signal: AbortSignal,
   modelMode: AgentModelMode = 'deepseek',
   conversationId: string | null = null,
+  displayQuestion: string | null = null,
 ): Promise<AgentResult> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   const token = localStorage.getItem('datacontrol_token')
@@ -238,6 +239,7 @@ export async function streamAgentTurn(
     body: JSON.stringify({
       question, sessionId: sessionId || undefined, runId, modelMode,
       conversationId: conversationId || undefined,
+      displayQuestion: displayQuestion || undefined,
       publicGatewayConsent: modelMode === 'free-test',
     }),
     signal,
@@ -407,8 +409,8 @@ export const relationApi = {
 
 export const agentApi = {
   conversations: () => get<ServerAgentConversation[]>('/agent/conversations'),
-  createConversation: (title: string, modelMode: AgentModelMode) =>
-    post<ServerAgentConversation>('/agent/conversations', { title, modelMode }),
+  createConversation: (title: string, modelMode: AgentModelMode, contextAsset?: Record<string, unknown> | null) =>
+    post<ServerAgentConversation>('/agent/conversations', { title, modelMode, contextAsset }),
   importConversations: (conversations: Array<Record<string, unknown>>) =>
     post<ServerAgentConversation[]>('/agent/conversations/import', { conversations }),
   editConversation: (id: string, data: { title?: string; pinned?: boolean }) =>
