@@ -29,6 +29,7 @@ export type ContextAsset = {
 
 export type AgentConversation = {
   id: string
+  serverId?: string | null
   title: string
   sessionId: string | null
   modelMode: AgentModelMode

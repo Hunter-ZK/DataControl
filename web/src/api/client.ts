@@ -172,6 +172,20 @@ export interface SemanticMetric {
 
 export type AgentModelMode = 'deepseek' | 'free-test'
 
+export interface ServerAgentConversation {
+  id: string
+  serverId?: string | null
+  title: string
+  sessionId: string | null
+  modelMode: AgentModelMode
+  pinned: boolean
+  createdAt: number
+  updatedAt: number
+  messages: Array<Record<string, unknown>>
+  contextAsset?: Record<string, unknown> | null
+  lastRunStatus?: string | null
+}
+
 export interface AgentStatus {
   modelMode?: AgentModelMode
   ready: boolean
@@ -213,6 +227,7 @@ export async function streamAgentTurn(
   onEvent: (event: AgentStreamEvent) => void,
   signal: AbortSignal,
   modelMode: AgentModelMode = 'deepseek',
+  conversationId: string | null = null,
 ): Promise<AgentResult> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   const token = localStorage.getItem('datacontrol_token')
@@ -222,6 +237,7 @@ export async function streamAgentTurn(
     headers,
     body: JSON.stringify({
       question, sessionId: sessionId || undefined, runId, modelMode,
+      conversationId: conversationId || undefined,
       publicGatewayConsent: modelMode === 'free-test',
     }),
     signal,
@@ -390,6 +406,15 @@ export const relationApi = {
 }
 
 export const agentApi = {
+  conversations: () => get<ServerAgentConversation[]>('/agent/conversations'),
+  createConversation: (title: string, modelMode: AgentModelMode) =>
+    post<ServerAgentConversation>('/agent/conversations', { title, modelMode }),
+  importConversations: (conversations: Array<Record<string, unknown>>) =>
+    post<ServerAgentConversation[]>('/agent/conversations/import', { conversations }),
+  editConversation: (id: string, data: { title?: string; pinned?: boolean }) =>
+    http.patch<{ code: string; data: ServerAgentConversation }>(`/agent/conversations/${id}`, data).then(r => r.data.data),
+  deleteConversation: (id: string) => remove<{ deleted: boolean }>(`/agent/conversations/${id}`),
+  runStatus: (runId: string) => get<{ status: string; runId: string; modelMode: AgentModelMode }>(`/agent/runs/${runId}`),
   status: (modelMode: AgentModelMode = 'deepseek') =>
     get<AgentStatus>('/agent/status', { params: { modelMode } }),
   query: (question: string, sessionId?: string | null, modelMode: AgentModelMode = 'deepseek') =>

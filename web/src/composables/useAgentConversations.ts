@@ -23,6 +23,7 @@ function normalizeConversation(value: unknown): AgentConversation | null {
   const now = Date.now()
   return {
     id: row.id,
+    serverId: typeof row.serverId === 'string' ? row.serverId : null,
     title: typeof row.title === 'string' && row.title.trim() ? row.title.trim() : '历史会话',
     sessionId: typeof row.sessionId === 'string' ? row.sessionId : null,
     modelMode: row.modelMode === 'free-test' || (
@@ -115,6 +116,7 @@ export function useAgentConversations() {
     const now = Date.now()
     const conversation: AgentConversation = {
       id: newConversationId(),
+      serverId: null,
       title: defaultTitle(firstQuestion),
       sessionId: null,
       modelMode,
@@ -183,6 +185,23 @@ export function useAgentConversations() {
     persist()
   }
 
+  function attachServerId(id: string, serverId: string) {
+    const conversation = conversations.value.find((item) => item.id === id)
+    if (!conversation) return
+    conversation.serverId = serverId
+    persist()
+  }
+
+  function mergeServer(remote: AgentConversation[]) {
+    // Keep existing local IDs for active view state; server owns published turns.
+    for (const incoming of remote) {
+      const existing = conversations.value.find((item) => item.serverId === incoming.id || item.id === incoming.id)
+      if (existing) Object.assign(existing, incoming, { id: existing.id, serverId: incoming.id })
+      else conversations.value.push({ ...incoming, serverId: incoming.id })
+    }
+    persist()
+  }
+
   return {
     conversations,
     activeConversationId,
@@ -198,5 +217,7 @@ export function useAgentConversations() {
     rename,
     remove,
     togglePin,
+    attachServerId,
+    mergeServer,
   }
 }
