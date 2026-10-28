@@ -35,7 +35,7 @@ try {
     $stdout = Join-Path $local "npm-$Name.stdout.log"
     $stderr = Join-Path $local "npm-$Name.stderr.log"
     Remove-Item $stdout, $stderr -Force -ErrorAction SilentlyContinue
-    $command = "npm install --no-audit --no-fund --no-progress --install-strategy=shallow --maxsockets=5"
+    $command = "npm install --no-audit --no-fund --no-progress --maxsockets=5"
     Write-Host "[DataControl] Installing $Name npm packages. Detailed output: $stderr"
     $params = @{
       FilePath = $env:ComSpec
