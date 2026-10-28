@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "agent-profile-state.ps1")
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $root
 $local = Join-Path $root ".local"
@@ -38,6 +39,13 @@ function Test-PortalReady {
 
 function Test-AgentReady {
   if (-not ((Test-Path $agentMarker) -and (Test-Path $dsh) -and (Test-Path $headless))) {
+    return $false
+  }
+  if (-not (Test-DataAgentProfilesCurrent -RepoRoot $root)) {
+    Write-Host "[DataControl] Agent profile differs from current source; rebuilding its configuration..."
+    return $false
+  }
+  if (-not (Test-Path (Join-Path $root "agent\guard-plugin\dist\index.js"))) {
     return $false
   }
   & $python -c "import importlib.util as u; raise SystemExit(0 if all(u.find_spec(n) for n in ('agent3','dataagent_gateway')) else 1)"
@@ -82,7 +90,7 @@ if (-not (Test-PortalReady)) {
 
 if (-not $SkipAgent) {
   if ($Action -eq "repair") {
-    Write-Host "[DataControl] Repairing the incomplete dsh npm installation..."
+    Write-Host "[DataControl] Repairing Agent packages and generated dsh profiles..."
     & (Join-Path $root "scripts\setup-agent.ps1") -Repair
   } elseif (-not (Test-AgentReady)) {
     Write-Host "[DataControl] Installing or repairing missing Agent dependencies..."
@@ -91,7 +99,7 @@ if (-not $SkipAgent) {
     Write-Host "[DataControl] Agent already installed; skipping setup."
   }
   if (-not (Test-AgentReady)) {
-    throw "Agent installation is incomplete. Run .\start.bat repair and inspect .local\npm-dsh.stderr.log."
+    throw "Agent initialization is incomplete. Run .\start.bat repair. For profile errors inspect .local\dsh-profile-command.stderr.log; for npm errors inspect .local\npm-dsh.stderr.log."
   }
 }
 

@@ -58,8 +58,30 @@ try {
     if (-not (Test-Path (Join-Path $profile "package.json"))) {
       $null=Invoke-DshProfile -CliArguments @("--profile",$name,"--from-default-profile",$base,"--dump-config")
     }
-    Copy-Item $patch (Join-Path $profile "cordis.patch.yml") -Force
-    $config=Invoke-DshProfile -CliArguments @("--profile",$name,"--dump-config")
+    # Always replace a previously generated overlay; old patches can mention
+    # plugin IDs removed by newer dsh releases (for example tool-ralph).
+    Copy-Item -LiteralPath $patch -Destination (Join-Path $profile "cordis.patch.yml") -Force
+    try {
+      $config=Invoke-DshProfile -CliArguments @("--profile",$name,"--dump-config")
+    } catch {
+      $detail=$_.Exception.Message
+      if ($detail -notmatch 'patch: entry .+ not found') { throw }
+      # The old profile base itself is incompatible. Keep every file in a backup
+      # before recreating; never silently delete sessions or locally saved data.
+      $backupRoot=Join-Path $env:DSH_HOME "profile-backups"
+      New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
+      $backupName="$name-$([DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))"
+      $backup=Join-Path $backupRoot $backupName
+      Write-Warning "Stale dsh profile '$name' references a removed plugin; backing it up to $backup"
+      Move-Item -LiteralPath $profile -Destination $backup
+      try {
+        $null=Invoke-DshProfile -CliArguments @("--profile",$name,"--from-default-profile",$base,"--dump-config")
+        Copy-Item -LiteralPath $patch -Destination (Join-Path $profile "cordis.patch.yml") -Force
+        $config=Invoke-DshProfile -CliArguments @("--profile",$name,"--dump-config")
+      } catch {
+        throw "Could not recreate dsh profile '$name'. Previous profile is preserved at $backup. $($_.Exception.Message)"
+      }
+    }
     foreach($required in @('deepseek-official','mcp-agent3','agent3-guard')) {
       if ($config -notmatch [regex]::Escape($required)) { throw "DataAgent profile $name missing $required" }
     }

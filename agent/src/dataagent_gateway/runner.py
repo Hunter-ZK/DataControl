@@ -456,15 +456,31 @@ class HeadlessHarnessRunner:
 
     async def health(self) -> dict[str, Any]:
         dsh_installed = (self.dsh_js_entry if os.name == "nt" else self.dsh_bin).exists()
-        profile_ready = (self.profile_dir / "package.json").exists()
+        profile_package_ready = (self.profile_dir / "package.json").exists()
+        source_overlay = self.agent_root / "dsh" / "profile" / "headless.patch.yml"
+        active_overlay = self.profile_dir / "cordis.patch.yml"
+        try:
+            profile_current = (
+                source_overlay.is_file()
+                and active_overlay.is_file()
+                and source_overlay.read_bytes() == active_overlay.read_bytes()
+            )
+        except OSError:
+            profile_current = False
+        profile_ready = profile_package_ready and profile_current
         api_key_present = bool(os.getenv("DEEPSEEK_API_KEY"))
         mcp_reachable = await self._mcp_reachable()
         ready = dsh_installed and profile_ready and api_key_present and mcp_reachable
         blockers: list[str] = []
         if not dsh_installed:
             blockers.append("DeepSeek Harness is not installed")
-        if not profile_ready:
-            blockers.append(f"dsh profile '{self.profile}' is not initialized")
+        if not profile_package_ready:
+            blockers.append(f"dsh profile '{self.profile}' is not initialized (run .\\start.bat repair)")
+        elif not profile_current:
+            blockers.append(
+                f"dsh profile '{self.profile}' is outdated or incomplete "
+                "(run .\\start.bat repair to reload the current source overlay)"
+            )
         if not api_key_present:
             blockers.append("DEEPSEEK_API_KEY is not set")
         if not mcp_reachable:

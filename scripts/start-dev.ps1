@@ -2,6 +2,7 @@
 param([switch]$SkipAgent)
 
 $ErrorActionPreference="Stop"
+. (Join-Path $PSScriptRoot "agent-profile-state.ps1")
 $root=(Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $root
 
@@ -69,7 +70,8 @@ $env:no_proxy=$env:NO_PROXY
 if(-not $SkipAgent){
   & $python -c "import agent3, dataagent_gateway" 2>$null
   $agentImportsOk=$LASTEXITCODE -eq 0
-  if(-not $agentImportsOk -or -not(Test-Path $dshBin) -or -not(Test-Path $headlessProfile)){
+  if(-not $agentImportsOk -or -not(Test-Path $dshBin) -or -not(Test-Path $headlessProfile) -or
+     -not(Test-DataAgentProfilesCurrent -RepoRoot $root)){
     Write-Host "Embedded DataAgent setup is incomplete; bootstrapping it in the shared .venv now..."
     & .\scripts\setup-agent.ps1
   }
@@ -109,7 +111,12 @@ try {
     $gatewayHealthJson=& $python -c "import httpx,json; r=httpx.get('http://127.0.0.1:8910/health',timeout=2.0,trust_env=False); r.raise_for_status(); print(json.dumps(r.json()))"
     $gatewayHealth=$gatewayHealthJson | ConvertFrom-Json
     Write-Host "Agent3 MCP:        READY http://127.0.0.1:8900/mcp"
-    if($gatewayHealth.ready){Write-Host "DataAgent Gateway: READY http://127.0.0.1:8910"}else{Write-Warning ("DataAgent Gateway is running but degraded: "+[string]$gatewayHealth.reason)}
+    if($gatewayHealth.ready){
+      Write-Host "DataAgent Gateway: READY http://127.0.0.1:8910 (queries enabled)"
+    }else{
+      Write-Warning ("DataAgent Gateway PROCESS STARTED on 8910, but Agent queries are UNAVAILABLE: "+[string]$gatewayHealth.reason)
+      Write-Host "Repair profile: .\start.bat repair; for missing API key set DEEPSEEK_API_KEY and restart."
+    }
     Write-Host "Agent 运行记录:     在另一 PowerShell 窗口执行："
     Write-Host "  Get-Content .\.local\agent-gateway.err.log -Tail 40 -Wait"
     if([string]::IsNullOrWhiteSpace($env:DEEPSEEK_API_KEY)){Write-Warning "DEEPSEEK_API_KEY is not set; Agent Gateway will be degraded until DataControl is restarted with the key present."}

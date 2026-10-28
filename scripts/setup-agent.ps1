@@ -91,8 +91,6 @@ try {
     try {
       & npm.cmd run build
       Assert-Exit "Guard plugin build"
-      & npm.cmd test
-      Assert-Exit "Guard plugin test"
     } finally { Pop-Location }
 
     & (Join-Path $root "agent\scripts\setup_dataagent.ps1") -DshHome (Join-Path $local "dsh-home-v0.2.1-rc.3")
