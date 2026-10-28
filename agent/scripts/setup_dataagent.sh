@@ -28,7 +28,7 @@ backup_profile() {
   local profile="$1" name="$2"
   local backups="$DSH_HOME/profile-backups"
   mkdir -p "$backups"
-  local destination="$backups/$name-$(date +%Y%m%d-%H%M%S)-$"
+  local destination="$backups/$name-$(date +%Y%m%d-%H%M%S)-$PPID"
   mv "$profile" "$destination"
   echo "Preserved incomplete or incompatible dsh profile at: $destination" >&2
 }

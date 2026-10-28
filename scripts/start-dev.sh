@@ -52,7 +52,7 @@ export NO_PROXY="127.0.0.1,localhost,::1${NO_PROXY:+,$NO_PROXY}"
 export no_proxy="$NO_PROXY"
 
 # This is the same profile root used by the running Gateway and dsh.
-export DSH_HOME="${DSH_HOME:-$ROOT/.local/dsh-home-v0.2.1-rc.3}"
+export DSH_HOME="$ROOT/.local/dsh-home-v0.2.1-rc.3"
 if [ "$SKIP_AGENT" -eq 0 ]; then
   if ! "$PYTHON" -c 'import agent3, dataagent_gateway' >/dev/null 2>&1 \
       || [ ! -x agent/dsh/node_modules/.bin/dsh ] \
