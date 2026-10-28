@@ -25,7 +25,8 @@ test('unified search keeps asset search and Agent Q&A as explicit choices', asyn
   await expect(page.getByText('贷款余额汇总')).toBeVisible()
   await expect(page).toHaveURL(/\/$/)
   await page.getByRole('button', { name: '问 DataAgent' }).click()
-  await expect(page).toHaveURL(/\/agent\?q=/)
+  // The Agent route is protected, so anonymous users are sent to login.
+  await expect(page).toHaveURL(/\/login\?redirect=/)
 })
 
 for (const width of [1440, 1024, 390]) {
