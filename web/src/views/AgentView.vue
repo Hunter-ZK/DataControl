@@ -255,7 +255,7 @@ async function loadContext() {
 function restoreConversation(conversation: AgentConversation) {
   taskTier.value = conversation.taskTier === 'multi' ? 'multi' : 'standard'
   modelMode.value = 'deepseek'
-  sessionId.value = conversation.modelMode === 'deepseek' ? conversation.sessionId || null : null
+  sessionId.value = null
   messages.value = [...conversation.messages]
   contextAsset.value = conversation.contextAsset ? { ...conversation.contextAsset } : null
   nextTick(() => { resizeComposer(); scrollBottom() })

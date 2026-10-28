@@ -63,7 +63,9 @@ def test_run_idempotency_and_one_active_turn(store):
     assert replay is True and repeated.status == "completed"
     with pytest.raises(HTTPException):
         history.reserve(store, 1, conv.id, run_id, "different question", "deepseek")
-    assert history.serialize(store, conv)["sessionId"] == "session-test"
+    assert history.serialize(store, conv)["sessionId"] is None
+    store.refresh(conv)
+    assert conv.session_id == "session-test"
 
 
 def test_result_and_events_never_persist_raw_tool_input(store):
@@ -127,7 +129,8 @@ def test_bounded_legacy_history_is_preserved(store):
     serialized = history.serialize(store, conv)
     assert serialized["modelMode"] == "free-test"
     assert serialized["messages"] == original
-    assert serialized["sessionId"] == "free-test:safe-id"
+    assert serialized["sessionId"] is None
+    assert history.public_answer({"sessionId": "private", "answer": "safe"}) == {"answer": "safe"}
 
 
 def test_conversation_task_tier_persists_and_serializes(store):

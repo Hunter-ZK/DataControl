@@ -3,10 +3,29 @@ import { useAgentConversations } from '@/composables/useAgentConversations'
 
 beforeEach(() => {
   localStorage.clear()
+  localStorage.setItem('datacontrol_user', JSON.stringify({ id: 1, username: 'demo' }))  it('does not expose user A browser history under user B', () => {
+    const userA = useAgentConversations()
+    userA.load()
+    const first = userA.create('用户 A 的问题')
+    userA.syncActive([{ role: 'user', text: '私有记录' }], null)
+
+    localStorage.setItem('datacontrol_user', JSON.stringify({ id: 2, username: 'admin' }))
+    const userB = useAgentConversations()
+    userB.load()
+    expect(userB.conversations.value).toHaveLength(0)
+    userB.create('用户 B 的问题')
+    expect(userB.conversations.value).toHaveLength(1)
+
+    localStorage.setItem('datacontrol_user', JSON.stringify({ id: 1, username: 'demo' }))
+    const restoredA = useAgentConversations()
+    restoredA.load()
+    expect(restoredA.conversations.value).toHaveLength(1)
+    expect(restoredA.conversations.value[0].id).toBe(first.id)
+  })
 })
 
 describe('useAgentConversations', () => {
-  it('persists, searches and pins conversations without a server identity dependency', () => {
+  it('persists, searches and pins conversations within the signed-in account', () => {
     const store = useAgentConversations()
     store.load()
 
@@ -32,7 +51,7 @@ describe('useAgentConversations', () => {
     reloaded.load()
     const restored = reloaded.restoreLast()
     expect(restored?.title).toBe('贷款余额查询')
-    expect(restored?.sessionId).toBe('session-1')
+    expect(restored?.sessionId).toBeNull()
     expect(restored?.pinned).toBe(true)
   })
 
@@ -66,7 +85,11 @@ describe('useAgentConversations', () => {
     )
     const store = useAgentConversations()
     store.load()
+    expect(store.conversations.value).toHaveLength(0)
+    expect(store.hasUnscopedLegacy()).toBe(true)
+    expect(store.adoptUnscopedLegacy()).toBe(1)
     expect(store.conversations.value[0].pinned).toBe(false)
+    expect(localStorage.getItem('datacontrol_agent_conversations_v1')).toBeNull()
   })
   it('merges remote conversations without losing local-only history or changing active IDs', () => {
     const store = useAgentConversations()
@@ -82,7 +105,7 @@ describe('useAgentConversations', () => {
     store.mergeServer([remoteData])
     expect(store.conversations.value).toHaveLength(2)
     expect(store.activeConversationId.value).toBe(local.id)
-    expect(store.conversations.value.find(c => c.serverId === remoteData.id)?.sessionId).toBe('remote-session')
+    expect(store.conversations.value.find(c => c.serverId === remoteData.id)?.sessionId).toBeNull()
     store.attachServerId(local.id, '22222222-2222-4222-8222-222222222222')
     store.mergeServer([{
       ...remoteData, id: '22222222-2222-4222-8222-222222222222',

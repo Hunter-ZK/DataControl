@@ -216,13 +216,13 @@ export function useAgentConversations() {
 
   function syncActive(
     messages: AgentMessage[],
-    sessionId: string | null,
+    _sessionId: string | null,
     contextAsset?: ContextAsset | null,
     modelMode?: AgentModelMode,
   ) {
     const conversation = activeConversation.value
     if (!conversation) return
-    conversation.sessionId = sessionId
+    conversation.sessionId = null
     if (modelMode) conversation.modelMode = modelMode
     conversation.updatedAt = Date.now()
     conversation.messages = [...messages]
@@ -266,8 +266,10 @@ export function useAgentConversations() {
     // Keep existing local IDs for active view state; server owns published turns.
     for (const incoming of remote) {
       const existing = conversations.value.find((item) => item.serverId === incoming.id || item.id === incoming.id)
-      if (existing) Object.assign(existing, incoming, { id: existing.id, serverId: incoming.id })
-      else conversations.value.push({ ...incoming, serverId: incoming.id })
+      if (existing) Object.assign(existing, incoming, {
+        id: existing.id, serverId: incoming.id, sessionId: null,
+      })
+      else conversations.value.push({ ...incoming, serverId: incoming.id, sessionId: null })
     }
     persist()
   }
