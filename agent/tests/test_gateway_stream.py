@@ -27,7 +27,7 @@ def test_live_activity_projects_only_allowlisted_tool_and_status():
              "result": secret},
             {"type": "final", "text": secret},
         ]
-        reader.feed_data(("\\n".join(json.dumps(x) for x in items)+"\\n").encode())
+        reader.feed_data(("\n".join(json.dumps(x) for x in items)+"\n").encode())
         reader.feed_eof()
         return await HeadlessHarnessRunner()._capture_trace(reader, "safe-id", seen.append)
 
