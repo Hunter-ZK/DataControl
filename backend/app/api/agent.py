@@ -170,7 +170,7 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
             if not terminal:
                 if persisted:
                     history.transition(run_id, "interrupted", error="Stream ended without terminal event")
-                yield (json.dumps({"type": "error", "message": "Agent 连接中断，结果未确认。"}, ensure_ascii=False) + "\\n").encode("utf-8")
+                yield (json.dumps({"type": "error", "message": "Agent 连接中断，结果未确认。"}, ensure_ascii=False) + "\n").encode("utf-8")
                 terminal = True
         except AgentRuntimeError:
             LOG.exception("Agent stream failed")
