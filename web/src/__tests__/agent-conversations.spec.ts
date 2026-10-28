@@ -68,4 +68,33 @@ describe('useAgentConversations', () => {
     store.load()
     expect(store.conversations.value[0].pinned).toBe(false)
   })
+  it('merges remote conversations without losing local-only history or changing active IDs', () => {
+    const store = useAgentConversations()
+    store.load()
+    const local = store.create('本地草稿')
+    store.syncActive([{ role: 'user', text: '本地问题' }], null)
+    const remoteData = {
+      id: '11111111-1111-4111-8111-111111111111',
+      title: '远程记录', sessionId: 'remote-session', modelMode: 'deepseek' as const,
+      createdAt: 100, updatedAt: 200, pinned: false,
+      messages: [{ role: 'user' as const, text: '远程问题' }],
+    }
+    store.mergeServer([remoteData])
+    expect(store.conversations.value).toHaveLength(2)
+    expect(store.activeConversationId.value).toBe(local.id)
+    expect(store.conversations.value.find(c => c.serverId === remoteData.id)?.sessionId).toBe('remote-session')
+    store.attachServerId(local.id, '22222222-2222-4222-8222-222222222222')
+    store.mergeServer([{
+      ...remoteData, id: '22222222-2222-4222-8222-222222222222',
+      messages: [{ role: 'user', text: '服务端是最终事实' }],
+    }])
+    expect(store.conversations.value).toHaveLength(2)
+    expect(store.activeConversationId.value).toBe(local.id)
+    expect(store.activeConversation.value?.messages[0].text).toBe('服务端是最终事实')
+    const loaded = useAgentConversations()
+    loaded.load()
+    expect(loaded.conversations.value.find(c => c.id === local.id)?.serverId)
+      .toBe('22222222-2222-4222-8222-222222222222')
+  })
+
 })

@@ -67,4 +67,23 @@ describe('Agent NDJSON stream contract', () => {
     await expect(streamAgentTurn('question', null, 'r3', () => {}, new AbortController().signal))
       .rejects.toThrow('without a final result')
   })
+  it('sends server conversation identity and the user-facing text independently of the model prompt', async () => {
+    let body: Record<string, unknown> = {}
+    globalThis.fetch = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body)) as Record<string, unknown>
+      return {
+        ok: true,
+        body: chunks(['{"type":"result","result":{"answer":"可信结果","sqlExecuted":false,"hiddenReasoningExposed":false}}\\n']),
+      }
+    }) as unknown as typeof fetch
+    await streamAgentTurn(
+      'metadata preface and real question', 'old-session', 'run-a', () => {},
+      new AbortController().signal, 'deepseek',
+      '11111111-1111-4111-8111-111111111111', '用户看到的问题',
+    )
+    expect(body.conversationId).toBe('11111111-1111-4111-8111-111111111111')
+    expect(body.displayQuestion).toBe('用户看到的问题')
+    expect(body.question).toBe('metadata preface and real question')
+  })
+
 })
