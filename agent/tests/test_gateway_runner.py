@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -288,6 +289,6 @@ def test_windows_headless_command_uses_node_entrypoint_without_shell(monkeypatch
     monkeypatch.setattr(runner_module, "os", SimpleNamespace(name="nt"))
     command = runner._command("session-1234")
     assert command[:1] == ["node"]
-    assert command[1].replace("\\\\", "/").endswith("/@deepseek-ai/dsh/lib/bin.js")
+    assert Path(command[1]).as_posix().endswith("/@deepseek-ai/dsh/lib/bin.js")
     assert "cmd.exe" not in command
     assert command[-2:] == ["--session-id", "session-1234"]
