@@ -7,6 +7,7 @@ from pathlib import Path
 AGENT_ROOT = Path(__file__).resolve().parents[1]
 WEB_PATCH = AGENT_ROOT / "dsh" / "profile" / "cordis.patch.yml"
 HEADLESS_PATCH = AGENT_ROOT / "dsh" / "profile" / "headless.patch.yml"
+MULTI_PATCH = AGENT_ROOT / "dsh" / "profile" / "headless-multi.patch.yml"
 QUERY_PRESET = AGENT_ROOT / "dsh" / "presets" / "dataagent-query" / "agent.cordis.yml"
 
 
@@ -54,13 +55,19 @@ def test_headless_profile_enables_autonomy_but_blocks_unsafe_tools():
     assert missing == [], f"headless safety tombstones missing: {missing}"
     still_disabled = sorted(row_id for row_id in enabled if _row_disabled(text, row_id))
     assert still_disabled == [], f"autonomous planning tools still disabled: {still_disabled}"
-    assert "Decompose complex user tasks" in text
+    assert "Standard query profile" in text
+    assert "do not use Goal, Todo, Workflow, Subagent or Plan Mode" in text
+    multi = MULTI_PATCH.read_text(encoding="utf-8")
+    assert "Multi-step task profile" in multi
+    for row_id in blocked:
+        assert _row_disabled(multi, row_id)
+    assert "- id: mcp-agent3" in multi
 
 
 def test_dataagent_skill_discovery_is_embedded_and_deterministic():
     headless = HEADLESS_PATCH.read_text(encoding="utf-8")
     preset = QUERY_PRESET.read_text(encoding="utf-8")
-    for text in (headless, preset):
+    for text in (headless, MULTI_PATCH.read_text(encoding="utf-8"), preset):
         assert "includeDefaultRoots: false" in text
         assert "/agent/.dsh/skills" in text
     assert "- id: skill-filesystem\n  disabled: true" not in headless
@@ -79,7 +86,7 @@ def test_overlays_reference_only_pinned_harness_plugin_ids():
     """Guard against patching absent rows (e.g. removed tool-ralph)."""
     registry = json.loads((AGENT_ROOT / "dsh" / "profile" / "pinned-plugin-ids.json").read_text(encoding="utf-8"))
     assert registry["version"] == "0.2.1-rc.3"
-    for patch, mode in ((HEADLESS_PATCH, "headless"), (WEB_PATCH, "web")):
+    for patch, mode in ((HEADLESS_PATCH, "headless"), (MULTI_PATCH, "headless"), (WEB_PATCH, "web")):
         text = patch.read_text(encoding="utf-8")
         root_ids = re.findall(r"(?m)^- id: ([\w-]+)\s*$", text)
         unknown = sorted(set(root_ids) - set(registry[mode]))
@@ -88,7 +95,7 @@ def test_overlays_reference_only_pinned_harness_plugin_ids():
 
 
 def test_guard_plugin_is_loaded_directly_without_profile_package_install():
-    for patch in (HEADLESS_PATCH, WEB_PATCH):
+    for patch in (HEADLESS_PATCH, MULTI_PATCH, WEB_PATCH):
         text = patch.read_text(encoding="utf-8")
         assert "- id: agent3-guard" in text
         assert "agent/guard-plugin/dist/index.js" in text
