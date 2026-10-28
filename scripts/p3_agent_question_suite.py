@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -79,6 +80,12 @@ def main() -> None:
 
     results: list[dict[str, Any]] = []
     with httpx.Client(timeout=180.0, trust_env=False) as client:
+        credentials = {
+            "username": os.getenv("DATACONTROL_EVAL_USER", "demo"),
+            "password": os.getenv("DATACONTROL_EVAL_PASSWORD", "DataControl123!"),
+        }
+        login = unwrap(client.post(f"{BASE_URL}/auth/login", json=credentials))
+        client.headers.update({"Authorization": f"Bearer {login['accessToken']}"})
         status = unwrap(client.get(f"{BASE_URL}/agent/status"))
         if not status.get("ready"):
             raise SystemExit(f"Agent is not ready: {status.get('reason')}")
