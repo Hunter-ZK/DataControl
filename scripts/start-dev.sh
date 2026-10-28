@@ -131,6 +131,8 @@ PY
   "$PYTHON" -m uvicorn dataagent_gateway.app:app --host 127.0.0.1 --port 8910 >.local/agent-gateway.log 2>.local/agent-gateway.err.log & GATEWAY_PID=$!
   wait_http "$GATEWAY_PID" http://127.0.0.1:8910/health "DataAgent Gateway" .local/agent-gateway.err.log 25
   echo "Agent3 MCP:        READY http://127.0.0.1:8900/mcp"
+  echo "Agent live trace:   open another terminal and run:"
+  echo "  tail -n 40 -f .local/agent-gateway.err.log"
   gateway_health="$(curl --noproxy '*' -fsS http://127.0.0.1:8910/health)"
   if printf '%s' "$gateway_health" | grep -q '"ready":true'; then echo "DataAgent Gateway: READY http://127.0.0.1:8910"; else echo "WARNING: DataAgent Gateway is running but degraded: $gateway_health" >&2; fi
   [ -n "${DEEPSEEK_API_KEY:-}" ] || echo "WARNING: DEEPSEEK_API_KEY is not set; Agent Gateway will be degraded until DataControl is restarted with the key present." >&2

@@ -110,6 +110,8 @@ try {
     $gatewayHealth=$gatewayHealthJson | ConvertFrom-Json
     Write-Host "Agent3 MCP:        READY http://127.0.0.1:8900/mcp"
     if($gatewayHealth.ready){Write-Host "DataAgent Gateway: READY http://127.0.0.1:8910"}else{Write-Warning ("DataAgent Gateway is running but degraded: "+[string]$gatewayHealth.reason)}
+    Write-Host "Agent 运行记录:     在另一 PowerShell 窗口执行："
+    Write-Host "  Get-Content .\.local\agent-gateway.err.log -Tail 40 -Wait"
     if([string]::IsNullOrWhiteSpace($env:DEEPSEEK_API_KEY)){Write-Warning "DEEPSEEK_API_KEY is not set; Agent Gateway will be degraded until DataControl is restarted with the key present."}
   }
 

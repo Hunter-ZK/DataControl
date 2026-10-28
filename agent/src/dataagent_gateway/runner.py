@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import re
+import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +15,11 @@ import httpx
 
 class HarnessRunError(RuntimeError):
     pass
+
+
+# Uvicorn's configured stderr logger is redirected to .local/agent-gateway.err.log.
+# Only bounded event metadata is logged: never prompt, tool inputs, SQL, or reasoning.
+LOGGER = logging.getLogger("uvicorn.error")
 
 
 MCP_TOOL_SUFFIXES = {
@@ -489,10 +497,44 @@ class HeadlessHarnessRunner:
             "stdin": asyncio.subprocess.PIPE,
             "stdout": asyncio.subprocess.PIPE,
             "stderr": asyncio.subprocess.PIPE,
+            "limit": 8 * 1024 * 1024,
         }
         # Argument-vector execution is safe for CJK/space-containing Windows
         # paths because the Windows command begins with node.exe, not a .cmd file.
         return await asyncio.create_subprocess_exec(*command, **process_kwargs)
+
+    async def _capture_trace(self, stream: asyncio.StreamReader, request_id: str) -> str:
+        """Collect complete JSONL for the existing parser while reporting safe live events."""
+        lines: list[str] = []
+        tool_labels: dict[str, str] = {}
+        safe_native = {"todo_write", "goal", "subagent", "subagent_fork", "workflow"}
+        while True:
+            raw = await stream.readline()
+            if not raw:
+                break
+            line = raw.decode("utf-8", errors="replace")
+            lines.append(line)
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(event, dict):
+                continue
+            event_type = event.get("type")
+            if event_type == "tool_call":
+                suffix = _tool_suffix(str(event.get("tool") or ""))
+                tool = suffix if suffix in MCP_TOOL_SUFFIXES or suffix in safe_native else "harness_tool"
+                call_id = event.get("callId")
+                if isinstance(call_id, str):
+                    tool_labels[call_id] = tool
+                LOGGER.info("[Agent:%s] TOOL_START %s", request_id, tool)
+            elif event_type == "tool_result":
+                call_id = event.get("callId")
+                tool = tool_labels.get(call_id, "harness_tool") if isinstance(call_id, str) else "harness_tool"
+                raw_status = event.get("status")
+                status = raw_status if raw_status in {"completed", "error", "failed", "success"} else "unknown"
+                LOGGER.info("[Agent:%s] TOOL_END %s status=%s", request_id, tool, status)
+        return "".join(lines)
 
     async def run(self, question: str, *, session_id: str | None = None) -> dict[str, Any]:
         if not question.strip():
@@ -505,22 +547,50 @@ class HeadlessHarnessRunner:
         env = _with_loopback_no_proxy(os.environ.copy())
         env["DSH_HOME"] = str(self.dsh_home)
         env["DSH_TELEMETRY_MODE"] = "DISABLED"
+        request_id = uuid.uuid4().hex[:8]
+        started = time.monotonic()
+        LOGGER.info("[Agent:%s] START session=%s", request_id, "resume" if session_id else "new")
         process = await self._spawn(self._command(session_id), env)
         try:
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(input=question.encode("utf-8")),
+            assert process.stdin is not None
+            assert process.stdout is not None
+            assert process.stderr is not None
+            process.stdin.write(question.encode("utf-8"))
+            await process.stdin.drain()
+            process.stdin.close()
+
+            stdout_text, stderr, _ = await asyncio.wait_for(
+                asyncio.gather(
+                    self._capture_trace(process.stdout, request_id),
+                    process.stderr.read(),
+                    process.wait(),
+                ),
                 timeout=self.timeout_seconds,
             )
         except TimeoutError as exc:
             process.kill()
             await process.wait()
+            LOGGER.warning("[Agent:%s] TIMEOUT elapsed=%.1fs", request_id, time.monotonic() - started)
             raise HarnessRunError(
                 f"dsh request exceeded {self.timeout_seconds:g}s timeout"
             ) from exc
 
-        stdout_text = stdout.decode("utf-8", errors="replace")
         stderr_text = stderr.decode("utf-8", errors="replace")
         if process.returncode != 0:
+            LOGGER.error("[Agent:%s] ERROR exit_code=%d elapsed=%.1fs", request_id, process.returncode, time.monotonic() - started)
             detail = stderr_text.strip()[-1600:] or "dsh exited without diagnostics"
             raise HarnessRunError(f"dsh exited with code {process.returncode}: {detail}")
-        return parse_event_stream(stdout_text)
+        try:
+            result = parse_event_stream(stdout_text)
+        except HarnessRunError:
+            LOGGER.error("[Agent:%s] ERROR missing_final_answer elapsed=%.1fs", request_id, time.monotonic() - started)
+            raise
+        LOGGER.info(
+            "[Agent:%s] DONE elapsed=%.1fs tools=%d sql=%s validation=%s",
+            request_id,
+            time.monotonic() - started,
+            sum(1 for event in result["events"] if event["type"] == "tool_call"),
+            "yes" if result["sql"] else "no",
+            result["validationState"],
+        )
+        return result
