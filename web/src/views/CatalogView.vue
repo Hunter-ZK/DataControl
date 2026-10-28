@@ -219,4 +219,17 @@ onMounted(async()=>{try{catalogs.value=await assetApi.catalogs() as CatalogEntry
 @media(max-width:1280px){.folder-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.catalog-workspace{grid-template-columns:255px minmax(0,1fr)}.dataset-owner,.dataset-frequency{display:none}}
 @media(max-width:850px){.catalog-workspace{grid-template-columns:1fr}.tree-pane{position:static;min-height:0}.tree-scroll{max-height:240px}.folder-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.catalog-banner{padding:20px}.banner-metrics{display:none}}
 @media(max-width:580px){.catalog-banner{gap:12px}.banner-mark{width:46px;height:46px}.catalog-banner h2{font-size:17px}.catalog-banner p{font-size:12px}.folder-grid{grid-template-columns:1fr}.directory-heading{flex-direction:column;align-items:flex-start}.datasets-header{align-items:stretch;flex-direction:column}.dataset-tools{width:100%}.dataset-tools :deep(.el-input){flex:1;width:auto}.layer-tabs>span{width:100%;margin:5px 0}.dataset-row{gap:9px;padding:13px}.dataset-info b{font-size:14px}.dataset-info small{display:none}.pager{flex-direction:column;align-items:flex-start}.explore-link{font-size:12px}}
+
+/* Atlas 2.1 — enhanced intra-panel readability */
+
+.dataset-row:nth-child(odd){background:#fff}
+.dataset-row:nth-child(even){background:#f0f6ff}
+.dataset-row:nth-child(even) .dataset-info code{color:#526f97}
+.dataset-row:hover{background:#e5f0ff}
+.dataset-row:focus-visible{outline:3px solid #72a4fa;outline-offset:-3px}
+.layer-tabs{border-bottom:2px solid #cfdef5}
+.layer-tabs button.active{box-shadow:inset 0 -2px #2d70e9,0 2px 8px #1b55911a}
+.folder-card:nth-child(even){background:linear-gradient(145deg,#eff6ff,#fff)}
+.folder-card:focus-visible{outline:3px solid #72a4fa;outline-offset:2px}
+
 </style>

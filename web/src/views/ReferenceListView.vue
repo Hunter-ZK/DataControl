@@ -241,4 +241,34 @@ watch(()=>props.kind,()=>{keyword.value='';letter.value='';rows.value=[];selecte
 .document-row>svg{color:#9bb3d2;flex:none}
 @media(max-width:1000px){.code-workspace{grid-template-columns:260px minmax(0,1fr)}.reference-toolbar{align-items:stretch;flex-direction:column}.toolbar-desc{justify-content:flex-start}.reference-search{max-width:none}}
 @media(max-width:760px){.code-workspace{grid-template-columns:1fr}.code-items{max-height:230px}.reference-hero{padding:19px;gap:12px}.reference-total{display:none}.panel-heading{align-items:flex-start;flex-direction:column}.document-meta{display:none}.code-detail-head{align-items:flex-start;flex-direction:column}.code-values-toolbar{align-items:stretch;flex-direction:column}.code-values-toolbar :deep(.el-input){width:100%}.reference-hero h2{font-size:18px}.reference-hero-icon{width:47px;height:47px}}
+
+/* Atlas 2.1 — enhanced intra-panel readability */
+
+/* Gentle zebra stripes apply to dictionary rows, never to the entire card. */
+.dictionary-table{background:#fff}
+.dictionary-table thead th{position:sticky;top:0;z-index:2;background:#e6f0ff;border-bottom:2px solid #c4d9f4;color:#34567e}
+.dictionary-table tbody tr:nth-child(odd){background:#fff}
+.dictionary-table tbody tr:nth-child(even){background:#eef5ff}
+.dictionary-table tbody tr:nth-child(even) td{border-bottom-color:#d6e5f8}
+.dictionary-table tbody tr:hover{background:#dfeeff}
+.dictionary-table tbody tr:focus-within{outline:2px solid #7cacef;outline-offset:-2px}
+.dictionary-table td:first-child{border-left:3px solid transparent}
+.dictionary-table tbody tr:nth-child(even) td:first-child{border-left-color:#bfd7f6}
+.dictionary-table tbody tr:hover td:first-child{border-left-color:#3477e8}
+.dictionary-table .description-cell{line-height:1.75}
+.dictionary-table .row-link{padding:7px;border-radius:7px;background:#e3efff}
+.dictionary-table .row-link:hover{background:#cdddff}
+.code-items{background:#f2f7ff}
+.code-item:nth-child(odd){background:#fff}
+.code-item:nth-child(even){background:#eff6ff}
+.code-item.active{background:#d9eaff!important;border-left:4px solid #2d6ee1;padding-left:11px}
+.code-item:hover:not(.active){background:#e6f1ff}
+.code-item:focus-visible,.alphabet button:focus-visible{outline:2px solid #367bf0;outline-offset:-2px}
+.alphabet{background:#f8fbff}
+.alphabet button.active{box-shadow:inset 0 -2px #2a6bec}
+.document-row:nth-child(even){background:#f0f6ff}
+.document-row:hover{background:#e7f0ff}
+.document-row{border-bottom-color:#dce8f8}
+@media(max-width:760px){.dictionary-table th,.dictionary-table td{padding:13px 15px}.table-clip{overscroll-behavior-x:contain}}
+
 </style>
