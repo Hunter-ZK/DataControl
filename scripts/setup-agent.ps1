@@ -65,10 +65,15 @@ try {
       Write-Host "[DataControl] dsh 0.2.1-rc.3 installed; refreshing profile without npm reinstall."
     }
 
-    & $python -m pip install --only-binary=:all: "cryptography>=48.0.1,<49"
-    Assert-Exit "cryptography setup"
-    & $python -m pip install -e ".\agent[all]"
-    Assert-Exit "Agent Python setup"
+    & $python -c "import importlib.util as u; import importlib.metadata as m; a=all(u.find_spec(n) for n in ('agent3','dataagent_gateway','cryptography')); b=m.version('cryptography').startswith('48.') if a else False; raise SystemExit(0 if a and b else 1)"
+    if ($LASTEXITCODE -ne 0) {
+      & $python -m pip install --only-binary=:all: "cryptography>=48.0.1,<49"
+      Assert-Exit "cryptography setup"
+      & $python -m pip install -e ".\agent[all]"
+      Assert-Exit "Agent Python setup"
+    } else {
+      Write-Host "[DataControl] Existing Agent Python dependencies found; skipping pip."
+    }
 
     if (-not (Test-Path $dshBin)) {
       Invoke-NpmInstall "dsh" $dshRoot
@@ -79,7 +84,7 @@ try {
       throw "dsh.cmd is missing after npm installation."
     }
 
-    if ($Repair -or -not (Test-Path (Join-Path $guardRoot "node_modules\.bin\tsc.cmd"))) {
+    if (-not (Test-Path (Join-Path $guardRoot "node_modules\.bin\tsc.cmd"))) {
       Invoke-NpmInstall "guard" $guardRoot
     }
     Push-Location $guardRoot
