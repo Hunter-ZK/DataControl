@@ -26,9 +26,12 @@
 
         <section class="chat-shell">
           <div class="chat-model-bar">
+            <button class="inspector-toggle" @click="inspectorOpen=!inspectorOpen">
+              <PanelRight :size="15"/>{{ inspectorOpen ? '隐藏检查器' : '查看检查器' }}
+            </button>
             <span class="chat-model-label">对话模型</span>
             <div class="model-options" role="group" aria-label="选择当前对话模型">
-              <button type="button" :class="{ selected: modelMode === 'deepseek' }" :disabled="loading" :aria-pressed="modelMode === 'deepseek'" @click="switchModel('deepseek')">DeepSeek 官方</button>
+              <span class="fixed-model">DeepSeek 官方</span>
             </div>
             <span class="model-context">官方 DeepSeek · 可信 SQL 校验 · 不执行 SQL</span>
           </div>
@@ -55,6 +58,18 @@
               :message="item"
               @clarify="submitClarification(index, $event)"
             />
+            <div v-if="latestAnswer && !loading" class="answer-quick-actions">
+              <button @click="copyLatestAnswer"><Copy :size="14"/>复制回答</button>
+              <button @click="regenerateLatest"><RotateCcw :size="14"/>重新生成</button>
+              <button @click="recordFeedback('useful')"><ThumbsUp :size="14"/>有用</button>
+              <button @click="recordFeedback('incorrect')"><ThumbsDown :size="14"/>有误</button>
+            </div>
+            <div v-if="latestAnswer && !loading && suggestedPrompts.length" class="followup-prompts">
+              <span>继续探索</span>
+              <button v-for="suggestion in suggestedPrompts" :key="suggestion" @click="question=suggestion;nextTick(resizeComposer)">
+                {{ suggestion }}
+              </button>
+            </div>
 
             <article v-if="loading" class="loading-answer">
               <div class="loading-label">
@@ -83,6 +98,32 @@
             <div class="composer-hint"><span>Enter 发送 · Shift+Enter 换行</span><span><ShieldCheck :size="14" />内部证据 · 静态校验 · 不执行生产 SQL</span></div>
           </div>
         </section>
+        <aside v-if="inspectorOpen" class="agent-inspector" aria-label="依据与 SQL 检查器">
+          <header><b>结果检查器</b><small>来自实际工具与校验结果</small></header>
+          <nav class="inspector-tabs" aria-label="检查器页面">
+            <button :class="{active:inspectorTab==='evidence'}" @click="inspectorTab='evidence'">数据依据</button>
+            <button :class="{active:inspectorTab==='sql'}" @click="inspectorTab='sql'">SQL 校验</button>
+            <button :class="{active:inspectorTab==='steps'}" @click="inspectorTab='steps'">执行步骤</button>
+          </nav>
+          <div class="inspector-content">
+            <template v-if="inspectorTab==='evidence'">
+              <AgentEvidence v-if="latestAnswer?.evidence" :evidence="latestAnswer.evidence"/>
+              <p v-else class="inspector-empty">尚无可信资产证据。提问后会显示相关指标和数据资产。</p>
+            </template>
+            <template v-if="inspectorTab==='sql'">
+              <template v-if="latestAnswer?.sql">
+                <AgentSqlCard :message="latestAnswer"/>
+                <AgentValidationPanel :message="latestAnswer"/>
+              </template>
+              <p v-else class="inspector-empty">本轮尚无生成的 SQL。</p>
+            </template>
+            <template v-if="inspectorTab==='steps'">
+              <AgentTrace v-if="loading && liveEvents.length" :events="liveEvents"/>
+              <AgentTrace v-else-if="latestAnswer?.events?.length" :events="latestAnswer.events"/>
+              <p v-else class="inspector-empty">真实工具调用会在这里逐步显示，不展示模型隐藏推理。</p>
+            </template>
+          </div>
+        </aside>
       </section>
     </div>
   </div>
@@ -91,12 +132,15 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpRight, Database, LoaderCircle, Send, ShieldCheck, Sparkles, Square, TriangleAlert, X } from 'lucide-vue-next'
+import { ArrowUpRight, Copy, Database, LoaderCircle, PanelRight, RotateCcw, Send, ShieldCheck, Sparkles, Square, ThumbsDown, ThumbsUp, TriangleAlert, X } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { agentApi, assetApi, type AgentActivity, type AgentModelMode, type AgentResult, type AgentStatus, type AgentStreamEvent, AgentTurnCancelledError } from '@/api/client'
 import AgentConversationSidebar from '@/components/agent/AgentConversationSidebar.vue'
 import AgentMessageView from '@/components/agent/AgentMessage.vue'
 import AgentTrace from '@/components/agent/AgentTrace.vue'
+import AgentEvidence from '@/components/agent/AgentEvidence.vue'
+import AgentSqlCard from '@/components/agent/AgentSqlCard.vue'
+import AgentValidationPanel from '@/components/agent/AgentValidationPanel.vue'
 import type { AgentConversation, AgentMessage, ContextAsset } from '@/components/agent/types'
 import { useAgentConversations } from '@/composables/useAgentConversations'
 
@@ -111,6 +155,8 @@ const agentUnavailableReason = computed(() => {
     ? `Agent 暂不可用：${status.value.reason}`
     : 'Agent 暂不可用：请查看启动终端的 Gateway/MCP 状态和日志。'
 })
+const inspectorOpen = ref(true)
+const inspectorTab = ref<'evidence' | 'sql' | 'steps'>('evidence')
 const question = ref('')
 const loading = ref(false)
 const liveEvents = ref<AgentActivity[]>([])
@@ -118,6 +164,17 @@ const stopRequested = ref(false)
 let activeRunId: string | null = null
 let activeController: AbortController | null = null
 const messages = ref<AgentMessage[]>([])
+const latestAnswer = computed<AgentMessage | null>(
+  () => [...messages.value].reverse().find(m => m.role === 'assistant') || null,
+)
+const suggestedPrompts = computed(() => {
+  const dims = latestAnswer.value?.evidence?.dimensions || []
+  if (!latestAnswer.value?.sql) return []
+  const prompts = ['解释这个 SQL 的统计口径']
+  if (dims.includes('region_code')) prompts.push('仅查看广东省的结果')
+  if (dims.includes('org_code')) prompts.push('改为按机构统计')
+  return prompts.slice(0, 3)
+})
 const messageBox = ref<HTMLElement | null>(null)
 const composer = ref<HTMLTextAreaElement | null>(null)
 const sessionId = ref<string | null>(null)
@@ -277,6 +334,23 @@ function onAgentStreamEvent(update: AgentStreamEvent) {
   scrollBottom()
 }
 
+async function copyLatestAnswer() {
+  if (!latestAnswer.value) return
+  try { await navigator.clipboard.writeText(latestAnswer.value.text); ElMessage.success('已复制回答') }
+  catch { ElMessage.warning('复制失败，请手动选择内容。') }
+}
+function recordFeedback(value: 'useful' | 'incorrect') {
+  ElMessage.info(value === 'useful' ? '已记录本地有用标记' : '已记录本地有误标记')
+  const key = 'datacontrol_agent_feedback_v1'
+  const saved = JSON.parse(localStorage.getItem(key) || '{}') as Record<string, string>
+  saved[activeConversationId.value || 'unknown'] = value
+  localStorage.setItem(key, JSON.stringify(saved))
+}
+async function regenerateLatest() {
+  if (loading.value) return
+  const prior = [...messages.value].reverse().find(m => m.role === 'user')
+  if (prior) await runAgentTurn('重新生成：' + prior.text, prior.text)
+}
 async function stopAgentTurn() {
   if (!loading.value || !activeRunId || stopRequested.value) return
   stopRequested.value = true
@@ -458,7 +532,7 @@ onMounted(async () => {
 .service-status i { width: 9px; height: 9px; border-radius: 50%; background: #bd7410; }
 .service-status.ready { background: #d8efe4; border-color: #61aa84; color: #126546; }
 .service-status.ready i { background: #1c805a; }
-.agent-workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: 268px minmax(0,1fr); overflow: hidden; border-color: #a9c9d8; box-shadow: 0 20px 52px rgba(27,78,106,.15); background: #fff; }
+.agent-workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: 240px minmax(0,1fr) 300px; overflow: hidden; border-color: #a9c9d8; box-shadow: 0 20px 52px rgba(27,78,106,.15); background: #fff; }
 .chat-shell { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: rgba(255,255,255,.99); }
 .chat-model-bar { flex: none; display: flex; align-items: center; gap: 12px; padding: 11px 20px; background: #f7fbfd; border-bottom: 1px solid #d8e7ef; }
 .chat-model-label { color: #547184; font-weight: 700; font-size: 12px; white-space: nowrap; }
@@ -500,12 +574,26 @@ onMounted(async () => {
 .composer-hint span:last-child { display: flex; align-items: center; gap: 4px; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media(max-width:980px){.agent-workspace{grid-template-columns:220px minmax(0,1fr)}}
+@media(max-width:1180px){.agent-workspace{grid-template-columns:220px minmax(0,1fr)}.agent-inspector{display:none}}
 @media(max-width:760px){.chat-model-bar{padding:9px 12px;gap:7px;flex-wrap:wrap}.model-context{display:none}.model-options button{padding:7px 9px}.agent-screen{min-height:640px;padding:12px 0}.agent-head{align-items:flex-start;flex-direction:column;gap:10px;padding-bottom:12px}.agent-head h1{font-size:31px}.agent-workspace{grid-template-columns:1fr}.agent-workspace :deep(.history-pane){display:none}.messages{padding:21px 15px}.prompt-grid{grid-template-columns:1fr}.composer-wrap{padding:10px 12px 11px}.composer-hint span:first-child{display:none}.composer-hint{justify-content:flex-end}}
 </style>
 
 <style scoped>
-.stop-turn { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border: 1px solid #b8cdd9; border-radius: 8px; background: #fff; color: #516b7a; cursor: pointer; font-size: 12px; font-weight: 650; }
+ .fixed-model {display:inline-flex;align-items:center;padding:8px 12px;background:#fff;border:1px solid var(--dc-border);border-radius:8px;color:var(--dc-primary);font-size:12px;font-weight:700;}
+ .inspector-toggle {border:0;background:transparent;color:var(--dc-primary);font-size:12px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;}
+ .agent-inspector {min-height:0;display:flex;flex-direction:column;overflow:hidden;border-left:1px solid var(--dc-border);background:#fbfdfe;}
+ .agent-inspector header {display:grid;gap:4px;padding:18px 15px 10px;}
+ .agent-inspector header b {font-size:15px;}
+ .agent-inspector header small {color:var(--dc-text-2);font-size:12px;}
+ .inspector-tabs {display:flex;gap:2px;padding:7px;border-bottom:1px solid var(--dc-border);}
+ .inspector-tabs button {flex:1;border:0;padding:8px 4px;border-radius:7px;background:transparent;color:var(--dc-text-2);font-size:12px;cursor:pointer;}
+ .inspector-tabs button.active {background:var(--dc-primary-soft);color:var(--dc-primary);font-weight:700;}
+ .inspector-content {flex:1;overflow-y:auto;padding:12px;}
+ .inspector-empty{color:var(--dc-text-2);font-size:13px;line-height:1.7;}
+ .answer-quick-actions,.followup-prompts{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:0 0 14px;}
+ .answer-quick-actions button,.followup-prompts button{border:1px solid var(--dc-border);border-radius:8px;background:white;padding:7px 10px;color:var(--dc-text-2);cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:12px;}
+ .followup-prompts>span{font-size:12px;color:var(--dc-text-3);}
+ .stop-turn { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border: 1px solid #b8cdd9; border-radius: 8px; background: #fff; color: #516b7a; cursor: pointer; font-size: 12px; font-weight: 650; }
 .stop-turn:hover:not(:disabled) { border-color: #d78b8b; color: #a64a4a; background: #fff6f6; }
 .stop-turn:disabled { cursor: wait; opacity: .6; }
 </style>
