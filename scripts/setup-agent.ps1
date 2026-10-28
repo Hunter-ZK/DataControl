@@ -48,9 +48,17 @@ try {
     }
     $process = Start-Process @params
     try {
-      if (-not $process.WaitForExit($npmTimeoutMs)) {
-        & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null
-        throw "$Name npm installation timed out and was stopped. Check $stderr."
+      $watch = [System.Diagnostics.Stopwatch]::StartNew()
+      $nextNotice = 30000
+      while (-not $process.WaitForExit(1000)) {
+        if ($watch.ElapsedMilliseconds -ge $npmTimeoutMs) {
+          & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null
+          throw "$Name npm installation timed out and was stopped. Check $stderr."
+        }
+        if ($watch.ElapsedMilliseconds -ge $nextNotice) {
+          Write-Host "[DataControl] $Name npm is still running; progress details: $stderr"
+          $nextNotice += 30000
+        }
       }
       if ($process.ExitCode -ne 0) {
         $tail = if (Test-Path $stderr) { (Get-Content $stderr -Tail 16) -join [Environment]::NewLine } else { "No npm error log." }
