@@ -188,6 +188,69 @@ export interface AgentStatus {
   hiddenReasoningExposed: boolean
 }
 
+export type AgentStreamEvent =
+  | { type: 'started'; runId: string }
+  | { type: 'activity'; event: AgentActivity }
+  | { type: 'result'; result: AgentResult }
+  | { type: 'cancelled' }
+  | { type: 'error'; message: string }
+
+export class AgentTurnCancelledError extends Error {
+  constructor() {
+    super('Agent run cancelled')
+    this.name = 'AgentTurnCancelledError'
+  }
+}
+
+/** Fetch the actual newline-delimited Agent stream; no simulated progress. */
+export async function streamAgentTurn(
+  question: string,
+  sessionId: string | null,
+  runId: string,
+  onEvent: (event: AgentStreamEvent) => void,
+  signal: AbortSignal,
+): Promise<AgentResult> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const token = localStorage.getItem('datacontrol_token')
+  if (token) headers.Authorization = `Bearer ${token}`
+  const response = await fetch('/api/v1/agent/query/stream', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ question, sessionId: sessionId || undefined, runId }),
+    signal,
+  })
+  if (!response.ok) throw new Error(`Agent streaming request failed (HTTP ${response.status})`)
+  if (!response.body) throw new Error('Agent stream is unavailable in this browser')
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let pending = ''
+  let result: AgentResult | null = null
+  const parseLine = (line: string) => {
+    if (!line.trim()) return
+    const event = JSON.parse(line) as AgentStreamEvent
+    if (event.type === 'error') throw new Error(event.message)
+    if (event.type === 'cancelled') throw new AgentTurnCancelledError()
+    if (event.type === 'result') result = event.result
+    onEvent(event)
+  }
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      pending += decoder.decode(value, { stream: true })
+      const lines = pending.split('\n')
+      pending = lines.pop() || ''
+      for (const line of lines) parseLine(line)
+    }
+    pending += decoder.decode()
+    if (pending.trim()) parseLine(pending)
+    if (!result) throw new Error('Agent stream ended without a final result')
+    return result
+  } finally {
+    reader.releaseLock()
+  }
+}
+
 export interface AgentActivity {
   type: string
   phase?: string
@@ -323,6 +386,8 @@ export const agentApi = {
   status: () => get<AgentStatus>('/agent/status'),
   query: (question: string, sessionId?: string | null) =>
     post<AgentResult>('/agent/query', { question, sessionId: sessionId || undefined }),
+  stream: streamAgentTurn,
+  cancel: (runId: string) => post<{ cancelled: boolean }>(`/agent/query/${runId}/cancel`),
 }
 
 export const authApi = {

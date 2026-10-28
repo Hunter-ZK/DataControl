@@ -50,8 +50,13 @@
             />
 
             <article v-if="loading" class="loading-answer">
-              <div class="loading-label"><span class="agent-avatar"><LoaderCircle class="spin" :size="16" /></span><b>DataAgent 正在分析</b></div>
-              <p>正在处理当前问题。完成后会展示真实工具调用、内部数据证据、SQL 与校验结果。</p>
+              <div class="loading-label">
+                <span class="agent-avatar"><LoaderCircle class="spin" :size="16" /></span>
+                <b>{{ stopRequested ? '正在停止任务' : 'DataAgent 正在分析' }}</b>
+                <button class="stop-turn" :disabled="stopRequested" @click="stopAgentTurn"><Square :size="12" />停止</button>
+              </div>
+              <p>{{ liveEvents.length ? '以下步骤来自真实 Agent3 工具调用，完成后将展示证据与最终答案。' : '已开始处理，等待 Agent3 返回实际工具步骤。' }}</p>
+              <AgentTrace v-if="liveEvents.length" :events="liveEvents" />
             </article>
           </div>
 
@@ -79,11 +84,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpRight, Database, LoaderCircle, Send, ShieldCheck, Sparkles, TriangleAlert, X } from 'lucide-vue-next'
+import { ArrowUpRight, Database, LoaderCircle, Send, ShieldCheck, Sparkles, Square, TriangleAlert, X } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { agentApi, assetApi, type AgentResult, type AgentStatus } from '@/api/client'
+import { agentApi, assetApi, type AgentActivity, type AgentResult, type AgentStatus, type AgentStreamEvent, AgentTurnCancelledError } from '@/api/client'
 import AgentConversationSidebar from '@/components/agent/AgentConversationSidebar.vue'
 import AgentMessageView from '@/components/agent/AgentMessage.vue'
+import AgentTrace from '@/components/agent/AgentTrace.vue'
 import type { AgentConversation, AgentMessage, ContextAsset } from '@/components/agent/types'
 import { useAgentConversations } from '@/composables/useAgentConversations'
 
@@ -98,6 +104,10 @@ const agentUnavailableReason = computed(() => {
 })
 const question = ref('')
 const loading = ref(false)
+const liveEvents = ref<AgentActivity[]>([])
+const stopRequested = ref(false)
+let activeRunId: string | null = null
+let activeController: AbortController | null = null
 const messages = ref<AgentMessage[]>([])
 const messageBox = ref<HTMLElement | null>(null)
 const composer = ref<HTMLTextAreaElement | null>(null)
@@ -228,27 +238,65 @@ function reportAgentDevtools(result: AgentResult) {
   console.groupEnd()
 }
 
+function onAgentStreamEvent(update: AgentStreamEvent) {
+  if (update.type !== 'activity') return
+  if (update.event.type !== 'tool_call' && update.event.type !== 'tool_result') return
+  liveEvents.value = [...liveEvents.value, update.event].slice(-40)
+  scrollBottom()
+}
+
+async function stopAgentTurn() {
+  if (!loading.value || !activeRunId || stopRequested.value) return
+  stopRequested.value = true
+  const runId = activeRunId
+  // The server endpoint cancels the actual Harness child; AbortController only
+  // closes this browser's stream and must not be mistaken for a server-side stop.
+  try {
+    await agentApi.cancel(runId)
+  } catch {
+    ElMessage.warning('停止请求未得到服务端确认，请查看 Agent 运行日志。')
+  } finally {
+    activeController?.abort()
+  }
+}
+
 async function runAgentTurn(displayText: string, prompt: string, createTitle?: string) {
   if (!status.value?.ready || loading.value) return
   if (!activeConversationId.value) createConversation(createTitle || displayText, contextAsset.value)
   messages.value.push({ role: 'user', text: displayText })
   syncActive(messages.value, sessionId.value, contextAsset.value)
   loading.value = true
+  stopRequested.value = false
+  liveEvents.value = []
+  activeRunId = crypto.randomUUID()
+  activeController = new AbortController()
   await scrollBottom()
   try {
-    const result = await agentApi.query(prompt, sessionId.value)
+    const result = await agentApi.stream(prompt, sessionId.value, activeRunId, onAgentStreamEvent, activeController.signal)
+    if (stopRequested.value) return
     reportAgentDevtools(result)
     if (result.sessionId) sessionId.value = result.sessionId
     messages.value.push(assistantMessage(result))
     syncActive(messages.value, sessionId.value, contextAsset.value)
     await scrollBottom()
   } catch (error) {
-    console.error('DataAgent query failed', error)
-    ElMessage.error('智能问数本次未完成，请确认 Agent 服务状态后重试。')
-    await refreshStatus()
-    syncActive(messages.value, sessionId.value, contextAsset.value)
+    if (stopRequested.value || error instanceof AgentTurnCancelledError) {
+      // A partially written dsh session must not be silently resumed.
+      sessionId.value = null
+      messages.value.push({ role: 'assistant', text: '本轮任务已停止，未生成可采信的最终结果。Agent 会话上下文已重置，请重新发起需要的查询。' })
+      syncActive(messages.value, sessionId.value, contextAsset.value)
+    } else {
+      console.error('DataAgent query failed', error)
+      ElMessage.error('智能问数本次未完成，请检查 Agent 服务与运行日志。')
+      await refreshStatus()
+      syncActive(messages.value, sessionId.value, contextAsset.value)
+    }
   } finally {
     loading.value = false
+    stopRequested.value = false
+    liveEvents.value = []
+    activeRunId = null
+    activeController = null
     await scrollBottom()
   }
 }
@@ -348,4 +396,10 @@ onMounted(async () => {
 @keyframes spin { to { transform: rotate(360deg); } }
 @media(max-width:980px){.agent-workspace{grid-template-columns:220px minmax(0,1fr)}}
 @media(max-width:760px){.agent-screen{min-height:640px;padding:12px 0}.agent-head{align-items:flex-start;flex-direction:column;gap:10px;padding-bottom:12px}.agent-head h1{font-size:31px}.agent-workspace{grid-template-columns:1fr}.agent-workspace :deep(.history-pane){display:none}.messages{padding:21px 15px}.prompt-grid{grid-template-columns:1fr}.composer-wrap{padding:10px 12px 11px}.composer-hint span:first-child{display:none}.composer-hint{justify-content:flex-end}}
+</style>
+
+<style scoped>
+.stop-turn { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border: 1px solid #b8cdd9; border-radius: 8px; background: #fff; color: #516b7a; cursor: pointer; font-size: 12px; font-weight: 650; }
+.stop-turn:hover:not(:disabled) { border-color: #d78b8b; color: #a64a4a; background: #fff6f6; }
+.stop-turn:disabled { cursor: wait; opacity: .6; }
 </style>
