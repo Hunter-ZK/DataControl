@@ -58,10 +58,6 @@ try {
     if (-not (Test-Path (Join-Path $profile "package.json"))) {
       $null=Invoke-DshProfile -CliArguments @("--profile",$name,"--from-default-profile",$base,"--dump-config")
     }
-    $pkg=Get-Content (Join-Path $profile "package.json") -Raw
-    if ($pkg -notmatch '@hunter-zk/agent3-guard') {
-      $null=Invoke-DshProfile -CliArguments @("plugin","--profile",$name,"add",$guardDir)
-    }
     Copy-Item $patch (Join-Path $profile "cordis.patch.yml") -Force
     $config=Invoke-DshProfile -CliArguments @("--profile",$name,"--dump-config")
     foreach($required in @('deepseek-official','mcp-agent3','agent3-guard')) {

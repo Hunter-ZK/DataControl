@@ -29,9 +29,6 @@ setup_profile() {
   if [ ! -f "$profile/package.json" ]; then
     (cd "$REPO_ROOT" && "$DSH_BIN" --profile "$name" --from-default-profile "$base" --dump-config >/dev/null)
   fi
-  if ! grep -q '"@hunter-zk/agent3-guard"' "$profile/package.json" 2>/dev/null; then
-    (cd "$REPO_ROOT" && "$DSH_BIN" plugin --profile "$name" add "$GUARD_DIR")
-  fi
   cp "$patch" "$profile/cordis.patch.yml"
   local out err
   out="$(mktemp)"; err="$(mktemp)"

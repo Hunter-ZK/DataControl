@@ -85,3 +85,15 @@ def test_overlays_reference_only_pinned_harness_plugin_ids():
         unknown = sorted(set(root_ids) - set(registry[mode]))
         assert not unknown, f"{patch.name} references absent dsh {mode} rows: {unknown}"
     assert "tool-ralph" not in HEADLESS_PATCH.read_text(encoding="utf-8")
+
+
+def test_guard_plugin_is_loaded_directly_without_profile_package_install():
+    for patch in (HEADLESS_PATCH, WEB_PATCH):
+        text = patch.read_text(encoding="utf-8")
+        assert "- id: agent3-guard" in text
+        assert "agent/guard-plugin/dist/index.js" in text
+    for script in (
+        AGENT_ROOT / "scripts" / "setup_dataagent.ps1",
+        AGENT_ROOT / "scripts" / "setup_dataagent.sh",
+    ):
+        assert 'plugin --profile' not in script.read_text(encoding="utf-8")

@@ -89,3 +89,10 @@
         reconnect:
           enabled: true
           maxAttempts: 20
+
+# Load the built, local Guard as a module without dsh plugin add / pnpm.
+# The project checkout may contain non-ASCII characters on Windows.
+- insert:
+    - id: agent3-guard
+      name: !!js process.cwd() + '/agent/guard-plugin/dist/index.js'
+      config: {}
