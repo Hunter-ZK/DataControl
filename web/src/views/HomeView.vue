@@ -17,7 +17,7 @@
             <div class="suggest-title">相关资产 · 选择后查看详情</div>
             <RouterLink v-for="item in suggestions" :key="item.assetType+item.assetId"
               :to="assetRoute(item)" class="suggest-item">
-              <span>{{ item.title }}</span><code>{{ item.technicalName }}</code>
+              <AssetIcon :type="item.assetType" :size="17" mode="inline"/><span>{{ item.title }}</span><code>{{ item.technicalName }}</code>
               <small>{{ item.assetType }}</small>
             </RouterLink>
           </div>
@@ -29,7 +29,7 @@
             <div v-else-if="!assetResults.length" class="empty-result">未找到匹配资产，可以改用“问 DataAgent”进一步描述需求。</div>
             <RouterLink v-for="item in assetResults" :key="item.assetType+item.assetId"
               :to="assetRoute(item)" class="result-card">
-              <span class="result-kind">{{ item.assetType }}</span>
+              <span class="result-kind"><AssetIcon :type="item.assetType" :size="18"/><small>{{ item.assetType }}</small></span>
               <span><b>{{ item.title }}</b><code>{{ item.technicalName }}</code><small>{{ item.snippet }}</small></span>
               <ArrowUpRight :size="17"/>
             </RouterLink>
@@ -41,7 +41,7 @@
 
       <section class="launch-grid">
         <RouterLink v-for="item in launchers" :key="item.to" :to="item.to" class="launch-card">
-          <span class="launch-icon"><component :is="item.icon" :size="21" stroke-width="1.8" /></span>
+          <span class="launch-icon"><AssetIcon :type="launcherType(item.to)" :size="21"/></span>
           <div><b>{{ item.title }}</b><p>{{ item.desc }}</p></div>
           <ArrowUpRight :size="17" class="launch-arrow" />
         </RouterLink>
@@ -83,6 +83,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { ArrowRight, ArrowUpRight, BookOpenCheck, Boxes, Database, Hash, Search, Sparkles } from 'lucide-vue-next'
 import { activityApi, assetApi, agentApi, type SearchItem, type SearchSuggestion, type ServerAgentConversation } from '@/api/client'
+import AssetIcon from '@/components/AssetIcon.vue'
 
 const router = useRouter(); const keyword = ref(''); const hot = ['贷款余额','企业风险','region_code','监管报送']
 const overview = reactive({ tableCount: 0, columnCount: 0, metricCount: 0, codeTableCount: 0 })
@@ -102,6 +103,15 @@ const launchers = [
   { to:'/metrics', title:'指标与制度', desc:'查询指标口径与制度依据', icon:BookOpenCheck },
   { to:'/search?mode=ai', title:'智能问数', desc:'自然语言提问并生成可信 SQL', icon:Sparkles },
 ]
+function launcherType(path: string): string {
+  if (path.startsWith('/catalog')) return 'TABLE'
+  if (path.startsWith('/code-tables')) return 'CODE_TABLE'
+  if (path.startsWith('/standards')) return 'STANDARD'
+  if (path.startsWith('/word-roots')) return 'WORD_ROOT'
+  if (path.startsWith('/metrics')) return 'METRIC'
+  if (path.startsWith('/search')) return 'FIELD'
+  return 'METRIC'
+}
 function assetRoute(item: {assetType: string;assetId: string;technicalName: string}) {
   const code = item.technicalName || item.assetId
   switch (item.assetType) {
@@ -184,4 +194,15 @@ onMounted(async()=>{
  .recent-chat{display:flex;gap:9px;align-items:center;padding:11px;border:1px solid var(--dc-border);border-radius:9px;color:var(--dc-text);font-size:13px;}
  .recent-chat span{flex:1;}
  @media(max-width:650px){.hero-search{align-items:stretch;}.hero-search .ask-action,.hero-search .search-primary{min-height:40px;}.result-card small{display:none}}
+ .hero{background:linear-gradient(135deg,#f8fbff,#eff6ff);border-color:var(--dc-border)}
+ .hero-orbit{opacity:.55}
+ .hero-search{background:#fff;border-color:#dbeafe}
+ .launch-card,.recent-conversations{border-color:var(--dc-border);box-shadow:var(--dc-shadow-sm)}
+ .launch-icon{background:transparent;border:0;box-shadow:none}
+ .suggest-item{display:flex;align-items:center;gap:10px}
+ .suggest-item>span:nth-child(2){flex:1}
+ .result-kind{display:flex;align-items:center;gap:7px;width:auto;min-width:100px}
+ .result-kind small{font-size:11px;color:var(--dc-text-3)}
+ .result-card{gap:14px}
+ @media(max-width:650px){.result-kind small{display:none}.result-kind{min-width:36px}}
 </style>

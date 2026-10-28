@@ -16,7 +16,7 @@
           </div>
           <div v-if="showSuggestions && suggestions.length" class="suggestions dc-card">
             <button v-for="item in suggestions" :key="item.assetId" @mousedown.prevent="openSuggestion(item)">
-              <span class="asset-chip">{{ label(item.assetType) }}</span>
+              <AssetIcon :type="item.assetType" :size="15" mode="inline"/><span class="asset-chip">{{ label(item.assetType) }}</span>
               <div><b>{{ item.title }}</b><code>{{ item.technicalName }}</code></div>
               <ArrowRight :size="15" />
             </button>
@@ -36,7 +36,7 @@
 
       <div class="search-grid">
         <aside class="filter-panel dc-card">
-          <div class="filter-head"><b>筛选</b><button @click="clearFilters">清除</button></div>
+          <div class="filter-head"><b><Filter :size="16"/> 筛选</b><button @click="clearFilters">清除</button></div>
           <FilterGroup title="资产类型" :items="typeFacetItems" :selected="type" @select="selectType" />
           <FilterGroup title="数仓层级" :items="layerFacetItems" :selected="layer" @select="selectLayer" />
           <FilterGroup title="主题目录" :items="catalogFacetItems" :selected="catalog" @select="selectCatalog" />
@@ -49,7 +49,7 @@
             <div class="section-title"><span>最佳匹配</span><small>名称、技术名与业务定义综合排序</small></div>
             <div class="best-grid">
               <article v-for="item in bestRows" :key="item.assetId" class="best-card dc-card" @click="open(item)">
-                <div class="best-tags"><span class="asset-chip">{{ label(item.assetType) }}</span><span v-if="item.layerCode" class="layer-chip" :data-layer="item.layerCode">{{ item.layerCode }}</span><span>{{ statusText(item.status) }}</span></div>
+                <div class="best-tags"><AssetIcon :type="item.assetType" :size="19"/><span class="asset-chip">{{ label(item.assetType) }}</span><span v-if="item.layerCode" class="layer-chip" :data-layer="item.layerCode">{{ item.layerCode }}</span><span>{{ statusText(item.status) }}</span></div>
                 <h2 v-html="safeMarkHtml(item.titleHighlight || item.title)" />
                 <code v-html="safeMarkHtml(item.technicalNameHighlight || item.technicalName)" />
                 <p v-html="safeMarkHtml(item.snippet || '点击查看资产定义、字段与治理信息。')" />
@@ -68,7 +68,7 @@
             <div v-if="loading" class="dc-empty">正在检索统一资产索引…</div>
             <div v-else-if="rows.length===0" class="dc-empty">没有找到匹配资产。可以尝试业务词、字段英文名或标准编号。</div>
             <article v-for="item in rows" :key="item.assetId" class="result-row" @click="open(item)">
-              <div class="row-tags"><span class="asset-chip">{{ label(item.assetType) }}</span><span v-if="item.layerCode" class="layer-chip" :data-layer="item.layerCode">{{ item.layerCode }}</span><span v-if="item.catalogCode">{{ item.catalogCode }}</span></div>
+              <div class="row-tags"><AssetIcon :type="item.assetType" :size="18"/><span class="asset-chip">{{ label(item.assetType) }}</span><span v-if="item.layerCode" class="layer-chip" :data-layer="item.layerCode">{{ item.layerCode }}</span><span v-if="item.catalogCode">{{ item.catalogCode }}</span></div>
               <div class="row-body">
                 <div><h3 v-html="safeMarkHtml(item.titleHighlight || item.title)" /><code v-html="safeMarkHtml(item.technicalNameHighlight || item.technicalName)" /></div>
                 <p v-html="safeMarkHtml(item.snippet || '点击查看资产详情。')" />
@@ -94,7 +94,8 @@
 <script setup lang="ts">
 import { computed, defineComponent, h, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowRight, Search, Sparkles, WandSparkles } from 'lucide-vue-next'
+import { ArrowRight, Filter, Search, Sparkles, WandSparkles } from 'lucide-vue-next'
+import AssetIcon from '@/components/AssetIcon.vue'
 import { activityApi, assetApi, type SearchItem, type SearchSuggestion } from '@/api/client'
 
 interface FacetItem { key: string; label: string; count: number }
@@ -201,4 +202,10 @@ onMounted(() => { if (q.value) runSearch(false) })
 
 <style scoped>
 .search-v2{background:#eef6fa;min-height:100%}.search-hero{padding:18px 20px 14px}.search-box-wrap{position:relative}.search-box{height:52px;display:flex;align-items:center;gap:10px;border:1.5px solid #5eabc9;border-radius:10px;background:#fff;padding:4px 5px 4px 14px;color:#2e7897;box-shadow:0 3px 10px rgba(34,108,142,.06)}.search-box input{flex:1;border:0;outline:0;background:transparent;font-size:15px;color:#173f54}.search-box>button{height:40px;border:0;border-radius:8px;background:#177da7;color:#fff;padding:0 17px;display:flex;align-items:center;gap:6px;font-weight:700;cursor:pointer}.suggestions{position:absolute;left:0;right:0;top:58px;z-index:40;padding:7px;box-shadow:0 18px 42px rgba(38,94,126,.15)}.suggestions button{width:100%;border:0;background:#fff;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;text-align:left;padding:10px;border-radius:8px;cursor:pointer}.suggestions button:hover{background:#eef8fc}.suggestions div{min-width:0;display:grid;gap:3px}.suggestions b{font-size:13px}.suggestions code{font-size:11px;color:#55778a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.query-meta{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:9px 2px 0;font-size:11px;color:#607b8a}.query-meta b{padding:3px 8px;border-radius:999px;background:#dff1f8;color:#1f6f91}.query-meta strong{margin-left:auto;color:#355c70}.agent-intent{margin-top:10px;padding:10px 12px;border:1px solid #cce7df;background:#effaf6;border-radius:9px;display:flex;align-items:center;justify-content:space-between;gap:16px;color:#2f6959;font-size:12px}.agent-intent>div{display:flex;align-items:center;gap:8px}.agent-intent button{border:0;border-radius:8px;background:#137da5;color:#fff;padding:8px 12px;display:flex;gap:6px;align-items:center;cursor:pointer;font-size:11px}.search-grid{display:grid;grid-template-columns:220px minmax(0,1fr);gap:14px;margin-top:14px;align-items:start}.filter-panel{padding:14px 14px 16px;position:sticky;top:78px}.filter-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.filter-head b{font-size:13px}.filter-head button{border:0;background:transparent;color:#177da7;font-size:11px;cursor:pointer}.filter-panel :deep(.filter-group){padding:10px 0;border-top:1px solid #e6eef2}.filter-panel :deep(.filter-group h4){font-size:10px;color:#6c8493;margin:0 0 5px}.filter-panel :deep(.filter-group button){width:100%;border:0;background:transparent;display:grid;grid-template-columns:14px 1fr auto;align-items:center;gap:7px;padding:5px 2px;color:#4c6a7a;text-align:left;cursor:pointer;font-size:11px}.filter-panel :deep(.filter-group button i){width:11px;height:11px;border:1px solid #a8c1cd;border-radius:2px;background:#fff}.filter-panel :deep(.filter-group button.checked i){background:#1b83aa;border-color:#1b83aa;box-shadow:inset 0 0 0 2px #fff}.filter-panel :deep(.filter-group button b){font-size:10px;color:#6c8796}.facet-note{font-size:9px;line-height:1.55;color:#8498a4;margin:10px 0 0}.search-main{min-width:0}.section-title{display:flex;align-items:center;gap:10px;margin:2px 2px 8px}.section-title span{font-size:12px;font-weight:750;color:#34596c}.section-title small{font-size:10px;color:#8397a3}.best-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.best-card{padding:16px;cursor:pointer;border-color:#d1e3ec}.best-tags,.row-tags{display:flex;align-items:center;gap:6px;color:#718895;font-size:9px}.asset-chip{display:inline-flex;padding:3px 7px;border-radius:999px;background:#e3f3f8;color:#176f91;font-size:9px;font-weight:750}.layer-chip{padding:3px 6px;border-radius:5px;background:#edf3f6;color:#476575;font-weight:800}.layer-chip[data-layer="ODS"]{background:#eeeafd;color:#4f3fa8}.layer-chip[data-layer="DWD"]{background:#e2f4f1;color:#0d6f68}.layer-chip[data-layer="DWS"]{background:#e3f1f8;color:#126b93}.layer-chip[data-layer="ADS"]{background:#fff3da;color:#83570a}.layer-chip[data-layer="DIM"]{background:#edf1f4;color:#44596a}.best-card h2{font-size:16px;margin:9px 0 5px;color:#214c62}.best-card code{font-size:10px;color:#547687}.best-card p{font-size:11px;color:#607987;line-height:1.6;min-height:34px}.best-actions{display:flex;gap:7px;margin-top:12px}.best-actions button{border:1px solid #c7dbe4;background:#fff;color:#476e82;border-radius:7px;padding:7px 9px;font-size:10px;cursor:pointer}.best-actions button.primary{background:#177da7;border-color:#177da7;color:#fff;display:flex;align-items:center;gap:4px}.results{margin-top:12px;overflow:hidden}.result-tabs{height:47px;display:flex;align-items:center;border-bottom:1px solid #e1eaef;padding:0 10px;gap:2px}.result-tabs button{height:100%;border:0;border-bottom:2px solid transparent;background:transparent;padding:0 10px;color:#5f7785;font-size:10px;cursor:pointer}.result-tabs button.active{color:#15789f;border-bottom-color:#15789f;font-weight:800}.result-tabs b{font-size:9px}.sort{margin-left:auto;font-size:9px;color:#8094a0;padding-right:8px}.result-row{display:grid;grid-template-columns:130px minmax(0,1fr) auto;gap:10px;align-items:center;padding:13px 16px;border-bottom:1px solid #edf2f5;cursor:pointer}.result-row:hover{background:#f7fbfd}.row-body{min-width:0;display:grid;gap:6px}.row-body>div{display:flex;align-items:baseline;gap:8px;min-width:0}.row-body h3{font-size:13px;color:#234e63;margin:0}.row-body code{font-size:9px;color:#6d8795;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row-body p{margin:0;font-size:10px;color:#647d8b;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.results :deep(mark),.best-section :deep(mark){background:#fff0a8;color:#284f61}.pagination{display:flex;align-items:center;justify-content:space-between;padding:12px 15px;font-size:10px;color:#718794}.pagination>div{display:flex;gap:5px}.pagination button{min-width:29px;height:27px;border:1px solid #d1e0e7;border-radius:6px;background:#fff;color:#537184;font-size:10px;cursor:pointer}.pagination button.active{border-color:#2c8db4;color:#16749a;background:#edf8fc}.pagination button:disabled{opacity:.4;cursor:not-allowed}@media(max-width:980px){.search-grid{grid-template-columns:1fr}.filter-panel{position:static}.best-grid{grid-template-columns:1fr}.agent-intent{align-items:flex-start;flex-direction:column}.result-row{grid-template-columns:1fr auto}.row-tags{grid-column:1/-1}}@media(max-width:620px){.search-box>button{padding:0 11px}.query-meta strong{margin-left:0}.filter-panel{display:none}.result-tabs button:nth-of-type(n+4){display:none}.row-body>div{display:grid}.pagination{align-items:flex-start;flex-direction:column;gap:8px}}
+ .suggestions button{grid-template-columns:auto auto minmax(0,1fr) auto}
+ .best-tags,.row-tags{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+ .filter-head b{display:inline-flex;align-items:center;gap:6px}
+ .best-card,.results,.filter-panel,.search-hero{border-color:var(--dc-border);box-shadow:var(--dc-shadow-sm)}
+ .best-card:hover,.result-row:hover{background:#f8fbff}
+ .asset-chip{border-color:#dbeafe;background:var(--dc-primary-soft);color:var(--dc-primary)}
 </style>

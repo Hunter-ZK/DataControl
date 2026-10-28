@@ -1,20 +1,22 @@
 <template>
-  <div class="shell">
+  <div class="shell" :class="{ 'is-collapsed': navCollapsed }">
     <aside class="sidebar">
       <RouterLink class="brand" to="/">
         <span class="brand-mark">D</span>
         <span class="brand-copy"><b>DataControl</b><small>DATA ASSET PORTAL</small></span>
       </RouterLink>
 
+      <button class="collapse-nav" :aria-label="navCollapsed ? '展开侧边栏' : '折叠侧边栏'" :title="navCollapsed ? '展开导航' : '收起导航'" @click="navCollapsed=!navCollapsed"><PanelLeftClose :size="16"/></button>
       <nav class="nav">
         <span class="nav-section">工作台</span>
-        <RouterLink v-for="item in primary" :key="item.to" :to="item.to" class="nav-item">
-          <component :is="item.icon" :size="18" stroke-width="1.8" />
+        <RouterLink v-for="item in primary" :key="item.to" :to="item.to" class="nav-item" :title="item.label">
+          <AssetIcon v-if="item.assetType" :type="item.assetType" :size="18" mode="inline"/>
+          <component :is="item.icon" v-else :size="18" stroke-width="1.8" />
           <span>{{ item.label }}</span>
         </RouterLink>
         <div class="nav-divider" />
         <span class="nav-section">个人与统计</span>
-        <RouterLink v-for="item in secondary" :key="item.to" :to="item.to" class="nav-item">
+        <RouterLink v-for="item in secondary" :key="item.to" :to="item.to" class="nav-item" :title="item.label">
           <component :is="item.icon" :size="18" stroke-width="1.8" />
           <span>{{ item.label }}</span>
         </RouterLink>
@@ -32,13 +34,15 @@
         <div class="top-left">
           <button class="icon-button mobile-menu" aria-label="展开导航" @click="mobileNavOpen=true"><Menu :size="18"/></button>
           <button v-if="route.name !== 'home'" class="icon-button" @click="router.back()"><ArrowLeft :size="18" /></button>
+          <AssetIcon :type="breadcrumbType" :size="17" mode="inline"/>
           <span class="crumb">{{ route.meta.title || 'DataControl' }}</span>
         </div>
-        <button class="command" @click="commandOpen=true">
-          <Search :size="17" /><span>搜索数据集、字段、指标、标准…</span><kbd>⌘ K</kbd>
+        <button class="command" aria-label="打开全局资产搜索" @click="commandOpen=true">
+          <Search :size="17" /><span>搜索数据集、字段、指标、标准…</span><kbd>{{ isMac ? '⌘ K' : 'Ctrl K' }}</kbd>
         </button>
         <div class="top-actions">
           <RouterLink to="/agent" class="soft-action"><Sparkles :size="17" />智能问数</RouterLink>
+          <a class="icon-button help-link" title="使用说明" aria-label="使用说明" href="https://github.com/Hunter-ZK/DataControl/blob/main/README.md" target="_blank" rel="noopener noreferrer"><CircleHelp :size="17"/></a>
           <el-dropdown>
             <button class="avatar user-trigger" aria-label="用户菜单">{{userInitial}}</button>
             <template #dropdown>
@@ -55,7 +59,8 @@
     <el-drawer v-model="mobileNavOpen" title="DataControl 导航" direction="ltr" size="min(300px,85vw)">
       <div class="mobile-links">
         <RouterLink v-for="item in [...primary,...secondary]" :key="item.to" :to="item.to" @click="mobileNavOpen=false">
-          <component :is="item.icon" :size="18"/>{{item.label}}
+          <AssetIcon v-if="item.assetType" :type="item.assetType" :size="18" mode="inline"/>
+          <component :is="item.icon" v-else :size="18"/>{{item.label}}
         </RouterLink>
       </div>
     </el-drawer>
@@ -64,7 +69,7 @@
         @input="loadCommandSuggestions" @keydown.enter="openCommandSearch"/>
       <div class="command-results">
         <button v-for="item in commandSuggestions" :key="item.assetType+item.assetId"
-          @click="chooseCommand(item)"><b>{{item.title}}</b><code>{{item.technicalName}}</code><small>{{item.assetType}}</small></button>
+          @click="chooseCommand(item)"><AssetIcon :type="item.assetType" :size="16" mode="inline"/><b>{{item.title}}</b><code>{{item.technicalName}}</code><small>{{item.assetType}}</small></button>
         <button v-if="commandQuery.trim()" @click="openCommandSearch">查看完整检索结果：{{commandQuery}}</button>
       </div>
     </el-dialog>
@@ -74,11 +79,20 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, BarChart3, BookOpenCheck, Boxes, CircleGauge, Database, Hash, Menu, Search, Sparkles, UserRound } from 'lucide-vue-next'
+import { ArrowLeft, BarChart3, BookOpenCheck, Boxes, CircleGauge, CircleHelp, Database, Hash, Menu, PanelLeftClose, Search, Sparkles, UserRound } from 'lucide-vue-next'
 import { assetApi, type SearchSuggestion } from '@/api/client'
+import AssetIcon from '@/components/AssetIcon.vue'
 
 const router = useRouter()
 const mobileNavOpen=ref(false)
+const navCollapsed=ref(false)
+const isMac=typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+const breadcrumbType=computed(():string => ({
+  catalog:'TABLE',dataset:'TABLE',field:'COLUMN',search:'TABLE',
+  codeTables:'CODE_TABLE',codeTable:'CODE_TABLE',standards:'STANDARD',standard:'STANDARD',
+  wordRoots:'WORD_ROOT',wordRoot:'WORD_ROOT',metrics:'METRIC',metric:'METRIC',
+  statSystems:'STAT_SYSTEM',statSystem:'STAT_SYSTEM',
+} as Record<string,string>)[String(route.name)]||'CATALOG')
 const commandOpen=ref(false)
 const commandQuery=ref('')
 const commandSuggestions=ref<SearchSuggestion[]>([])
@@ -109,11 +123,11 @@ function logout(){localStorage.removeItem('datacontrol_token');localStorage.remo
 const route = useRoute()
 const primary = [
   { to: '/', label: '首页', icon: CircleGauge },
-  { to: '/catalog', label: '资产目录', icon: Database },
+  { to: '/catalog', label: '资产目录', icon: Database, assetType: 'TABLE' },
   { to: '/search', label: '资产检索', icon: Search },
-  { to: '/code-tables', label: '标准码值', icon: Boxes },
-  { to: '/word-roots', label: '词根索引', icon: Hash },
-  { to: '/metrics', label: '指标与制度', icon: BookOpenCheck },
+  { to: '/code-tables', label: '标准码值', icon: Boxes, assetType: 'CODE_TABLE' },
+  { to: '/word-roots', label: '词根索引', icon: Hash, assetType: 'WORD_ROOT' },
+  { to: '/metrics', label: '指标与制度', icon: BookOpenCheck, assetType: 'METRIC' },
   { to: '/agent', label: '智能问数', icon: Sparkles },
 ]
 const secondary = [
@@ -148,4 +162,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', shortcut))
  .command-results button code{color:var(--dc-text-2);font-size:12px;}
  .command-results button small{margin-left:auto;color:var(--dc-text-3);font-size:12px;}
  @media(max-width:820px){.mobile-menu{display:grid;}}
+ .shell.is-collapsed{grid-template-columns:76px minmax(0,1fr)}
+ .shell.is-collapsed .sidebar{padding-left:10px;padding-right:10px}
+ .shell.is-collapsed .brand-copy,.shell.is-collapsed .nav-item span,.shell.is-collapsed .sidebar-foot div,.shell.is-collapsed .nav-section{display:none}
+ .shell.is-collapsed .brand,.shell.is-collapsed .nav-item,.shell.is-collapsed .sidebar-foot{justify-content:center}
+ .collapse-nav{align-self:flex-end;border:1px solid var(--dc-border);border-radius:8px;background:#fff;color:var(--dc-primary);display:grid;place-items:center;width:28px;height:28px;cursor:pointer}
+ .shell.is-collapsed .collapse-nav{align-self:center;transform:rotate(180deg)}
+ .sidebar{background:#f8fbff;border-right-color:var(--dc-border)}
+ .nav-item.router-link-exact-active{background:var(--dc-primary-soft);color:var(--dc-primary);box-shadow:none}
+ .nav-item.router-link-exact-active:before{content:'';position:absolute;left:0;width:3px;height:22px;background:var(--dc-primary);border-radius:3px}
+ .nav-item{position:relative}
+ .command{background:#f8fbff;border-color:var(--dc-border)}
+ .help-link{display:grid;flex:none}
+ .soft-action{background:var(--dc-primary-soft);color:var(--dc-primary)}
+ .brand-mark{background:linear-gradient(140deg,#2563eb,#60a5fa);box-shadow:0 2px 9px rgba(37,99,235,.12)}
+ .topbar{background:rgba(255,255,255,.96);backdrop-filter:blur(12px)}
+ @media(max-width:820px){.collapse-nav{display:none}.shell.is-collapsed{display:block}}
 </style>
