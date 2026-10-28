@@ -88,6 +88,19 @@ def wait_tcp(service: Service, host: str, port: int, timeout: float = 30.0) -> N
 
 
 def unwrap(response: httpx.Response) -> dict:
+    if response.status_code >= 500:
+        detail = response.text[:1200]
+        # CI keeps these service logs local to the ephemeral stub environment.
+        diagnostics = []
+        for name in ("agent-gateway", "agent3-mcp", "portal"):
+            log_path = LOCAL / f"{name}.err.log"
+            if log_path.exists():
+                lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+                diagnostics.append(f"{name} stderr (last 18 lines):\n" + "\\n".join(lines[-18:]))
+        raise RuntimeError(
+            f"Stub endpoint returned {response.status_code} {response.url}: {detail}\\n"
+            + "\\n".join(diagnostics)
+        )
     response.raise_for_status()
     payload = response.json()
     if payload.get("code") != "OK" or not isinstance(payload.get("data"), dict):
