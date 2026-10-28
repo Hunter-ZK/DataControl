@@ -216,9 +216,14 @@ def main() -> None:
                 "本期各地区贷款余额是多少？请生成并校验 SQL；不要执行。 "
                 f"& printf injected > {INJECTION_MARKER}"
             )
+            login = unwrap(client.post(
+                "http://127.0.0.1:8000/api/v1/auth/login",
+                json={"username": "demo", "password": "DataControl123!"},
+            ))
             result = unwrap(
                 client.post(
                     "http://127.0.0.1:8000/api/v1/agent/query",
+                    headers={"Authorization": f"Bearer {login['accessToken']}"},
                     json={"question": prompt},
                 )
             )

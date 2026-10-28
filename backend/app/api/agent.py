@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from backend.app.agent.runtime import AgentRuntimeError, EmbeddedAgentGateway
 from backend.app.agent import history
-from backend.app.api.auth import get_optional_user
+from backend.app.api.auth import get_current_user, get_optional_user
 from backend.app.db.models import User
 from backend.app.db.application_models import AgentTurn
 from backend.app.db.session import SessionLocal
@@ -44,9 +44,13 @@ async def agent_status(modelMode: Literal["deepseek", "free-test"] = "deepseek")
 
 
 @router.post("/query")
-async def agent_query(body: AgentQuery):
-    if body.modelMode == "free-test" and not body.publicGatewayConsent:
-        raise HTTPException(403, detail="Free-test public gateway requires explicit consent")
+async def agent_query(body: AgentQuery, user: User = Depends(get_current_user)):
+    # Legacy one-shot API: authenticated and deliberately stateless.
+    # A caller-controlled dsh session could otherwise cross user boundaries.
+    if body.sessionId or body.conversationId:
+        raise HTTPException(400, detail="Use authenticated conversation stream for continuation")
+    if body.modelMode != "deepseek":
+        raise HTTPException(410, detail="Public free-model transport has been retired")
     runtime = EmbeddedAgentGateway()
     status = await runtime.status(body.modelMode)
     if not status.ready:
@@ -78,13 +82,19 @@ LOG = logging.getLogger("uvicorn.error")
 async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_optional_user)):
     if body.runId is None:
         raise HTTPException(422, detail="runId is required")
-    if body.modelMode == "free-test" and not body.publicGatewayConsent:
-        raise HTTPException(403, detail="Free-test public gateway requires explicit consent")
+    if body.modelMode != "deepseek":
+        raise HTTPException(410, detail="Public free-model transport has been retired")
+    if user is None:
+        raise HTTPException(401, detail="Agent login is required")
+    if body.conversationId is None:
+        raise HTTPException(422, detail="conversationId is required")
+    if body.sessionId:
+        raise HTTPException(400, detail="Provider session is server-owned")
     runtime = EmbeddedAgentGateway()
     run_id = str(body.runId)
     persisted = body.conversationId is not None
     replay = False
-    effective_session = body.sessionId
+    effective_session = None
 
     if persisted:
         if user is None:
@@ -205,12 +215,12 @@ async def agent_run_status(run_id: UUID, user: User = Depends(get_optional_user)
 
 
 @router.post("/query/{run_id}/cancel")
-async def agent_cancel(run_id: UUID, user: User | None = Depends(get_optional_user)):
+async def agent_cancel(run_id: UUID, user: User = Depends(get_current_user)):
     with SessionLocal() as db:
         turn = db.get(AgentTurn, str(run_id))
+        if turn is None:
+            raise HTTPException(404, "Agent run not found")
         if turn is not None:
-            if user is None:
-                raise HTTPException(401, "Authentication required")
             history.owned(db, user.id, turn.conversation_id)
             if turn.status in history.TERMINAL:
                 return {"code": "OK", "data": {"cancelled": False, "status": turn.status}}
