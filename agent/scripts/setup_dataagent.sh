@@ -11,6 +11,7 @@ DSH_BIN="$DSH_BIN_DIR/dsh"
 PNPM_BIN="$DSH_BIN_DIR/pnpm"
 WEB_PATCH="$AGENT_ROOT/dsh/profile/cordis.patch.yml"
 HEADLESS_PATCH="$AGENT_ROOT/dsh/profile/headless.patch.yml"
+MULTI_PATCH="$AGENT_ROOT/dsh/profile/headless-multi.patch.yml"
 
 if [ ! -x "$DSH_BIN" ]; then
   echo "DeepSeek Harness is not installed. Run scripts/setup-agent.sh first." >&2
@@ -54,4 +55,5 @@ setup_profile() {
 
 setup_profile dataagent web "$WEB_PATCH"
 setup_profile dataagent-headless headless "$HEADLESS_PATCH"
+setup_profile dataagent-headless-multi headless "$MULTI_PATCH"
 echo "DataAgent dsh profiles ready: dataagent + restricted dataagent-headless ($DSH_HOME)"

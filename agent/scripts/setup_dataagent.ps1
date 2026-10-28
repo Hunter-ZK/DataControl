@@ -12,6 +12,7 @@ $pnpmBin=Join-Path $dshBinDir "pnpm.cmd"
 $guardDir=Join-Path $agentRoot "guard-plugin"
 $webPatch=Join-Path $agentRoot "dsh\profile\cordis.patch.yml"
 $headlessPatch=Join-Path $agentRoot "dsh\profile\headless.patch.yml"
+$multiPatch=Join-Path $agentRoot "dsh\profile\headless-multi.patch.yml"
 if (-not (Test-Path $dshBin)) { throw "DeepSeek Harness is not installed. Run .\scripts\setup-agent.ps1 first." }
 if (-not (Test-Path $pnpmBin)) { throw "Pinned pnpm is missing from agent\dsh. Run .\scripts\setup-agent.ps1 again." }
 $env:PATH="$dshBinDir;$env:PATH"
@@ -19,7 +20,8 @@ New-Item -ItemType Directory -Force -Path $env:DSH_HOME | Out-Null
 
 $profiles=@(
   @{ Name="dataagent"; Base="web"; Patch=$webPatch },
-  @{ Name="dataagent-headless"; Base="headless"; Patch=$headlessPatch }
+  @{ Name="dataagent-headless"; Base="headless"; Patch=$headlessPatch },
+  @{ Name="dataagent-headless-multi"; Base="headless"; Patch=$multiPatch }
 )
 
 $python=Join-Path $repoRoot ".venv\\Scripts\\python.exe"

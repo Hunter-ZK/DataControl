@@ -6,6 +6,7 @@ function Test-DataAgentProfilesCurrent {
   $profilesRoot = Join-Path $RepoRoot ".local\dsh-home-v0.2.1-rc.3\profiles"
   $checks = @(
     @{ Source="agent\dsh\profile\headless.patch.yml"; Active="dataagent-headless\cordis.patch.yml" },
+    @{ Source="agent\dsh\profile\headless-multi.patch.yml"; Active="dataagent-headless-multi\cordis.patch.yml" },
     @{ Source="agent\dsh\profile\cordis.patch.yml"; Active="dataagent\cordis.patch.yml" }
   )
   foreach ($check in $checks) {
