@@ -301,6 +301,7 @@ export interface AgentDatasetEvidence {
 }
 
 export interface AgentEvidence {
+  assets?: Array<{ assetId: string; assetType: string; title: string; technicalName?: string; sourceCallId?: string }>
   metrics?: AgentMetricEvidence[]
   datasets?: AgentDatasetEvidence[]
   dimensions?: string[]

@@ -65,6 +65,7 @@ const hasSupportingDetails = computed(() => {
   const evidence = props.message.evidence
   return Boolean(
     props.message.events?.length ||
+    evidence?.assets?.length ||
     evidence?.metrics?.length ||
     evidence?.datasets?.length ||
     evidence?.dimensions?.length ||

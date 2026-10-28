@@ -198,6 +198,7 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
     call_inputs: dict[str, dict[str, Any]] = {}
     metrics: list[dict[str, Any]] = []
     datasets: list[dict[str, Any]] = []
+    assets: list[dict[str, Any]] = []
     code_values: list[dict[str, Any]] = []
     dimensions: list[str] = []
     period: dict[str, str] | None = None
@@ -349,6 +350,25 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
                                 ],
                             }
                         )
+                elif tool == "search_assets":
+                    for row in result.get("assets", [])[:40] if isinstance(result.get("assets"), list) else []:
+                        if isinstance(row, dict) and row.get("assetId") and row.get("assetType"):
+                            assets.append({
+                                "assetId": str(row["assetId"]),
+                                "assetType": str(row["assetType"]),
+                                "title": str(row.get("title") or row.get("technicalName") or ""),
+                                "technicalName": str(row.get("technicalName") or ""),
+                                "sourceCallId": call_id,
+                            })
+                elif tool == "get_asset":
+                    if result.get("assetId") and result.get("assetType"):
+                        assets.append({
+                            "assetId": str(result["assetId"]),
+                            "assetType": str(result["assetType"]),
+                            "title": str(result.get("title") or ""),
+                            "technicalName": str(result.get("technicalName") or ""),
+                            "sourceCallId": call_id,
+                        })
                 elif tool == "search_tables":
                     tables = result.get("tables", [])
                     for table in tables if isinstance(tables, list) else []:
@@ -403,6 +423,7 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
         "semanticValidation": semantic_validation,
         "evidence": {
             "metrics": _dedupe_dicts(metrics, "code"),
+            "assets": _dedupe_dicts(assets, "assetId"),
             "datasets": _dedupe_dicts(datasets, "tableName"),
             "codeValues": code_values,
             "dimensions": list(dict.fromkeys(dimensions)),

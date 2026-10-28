@@ -5,6 +5,19 @@
       <small><ShieldCheck :size="13" />仅使用 DataControl 内部治理事实</small>
     </div>
     <div v-if="evidence?.period" class="evidence-row"><span>统计期间</span><b>{{ evidence.period.label }}</b></div>
+    <div v-if="evidence?.assets?.length" class="evidence-row">
+      <span>可访问资产</span>
+      <div class="chips">
+        <RouterLink v-for="asset in evidence.assets.slice(0, 12)"
+          :key="`${asset.assetType}-${asset.assetId}`"
+          :to="assetRoute(asset)"
+          class="evidence-asset-link">
+          <Database :size="14" />
+          <span>{{ asset.title || asset.technicalName || asset.assetId }}</span>
+          <small>{{ asset.assetType }}</small>
+        </RouterLink>
+      </div>
+    </div>
     <div v-if="evidence?.metrics?.length" class="evidence-row">
       <span>使用指标</span>
       <div class="chips">
@@ -60,6 +73,7 @@ const props = defineProps<{ evidence?: AgentEvidence }>()
 const codeValues = computed(() => (props.evidence as P2Evidence | undefined)?.codeValues || [])
 
 const visible = computed(() => !!(
+  props.evidence?.assets?.length ||
   props.evidence?.metrics?.length ||
   props.evidence?.datasets?.length ||
   props.evidence?.dimensions?.length ||
@@ -67,6 +81,20 @@ const visible = computed(() => !!(
   props.evidence?.caliber ||
   codeValues.value.length
 ))
+
+function assetRoute(asset: { assetId: string; assetType: string; technicalName?: string }) {
+  const code = asset.technicalName || asset.assetId
+  switch (asset.assetType) {
+    case 'TABLE': return { name: 'dataset', params: { id: asset.assetId } }
+    case 'COLUMN': return { name: 'field', params: { id: asset.assetId } }
+    case 'METRIC': return { name: 'metric', params: { code } }
+    case 'CODE_TABLE': return { name: 'codeTable', params: { no: code } }
+    case 'STANDARD': return { name: 'standard', params: { no: code } }
+    case 'WORD_ROOT': return { name: 'wordRoot', params: { root: code } }
+    case 'STAT_SYSTEM': return { name: 'statSystem', params: { code } }
+    default: return { name: 'search', query: { q: code } }
+  }
+}
 
 function shortTable(value: string) {
   return value.includes('.') ? value.split('.').pop() || value : value
@@ -108,4 +136,7 @@ function dimensionName(value: string) {
 .caliber { display: grid; grid-template-columns: 82px minmax(0,1fr); gap: 10px; border-top: 1px solid #bfd7e2; padding-top: 10px; }
 .caliber p { margin: 0; font-size: 14px; line-height: 1.7; color: #365f72; }
 @media(max-width:760px){.evidence-row,.caliber{grid-template-columns:1fr;gap:4px}.evidence-head{align-items:flex-start;flex-direction:column;gap:4px}}
+ .evidence-asset-link { display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border:1px solid var(--dc-border);border-radius:9px;background:#fff;color:var(--dc-primary);font-size:13px;text-decoration:none;font-weight:650; }
+ .evidence-asset-link:hover { border-color:var(--dc-primary);background:var(--dc-primary-soft); }
+ .evidence-asset-link small {font-size:12px;color:var(--dc-text-2);}
 </style>
