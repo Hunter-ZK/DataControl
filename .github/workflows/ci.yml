@@ -71,7 +71,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $scripts = @('scripts/dev.ps1', 'scripts/setup-agent.ps1', 'scripts/setup-dev.ps1', 'scripts/run-npm-install.ps1')
+          $scripts = @('scripts/dev.ps1', 'scripts/setup-agent.ps1', 'scripts/setup-dev.ps1', 'scripts/run-npm-install.ps1', 'agent/scripts/setup_dataagent.ps1')
           foreach ($script in $scripts) {
             $tokens = $null
             $errors = $null
@@ -90,10 +90,18 @@ jobs:
           if (-not $failedAsExpected) { throw "Windows npm wrapper did not propagate the nonzero exit code." }
           cmd.exe /d /c start.bat stop
           if ($LASTEXITCODE -ne 0) { throw "Windows launcher's stop command failed" }
-      - name: Bootstrap DataAgent profiles (Windows)
+      - name: Bootstrap DataAgent profiles from a Unicode Windows path (PowerShell 5.1)
         if: runner.os == 'Windows'
-        shell: pwsh
-        run: .\agent\scripts\setup_dataagent.ps1 -DshHome (Join-Path $env:RUNNER_TEMP 'datacontrol-dsh-home')
+        shell: powershell
+        run: |
+          $unicodeRepo = Join-Path $env:RUNNER_TEMP '学习 DataControl'
+          New-Item -ItemType Junction -Path $unicodeRepo -Target $env:GITHUB_WORKSPACE | Out-Null
+          $unicodeHome = Join-Path $env:RUNNER_TEMP '元数据 模拟测试'
+          & (Join-Path $unicodeRepo 'agent\scripts\setup_dataagent.ps1') -DshHome $unicodeHome
+          if ($LASTEXITCODE -ne 0) { throw "Unicode-path profile setup failed" }
+          if (-not (Test-Path (Join-Path $unicodeHome 'profiles\dataagent-headless\package.json'))) {
+            throw "Unicode-path profile was not initialized"
+          }
       - name: Bootstrap DataAgent profiles (Unix)
         if: runner.os != 'Windows'
         shell: bash

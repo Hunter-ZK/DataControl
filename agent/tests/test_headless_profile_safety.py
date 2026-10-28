@@ -81,7 +81,7 @@ def test_overlays_reference_only_pinned_harness_plugin_ids():
     assert registry["version"] == "0.2.1-rc.3"
     for patch, mode in ((HEADLESS_PATCH, "headless"), (WEB_PATCH, "web")):
         text = patch.read_text(encoding="utf-8")
-        root_ids = re.findall(r"(?m)^- id: ([\\w-]+)\\s*$", text)
+        root_ids = re.findall(r"(?m)^- id: ([\w-]+)\s*$", text)
         unknown = sorted(set(root_ids) - set(registry[mode]))
         assert not unknown, f"{patch.name} references absent dsh {mode} rows: {unknown}"
     assert "tool-ralph" not in HEADLESS_PATCH.read_text(encoding="utf-8")

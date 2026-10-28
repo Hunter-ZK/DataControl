@@ -22,6 +22,29 @@ $profiles=@(
   @{ Name="dataagent-headless"; Base="headless"; Patch=$headlessPatch }
 )
 
+$python=Join-Path $repoRoot ".venv\\Scripts\\python.exe"
+if (-not (Test-Path $python)) {
+  $pythonCommand=Get-Command python -ErrorAction SilentlyContinue
+  if (-not $pythonCommand) { throw "Python 3.13/3.14 is required for dsh profile bootstrap." }
+  $python=$pythonCommand.Source
+}
+$cliHelper=Join-Path $PSScriptRoot "dsh_profile_cli.py"
+$localLogs=Join-Path $repoRoot ".local"
+New-Item -ItemType Directory -Force -Path $localLogs | Out-Null
+
+function Invoke-DshProfile([string[]]$CliArguments) {
+  $outLog=Join-Path $localLogs "dsh-profile-command.stdout.log"
+  $errLog=Join-Path $localLogs "dsh-profile-command.stderr.log"
+  & $python $cliHelper --executable $dshBin --cwd $repoRoot --stdout $outLog --stderr $errLog -- @CliArguments
+  $exitCode=$LASTEXITCODE
+  if ($exitCode -ne 0) {
+    $details=if (Test-Path $errLog) { Get-Content -LiteralPath $errLog -Raw -Encoding UTF8 } else { "(no stderr)" }
+    throw "dsh CLI failed (exit=$exitCode) while setting up profile. $details"
+  }
+  if (Test-Path $outLog) { return Get-Content -LiteralPath $outLog -Raw -Encoding UTF8 }
+  return ""
+}
+
 Push-Location $repoRoot
 try {
   foreach($entry in $profiles) {
@@ -33,17 +56,14 @@ try {
       Remove-Item -Recurse -Force $profile
     }
     if (-not (Test-Path (Join-Path $profile "package.json"))) {
-      & $dshBin --profile $name --from-default-profile $base --dump-config | Out-Null
-      if ($LASTEXITCODE -ne 0) { throw "dsh profile initialization failed: $name" }
+      $null=Invoke-DshProfile -CliArguments @("--profile",$name,"--from-default-profile",$base,"--dump-config")
     }
     $pkg=Get-Content (Join-Path $profile "package.json") -Raw
     if ($pkg -notmatch '@hunter-zk/agent3-guard') {
-      & $dshBin plugin --profile $name add $guardDir
-      if ($LASTEXITCODE -ne 0) { throw "guard plugin install failed: $name" }
+      $null=Invoke-DshProfile -CliArguments @("plugin","--profile",$name,"add",$guardDir)
     }
     Copy-Item $patch (Join-Path $profile "cordis.patch.yml") -Force
-    $config=& $dshBin --profile $name --dump-config 2>&1 | Out-String
-    if ($LASTEXITCODE -ne 0) { throw $config }
+    $config=Invoke-DshProfile -CliArguments @("--profile",$name,"--dump-config")
     foreach($required in @('deepseek-official','mcp-agent3','agent3-guard')) {
       if ($config -notmatch [regex]::Escape($required)) { throw "DataAgent profile $name missing $required" }
     }
