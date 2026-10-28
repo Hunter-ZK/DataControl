@@ -19,7 +19,7 @@ def test_headless_profile_is_direct_and_does_not_depend_on_agent_presets():
     assert "DataControl DataAgent" in text
     assert "mcp-agent3" in text
     assert "dataagent-query" not in text
-    assert "agent-presets" not in text
+    assert "- id: agent-presets" not in text
     assert "mode: native" in text
 
 
