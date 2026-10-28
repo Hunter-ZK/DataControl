@@ -128,3 +128,11 @@ def test_bounded_legacy_history_is_preserved(store):
     assert serialized["modelMode"] == "free-test"
     assert serialized["messages"] == original
     assert serialized["sessionId"] == "free-test:safe-id"
+
+
+def test_conversation_task_tier_persists_and_serializes(store):
+    conv = history.create(store, 1, "复杂任务", "deepseek", task_tier="multi")
+    store.expire_all()
+    serialized = history.serialize(store, conv)
+    assert serialized["taskTier"] == "multi"
+    assert serialized["modelMode"] == "deepseek"

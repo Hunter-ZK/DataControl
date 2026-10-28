@@ -87,3 +87,18 @@ def test_core_draft_generation_keeps_explicit_no_execution():
                                [{"name": "amount", "type": "BIGINT"}])
     assert result["execution_allowed"] is False
     assert result["requiresApproval"] is True
+
+
+def test_separate_dsh_profiles_have_explicit_tier_and_timeouts(monkeypatch):
+    from dataagent_gateway.runner import HeadlessHarnessRunner
+
+    monkeypatch.delenv("DATACONTROL_AGENT_RUN_TIMEOUT", raising=False)
+    monkeypatch.delenv("DATACONTROL_AGENT_RUN_TIMEOUT_MULTI", raising=False)
+    single = HeadlessHarnessRunner(task_tier="standard")
+    multi = HeadlessHarnessRunner(task_tier="multi")
+    assert single.profile == "dataagent-headless"
+    assert multi.profile == "dataagent-headless-multi"
+    assert single.timeout_seconds == 120
+    assert multi.timeout_seconds == 600
+    with pytest.raises(ValueError):
+        HeadlessHarnessRunner(task_tier="unknown")

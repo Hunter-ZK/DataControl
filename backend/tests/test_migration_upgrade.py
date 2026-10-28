@@ -110,7 +110,8 @@ def test_upgrade_from_pre_alembic_p0_schema(tmp_path: Path) -> None:
         assert metric_row == ("各项贷款余额", "ADDITIVE", "BASE", "MAX")
 
         revision = connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-        assert revision == "20261028_0005"
+        assert revision == "20261028_0006"
+        assert "task_tier" in _columns(connection, "sys_agent_conversation")
         assert {"id", "user_id", "model_mode", "session_id"} <= _columns(connection, "sys_agent_conversation")
         assert {"id", "conversation_id", "display_question", "status"} <= _columns(connection, "sys_agent_turn")
         assert {"turn_id", "call_id", "tool", "status"} <= _columns(connection, "sys_agent_tool_event")
