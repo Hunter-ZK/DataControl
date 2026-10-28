@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import json
+from pathlib import Path
 
 from agent3.adapters.mcp.authz import static_authz_provider
 from agent3.adapters.mcp.tools import MCPToolAdapter
@@ -31,25 +33,11 @@ def build_poc_server():
         ),
     )
     mcp = FastMCP("agent3", host="127.0.0.1", port=8900)
-    for tool in (
-        adapter.search_tables,
-        adapter.search_assets,
-        adapter.get_asset,
-        adapter.find_references,
-        adapter.get_lineage_summary,
-        adapter.revise_query,
-        adapter.get_schema,
-        adapter.resolve_code_value,
-        adapter.get_semantic_model,
-        adapter.resolve_metric,
-        adapter.plan_metric,
-        adapter.search_verified_sql,
-        adapter.validate_sql,
-        adapter.explain_sql,
-        adapter.compile_query,
-        adapter.submit_ddl,
-    ):
-        mcp.tool()(tool)
+    catalog = json.loads(
+        (Path(__file__).resolve().parents[4] / "tool-catalog.json").read_text(encoding="utf-8")
+    )
+    for tool_name in catalog["tools"]:
+        mcp.tool()(getattr(adapter, tool_name))
     return mcp
 
 

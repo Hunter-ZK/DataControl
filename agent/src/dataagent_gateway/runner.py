@@ -22,19 +22,9 @@ class HarnessRunError(RuntimeError):
 LOGGER = logging.getLogger("uvicorn.error")
 
 
-MCP_TOOL_SUFFIXES = {
-    "search_tables",
-    "get_schema",
-    "get_semantic_model",
-    "resolve_metric",
-    "plan_metric",
-    "resolve_code_value",
-    "search_verified_sql",
-    "validate_sql",
-    "explain_sql",
-    "compile_query",
-    "submit_ddl",
-}
+MCP_TOOL_SUFFIXES = frozenset(json.loads(
+    (Path(__file__).resolve().parents[2] / "tool-catalog.json").read_text(encoding="utf-8")
+)["tools"])
 
 _LOOPBACK_NO_PROXY = ("127.0.0.1", "localhost", "::1")
 _SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")

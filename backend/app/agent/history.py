@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 from datetime import datetime
 from uuid import uuid4
 
@@ -20,11 +21,9 @@ from backend.app.db.session import SessionLocal
 
 ACTIVE = ("queued", "running", "cancel_requested")
 TERMINAL = ("completed", "failed", "cancelled", "timeout", "interrupted")
-TOOL_NAMES = {
-    "search_tables", "get_schema", "get_semantic_model", "resolve_metric",
-    "plan_metric", "resolve_code_value", "search_verified_sql", "validate_sql",
-    "explain_sql", "compile_query", "submit_ddl",
-}
+TOOL_NAMES = frozenset(json.loads(
+    (Path(__file__).resolve().parents[3] / "agent" / "tool-catalog.json").read_text(encoding="utf-8")
+)["tools"])
 
 
 def _json(value):
