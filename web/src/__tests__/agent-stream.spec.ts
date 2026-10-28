@@ -33,21 +33,22 @@ describe('Agent NDJSON stream contract', () => {
     expect(observed).toEqual(['started', 'activity', 'result'])
   })
 
-  it('sends explicit mode and public-provider consent only for free test', async () => {
+  it('never sends a provider session or public-gateway consent from the browser', async () => {
     let body: Record<string, unknown> = {}
     globalThis.fetch = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
       body = JSON.parse(String(init?.body)) as Record<string, unknown>
       return {
         ok: true,
-        body: chunks(['{"type":"result","result":{"answer":"模拟结果","sqlExecuted":false,"hiddenReasoningExposed":false}}\n']),
+        body: chunks(['{"type":"result","result":{"answer":"可信结果","sqlExecuted":false,"hiddenReasoningExposed":false}}\\n']),
       }
     }) as unknown as typeof fetch
-    await streamAgentTurn('synthetic question', null, 'r-free', () => {}, new AbortController().signal, 'free-test')
-    expect(body.modelMode).toBe('free-test')
-    expect(body.publicGatewayConsent).toBe(true)
-    await streamAgentTurn('synthetic question', null, 'r-official', () => {}, new AbortController().signal)
+    await streamAgentTurn('synthetic question', 'untrusted-client-session', 'r-official',
+      () => {}, new AbortController().signal, 'deepseek',
+      '11111111-1111-4111-8111-111111111111')
     expect(body.modelMode).toBe('deepseek')
     expect(body.publicGatewayConsent).toBe(false)
+    expect(body.sessionId).toBeUndefined()
+    expect(body.conversationId).toBe('11111111-1111-4111-8111-111111111111')
   })
 
   it('never fabricates a completed response after cancellation', async () => {
