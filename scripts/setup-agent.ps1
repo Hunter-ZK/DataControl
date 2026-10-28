@@ -10,7 +10,6 @@ $dshModules = Join-Path $dshRoot "node_modules"
 $dshBin = Join-Path $dshModules ".bin\dsh.cmd"
 $guardRoot = Join-Path $root "agent\guard-plugin"
 $python = Join-Path $root ".venv\Scripts\python.exe"
-$npmTimeoutMs = 600000
 
 New-Item -ItemType Directory -Force -Path $local | Out-Null
 $setupLock = $null
@@ -32,42 +31,7 @@ try {
   }
 
   function Invoke-NpmInstall([string]$Name, [string]$Directory) {
-    $stdout = Join-Path $local "npm-$Name.stdout.log"
-    $stderr = Join-Path $local "npm-$Name.stderr.log"
-    Remove-Item $stdout, $stderr -Force -ErrorAction SilentlyContinue
-    $command = "npm install --no-audit --no-fund --no-progress --maxsockets=5"
-    Write-Host "[DataControl] Installing $Name npm packages. Detailed output: $stderr"
-    $params = @{
-      FilePath = $env:ComSpec
-      ArgumentList = @("/d", "/c", $command)
-      WorkingDirectory = $Directory
-      RedirectStandardOutput = $stdout
-      RedirectStandardError = $stderr
-      NoNewWindow = $true
-      PassThru = $true
-    }
-    $process = Start-Process @params
-    try {
-      $watch = [System.Diagnostics.Stopwatch]::StartNew()
-      $nextNotice = 30000
-      while (-not $process.WaitForExit(1000)) {
-        if ($watch.ElapsedMilliseconds -ge $npmTimeoutMs) {
-          & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null
-          throw "$Name npm installation timed out and was stopped. Check $stderr."
-        }
-        if ($watch.ElapsedMilliseconds -ge $nextNotice) {
-          Write-Host "[DataControl] $Name npm is still running; progress details: $stderr"
-          $nextNotice += 30000
-        }
-      }
-      if ($process.ExitCode -ne 0) {
-        $tail = if (Test-Path $stderr) { (Get-Content $stderr -Tail 16) -join [Environment]::NewLine } else { "No npm error log." }
-        throw "$Name npm installation failed with exit code $($process.ExitCode). $tail"
-      }
-    } finally {
-      $process.Dispose()
-    }
-    Write-Host "[DataControl] $Name npm packages installed."
+    & (Join-Path $PSScriptRoot "run-npm-install.ps1") -Name $Name -WorkingDirectory $Directory -LogDirectory $local
   }
 
   if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {

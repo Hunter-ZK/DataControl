@@ -66,13 +66,23 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $scripts = @('scripts/dev.ps1', 'scripts/setup-agent.ps1', 'scripts/setup-dev.ps1')
+          $scripts = @('scripts/dev.ps1', 'scripts/setup-agent.ps1', 'scripts/setup-dev.ps1', 'scripts/run-npm-install.ps1')
           foreach ($script in $scripts) {
             $tokens = $null
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $script).Path, [ref]$tokens, [ref]$errors) | Out-Null
             if ($errors.Count -gt 0) { throw "$script has syntax errors: $($errors | Out-String)" }
           }
+          # Prove native exit codes are preserved, including nonzero failures.
+          & .\scripts\run-npm-install.ps1 -Name smoke-success -WorkingDirectory agent/dsh -LogDirectory $env:RUNNER_TEMP -CommandLine "echo successful" -TimeoutSeconds 20
+          $failedAsExpected = $false
+          try {
+            & .\scripts\run-npm-install.ps1 -Name smoke-failure -WorkingDirectory agent/dsh -LogDirectory $env:RUNNER_TEMP -CommandLine "echo intentional_failure & exit /b 17" -TimeoutSeconds 20
+          } catch {
+            if ($_.Exception.Message -match 'exit code 17') { $failedAsExpected = $true }
+            else { throw }
+          }
+          if (-not $failedAsExpected) { throw "Windows npm wrapper did not propagate the nonzero exit code." }
           cmd.exe /d /c start.bat stop
           if ($LASTEXITCODE -ne 0) { throw "Windows launcher's stop command failed" }
       - name: Bootstrap DataAgent profiles (Windows)

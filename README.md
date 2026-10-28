@@ -91,6 +91,12 @@ processes and run `start.bat repair`. Repair only removes
 `agent/dsh/node_modules`, not your Python environment, sample database,
 old dsh sessions, or tracked source code. Installation logs are kept at
 `.local/npm-dsh.stderr.log` and `.local/npm-dsh.stdout.log`.
+Dependency install scripts are permitted by pinned `allowScripts` entries for the five
+reviewed transitive packages required by dsh 0.2.1-rc.3; unreviewed scripts
+remain blocked on npm versions that enforce approval. Never run broad
+`approve --all` or disable lifecycle script protection. The installer now
+captures a reliable Windows child-process exit code and includes both stdout
+and stderr when installation fails.
 The setup lock prevents parallel installer runs, and npm has an explicit
 timeout rather than silently blocking forever.
 
