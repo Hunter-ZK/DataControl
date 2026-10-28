@@ -38,7 +38,7 @@
             <div class="time-grid">
               <div><span>时间字段</span><code>{{ metric.time.field }}</code></div>
               <div><span>时间粒度</span><b>{{ metric.time.grain || '未登记' }}</b></div>
-              <div><span>调度时间参数</span><b>\${dt}</b><small>SQL 草案使用 DataWorks 参数占位，不计算最新物理分区</small></div>
+              <div><span>调度时间参数</span><b>${dt}</b><small>SQL 草案使用 DataWorks 参数占位，不计算最新物理分区</small></div>
               <div><span>跨期规则</span><b>{{ additivityLabel(metric.time.additivity) }}</b><small v-if="metric.time.additivity === 'NON_ADDITIVE'">余额/快照类指标禁止跨期直接求和</small></div>
             </div>
           </section>
