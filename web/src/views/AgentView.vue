@@ -216,6 +216,9 @@ const {
   togglePin,
   attachServerId,
   mergeServer,
+  hasUnscopedLegacy,
+  adoptUnscopedLegacy,
+  declineUnscopedLegacy,
 } = useAgentConversations()
 
 const quickPrompts = [
@@ -368,7 +371,9 @@ async function copyLatestAnswer() {
 }
 function recordFeedback(value: 'useful' | 'incorrect') {
   ElMessage.info(value === 'useful' ? '已记录本地有用标记' : '已记录本地有误标记')
-  const key = 'datacontrol_agent_feedback_v1'
+  const user = JSON.parse(localStorage.getItem('datacontrol_user') || '{}') as { id?: number }
+  if (!user.id) return
+  const key = `datacontrol_agent_feedback_v1_user_${user.id}`
   const saved = JSON.parse(localStorage.getItem(key) || '{}') as Record<string, string>
   saved[activeConversationId.value || 'unknown'] = value
   localStorage.setItem(key, JSON.stringify(saved))
@@ -533,11 +538,23 @@ async function refreshServerHistory() {
 }
 
 onMounted(async () => {
-  loadConversations()
   const initialQuestion = typeof route.query.q === 'string' ? route.query.q.trim() : ''
-  if (!localStorage.getItem('datacontrol_token')) {
+  if (!localStorage.getItem('datacontrol_token')
+    || !localStorage.getItem('datacontrol_user')) {
     await router.replace({ name: 'login', query: { redirect: route.fullPath } })
     return
+  }
+  loadConversations()
+  if (hasUnscopedLegacy()) {
+    try {
+      await ElMessageBox.confirm(
+        '发现旧版本未标记所属账号的浏览器会话。为避免账号间混用，默认不会展示。确认这些记录属于当前登录账号后，是否导入当前账号？',
+        '旧版历史归属确认',
+        { confirmButtonText: '导入到当前账号', cancelButtonText: '暂不导入', type: 'warning' },
+      )
+      const count = adoptUnscopedLegacy()
+      if (count) ElMessage.success(`已将 ${count} 条旧会话迁入当前账号的本地历史`)
+    } catch { declineUnscopedLegacy() }
   }
   const hasRouteAsset = typeof route.query.asset === 'string' && !!route.query.asset
   if (hasRouteAsset || initialQuestion) {
