@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -155,3 +156,29 @@ class EmbeddedAgentGateway:
         payload.setdefault("sqlExecuted", False)
         payload.setdefault("hiddenReasoningExposed", False)
         return payload
+
+    async def stream(self, prompt: str, *, run_id: str, session_id: str | None = None) -> AsyncIterator[bytes]:
+        status = await self.status()
+        if not status.ready:
+            raise AgentRuntimeError(status.reason or "embedded Agent runtime is not ready")
+        body: dict[str, Any] = {"question": prompt, "runId": run_id}
+        if session_id:
+            body["sessionId"] = session_id
+        try:
+            async with httpx.AsyncClient(timeout=None, trust_env=False) as client:
+                async with client.stream("POST", f"{self.gateway_url}/v1/query/stream", json=body) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if line:
+                            yield (line + "\n").encode("utf-8")
+        except httpx.HTTPError as exc:
+            raise AgentRuntimeError("Agent event stream disconnected") from exc
+
+    async def cancel(self, run_id: str) -> bool:
+        try:
+            async with httpx.AsyncClient(timeout=5.0, trust_env=False) as client:
+                response = await client.post(f"{self.gateway_url}/v1/query/{run_id}/cancel")
+                response.raise_for_status()
+                return bool(response.json().get("cancelled"))
+        except (httpx.HTTPError, ValueError):
+            return False

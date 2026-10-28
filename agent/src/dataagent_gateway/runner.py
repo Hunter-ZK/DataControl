@@ -8,7 +8,7 @@ import re
 import time
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 
@@ -519,7 +519,10 @@ class HeadlessHarnessRunner:
         # paths because the Windows command begins with node.exe, not a .cmd file.
         return await asyncio.create_subprocess_exec(*command, **process_kwargs)
 
-    async def _capture_trace(self, stream: asyncio.StreamReader, request_id: str) -> str:
+    async def _capture_trace(
+        self, stream: asyncio.StreamReader, request_id: str,
+        on_activity: Callable[[dict[str, Any]], None] | None = None,
+    ) -> str:
         """Collect complete JSONL for the existing parser while reporting safe live events."""
         lines: list[str] = []
         tool_labels: dict[str, str] = {}
@@ -537,22 +540,34 @@ class HeadlessHarnessRunner:
             if not isinstance(event, dict):
                 continue
             event_type = event.get("type")
+            # Never stream user questions, raw tool payloads, SQL, or hidden reasoning.
+            # Only known Agent3 tool identities and validated statuses are UI activity.
             if event_type == "tool_call":
-                suffix = _tool_suffix(str(event.get("tool") or ""))
+                tool_name = str(event.get("tool") or "")
+                suffix = _tool_suffix(tool_name)
                 tool = suffix if suffix in MCP_TOOL_SUFFIXES or suffix in safe_native else "harness_tool"
                 call_id = event.get("callId")
                 if isinstance(call_id, str):
                     tool_labels[call_id] = tool
                 LOGGER.info("[Agent:%s] TOOL_START %s", request_id, tool)
+                if on_activity and tool_name.startswith("mcp__agent3__") and suffix in MCP_TOOL_SUFFIXES:
+                    if isinstance(call_id, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", call_id):
+                        on_activity({"type": "tool_call", "callId": call_id, "tool": suffix})
             elif event_type == "tool_result":
                 call_id = event.get("callId")
                 tool = tool_labels.get(call_id, "harness_tool") if isinstance(call_id, str) else "harness_tool"
                 raw_status = event.get("status")
                 status = raw_status if raw_status in {"completed", "error", "failed", "success"} else "unknown"
                 LOGGER.info("[Agent:%s] TOOL_END %s status=%s", request_id, tool, status)
+                if on_activity and tool in MCP_TOOL_SUFFIXES:
+                    if isinstance(call_id, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", call_id):
+                        on_activity({"type": "tool_result", "callId": call_id, "tool": tool, "status": status})
         return "".join(lines)
 
-    async def run(self, question: str, *, session_id: str | None = None) -> dict[str, Any]:
+    async def run(
+        self, question: str, *, session_id: str | None = None,
+        on_activity: Callable[[dict[str, Any]], None] | None = None,
+    ) -> dict[str, Any]:
         if not question.strip():
             raise HarnessRunError("DataAgent question cannot be empty")
 
@@ -577,15 +592,23 @@ class HeadlessHarnessRunner:
 
             stdout_text, stderr, _ = await asyncio.wait_for(
                 asyncio.gather(
-                    self._capture_trace(process.stdout, request_id),
+                    self._capture_trace(process.stdout, request_id, on_activity),
                     process.stderr.read(),
                     process.wait(),
                 ),
                 timeout=self.timeout_seconds,
             )
+        except asyncio.CancelledError:
+            # Stop the actual Harness process, not just the browser spinner.
+            if process.returncode is None:
+                process.kill()
+                await process.wait()
+            LOGGER.info("[Agent:%s] CANCELLED elapsed=%.1fs", request_id, time.monotonic() - started)
+            raise
         except TimeoutError as exc:
-            process.kill()
-            await process.wait()
+            if process.returncode is None:
+                process.kill()
+                await process.wait()
             LOGGER.warning("[Agent:%s] TIMEOUT elapsed=%.1fs", request_id, time.monotonic() - started)
             raise HarnessRunError(
                 f"dsh request exceeded {self.timeout_seconds:g}s timeout"
