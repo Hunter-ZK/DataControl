@@ -1,7 +1,6 @@
 """R1-B tests: owner isolation, run lifecycle, replay and sanitized evidence."""
 from __future__ import annotations
 
-import json
 from uuid import uuid4
 
 import pytest
