@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.app.api.activity import router as activity_router
 from backend.app.api.agent import router as agent_router
 from backend.app.api.agent_history import router as agent_history_router
+from backend.app.api.agent_assets import router as agent_assets_router
 from backend.app.api.assets import router as assets_router
 from backend.app.api.auth import router as auth_router
 from backend.app.api.details import router as details_router
@@ -35,6 +36,7 @@ app.include_router(relations_router)
 app.include_router(semantic_router)
 app.include_router(agent_router)
 app.include_router(agent_history_router)
+app.include_router(agent_assets_router)
 app.include_router(activity_router)
 
 
