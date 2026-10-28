@@ -56,7 +56,12 @@ if (-not $patch.Contains($needle)) { throw "Read-only headless model declaration
 $patch = $patch.Replace($needle, ("provider: our-free-model" + $newline + "    model: kilo-auto/free"))
 [System.IO.File]::WriteAllText((Join-Path $profileDir "cordis.patch.yml"),$patch,[System.Text.UTF8Encoding]::new($false))
 # Upstream README: install local source; never install the unrelated npm package.
-$null = Invoke-Dsh -ArgsForDsh @("plugin","--profile",$profileName,"add",$sourceDir)
+$installed = Join-Path $profileDir "node_modules\dsh-our-free-model\package.json"
+if (-not (Test-Path $installed)) {
+  $null = Invoke-Dsh -ArgsForDsh @("plugin","--profile",$profileName,"add",$sourceDir)
+} else {
+  Write-Host "[free-test] Reusing already installed pinned plugin."
+}
 $config = Invoke-Dsh -ArgsForDsh @("--profile",$profileName,"--dump-config")
 foreach ($required in @("our-free-model","kilo-auto/free","mcp-agent3","agent3-guard")) {
   if ($config -notmatch [regex]::Escape($required)) { throw "Test profile missing: $required" }
