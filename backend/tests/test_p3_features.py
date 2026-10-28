@@ -75,4 +75,5 @@ def test_agent_bridge_is_implemented_but_runtime_is_fail_closed_when_not_started
         "/api/v1/agent/query",
         json={"question": "生成贷款余额 SQL"},
     )
-    assert query.status_code == 503
+    # Agent now verifies identity before checking runtime readiness.
+    assert query.status_code == 401

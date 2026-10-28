@@ -121,7 +121,6 @@ const secondary = [
   { to: '/profile', label: '个人中心', icon: UserRound },
 ]
 
-function goSearch() { router.push({ name: 'search' }) }
 function shortcut(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
     event.preventDefault(); commandOpen.value=true

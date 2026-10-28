@@ -222,7 +222,7 @@ export class AgentTurnCancelledError extends Error {
 /** Fetch the actual newline-delimited Agent stream; no simulated progress. */
 export async function streamAgentTurn(
   question: string,
-  sessionId: string | null,
+  _sessionId: string | null,
   runId: string,
   onEvent: (event: AgentStreamEvent) => void,
   signal: AbortSignal,
