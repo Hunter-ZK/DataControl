@@ -59,6 +59,8 @@ if($LASTEXITCODE -ne 0){throw "DataControl .venv must use Python 3.13 or 3.14."}
 if(-not(Get-Command npm -ErrorAction SilentlyContinue)){throw "npm is required."}
 if(-not(Test-Path (Join-Path $root "web\node_modules\.bin\vite.cmd"))){throw "Frontend dependencies are missing. Run .\scripts\setup-dev.ps1 first."}
 New-Item -ItemType Directory -Force -Path $localDir | Out-Null
+& $python -m alembic upgrade head
+if($LASTEXITCODE -ne 0){throw 'Database migration failed before service startup'}
 
 # Preserve any external proxy needed for model traffic while guaranteeing that
 # Portal/Gateway/MCP loopback traffic is never sent through it.
