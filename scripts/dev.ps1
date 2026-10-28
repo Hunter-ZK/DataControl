@@ -17,11 +17,23 @@ $dsh = Join-Path $root "agent\dsh\node_modules\.bin\dsh.cmd"
 $headless = Join-Path $local "dsh-home-v0.2.1-rc.3\profiles\dataagent-headless\package.json"
 
 function Test-PortalReady {
-  if (-not ((Test-Path $portalMarker) -and (Test-Path $python) -and (Test-Path $vite))) {
-    return $false
-  }
+  if (-not ((Test-Path $python) -and (Test-Path $vite))) { return $false }
   & $python -c "import backend.app.main, alembic, httpx" 2>$null
-  return ($LASTEXITCODE -eq 0)
+  if ($LASTEXITCODE -ne 0) { return $false }
+  if (Test-Path $portalMarker) { return $true }
+
+  # Older setup-dev runs predate the marker. Reuse only an intact demo corpus.
+  $legacyFiles = @(
+    (Join-Path $local "datacontrol.db"),
+    (Join-Path $local "search.db"),
+    (Join-Path $local "p2-question-bank.json"),
+    (Join-Path $local "p3-question-bank.json")
+  )
+  foreach ($file in $legacyFiles) {
+    if (-not (Test-Path $file)) { return $false }
+  }
+  Set-Content -LiteralPath $portalMarker -Value "Existing Portal corpus validated" -Encoding UTF8
+  return $true
 }
 
 function Test-AgentReady {
