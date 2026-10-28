@@ -136,13 +136,14 @@ class EmbeddedAgentGateway:
 
     async def run(
         self, prompt: str, *, session_id: str | None = None,
-        model_mode: str = "deepseek", public_gateway_consent: bool = False
+        model_mode: str = "deepseek", public_gateway_consent: bool = False,
+        task_tier: str = "standard",
     ) -> dict[str, Any]:
         status = await self.status(model_mode)
         if not status.ready:
             raise AgentRuntimeError(status.reason or "embedded Agent runtime is not ready")
         body: dict[str, Any] = {
-            "question": prompt, "modelMode": model_mode,
+            "question": prompt, "modelMode": model_mode, "taskTier": task_tier,
             "publicGatewayConsent": public_gateway_consent,
         }
         if session_id:
@@ -174,14 +175,15 @@ class EmbeddedAgentGateway:
 
     async def stream(
         self, prompt: str, *, run_id: str, session_id: str | None = None,
-        model_mode: str = "deepseek", public_gateway_consent: bool = False
+        model_mode: str = "deepseek", public_gateway_consent: bool = False,
+        task_tier: str = "standard",
     ) -> AsyncIterator[bytes]:
         status = await self.status(model_mode)
         if not status.ready:
             raise AgentRuntimeError(status.reason or "embedded Agent runtime is not ready")
         body: dict[str, Any] = {
             "question": prompt, "runId": run_id, "modelMode": model_mode,
-            "publicGatewayConsent": public_gateway_consent,
+            "taskTier": task_tier, "publicGatewayConsent": public_gateway_consent,
         }
         if session_id:
             body["sessionId"] = session_id

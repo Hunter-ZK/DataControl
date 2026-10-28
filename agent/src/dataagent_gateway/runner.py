@@ -437,11 +437,17 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
 
 
 class HeadlessHarnessRunner:
-    def __init__(self, *, timeout_seconds: float | None = None, model_mode: str | None = None) -> None:
+    def __init__(self, *, timeout_seconds: float | None = None, model_mode: str | None = None,
+                 task_tier: str = "standard") -> None:
         self.repo_root = Path(__file__).resolve().parents[3]
         self.agent_root = self.repo_root / "agent"
+        if task_tier not in ("standard", "multi"):
+            raise ValueError("Unknown Agent task tier")
+        self.task_tier = task_tier
         self.timeout_seconds = timeout_seconds or float(
-            os.getenv("DATACONTROL_AGENT_RUN_TIMEOUT", "120")
+            os.getenv("DATACONTROL_AGENT_RUN_TIMEOUT_MULTI" if task_tier == "multi"
+                      else "DATACONTROL_AGENT_RUN_TIMEOUT",
+                      "600" if task_tier == "multi" else "120")
         )
         self.dsh_home = Path(
             os.getenv("DSH_HOME", str(self.repo_root / ".local" / "dsh-home-v0.2.1-rc.3"))
@@ -460,7 +466,8 @@ class HeadlessHarnessRunner:
         self.free_test = self.model_mode == "free-test"
         self.profile = (
             "dataagent-headless-free" if self.free_test
-            else os.getenv("DATACONTROL_DSH_PROFILE", "dataagent-headless")
+            else ("dataagent-headless-multi" if task_tier == "multi"
+                  else os.getenv("DATACONTROL_DSH_PROFILE", "dataagent-headless"))
         )
 
     @property
@@ -478,7 +485,9 @@ class HeadlessHarnessRunner:
     async def health(self) -> dict[str, Any]:
         dsh_installed = (self.dsh_js_entry if os.name == "nt" else self.dsh_bin).exists()
         profile_package_ready = (self.profile_dir / "package.json").exists()
-        source_overlay = self.agent_root / "dsh" / "profile" / "headless.patch.yml"
+        source_overlay = (self.agent_root / "dsh" / "profile" /
+                          ("headless-multi.patch.yml" if self.task_tier == "multi"
+                           else "headless.patch.yml"))
         active_overlay = self.profile_dir / "cordis.patch.yml"
         provider = "our-free-model" if self.free_test else "deepseek-official"
         model = "kilo-auto/free" if self.free_test else "deepseek-flash"

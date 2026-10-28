@@ -20,12 +20,14 @@ class QueryRequest(BaseModel):
     sessionId: str | None = Field(default=None, max_length=200)
     runId: UUID | None = None
     modelMode: Literal["deepseek", "free-test"] = "deepseek"
+    taskTier: Literal["standard", "multi"] = "standard"
     publicGatewayConsent: bool = False
 
 
 @app.get("/health")
-async def health(modelMode: Literal["deepseek", "free-test"] | None = None):
-    status = await HeadlessHarnessRunner(model_mode=modelMode).health()
+async def health(modelMode: Literal["deepseek", "free-test"] | None = None,
+                 taskTier: Literal["standard", "multi"] = "standard"):
+    status = await HeadlessHarnessRunner(model_mode=modelMode, task_tier=taskTier).health()
     return {
         "status": "ok" if status["ready"] else "degraded",
         "component": "embedded-dataagent-gateway",
@@ -39,7 +41,9 @@ async def health(modelMode: Literal["deepseek", "free-test"] | None = None):
 async def query(body: QueryRequest):
     if body.modelMode != "deepseek":
         raise HTTPException(410, detail="Public free-model transport has been retired")
-    runner = HeadlessHarnessRunner(model_mode=body.modelMode)
+    runner = HeadlessHarnessRunner(model_mode=body.modelMode, **(
+        {"task_tier": "multi"} if body.taskTier == "multi" else {}
+    ))
     try:
         result = await runner.run(body.question.strip(), session_id=body.sessionId)
     except HarnessRunError as exc:
@@ -71,7 +75,9 @@ async def query_stream(body: QueryRequest):
         raise HTTPException(429, detail="Agent gateway is at its concurrent run limit")
     if body.modelMode == "free-test" and not body.publicGatewayConsent:
         raise HTTPException(403, detail="Public gateway requires explicit per-turn consent")
-    runner = HeadlessHarnessRunner(model_mode=body.modelMode)
+    runner = HeadlessHarnessRunner(model_mode=body.modelMode, **(
+        {"task_tier": "multi"} if body.taskTier == "multi" else {}
+    ))
     events: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
 
     def on_activity(activity: dict[str, Any]) -> None:

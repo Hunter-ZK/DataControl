@@ -27,6 +27,7 @@ class AgentQuery(BaseModel):
     conversationId: UUID | None = None
     displayQuestion: str | None = Field(default=None, max_length=4000)
     modelMode: Literal["deepseek", "free-test"] = "deepseek"
+    taskTier: Literal["standard", "multi"] = "standard"
     publicGatewayConsent: bool = False
 
 
@@ -72,6 +73,7 @@ async def agent_query(body: AgentQuery, user: User = Depends(get_current_user)):
         data = await runtime.run(
             body.question.strip(), session_id=body.sessionId,
             model_mode=body.modelMode, public_gateway_consent=body.publicGatewayConsent,
+            task_tier=body.taskTier,
         )
     except AgentRuntimeError as exc:
         raise HTTPException(502, detail=str(exc)) from exc
@@ -103,6 +105,8 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
             raise HTTPException(401, detail="Authentication required for server history")
         with SessionLocal() as db:
             conv = history.owned(db, user.id, str(body.conversationId))
+            if conv.task_tier != body.taskTier:
+                raise HTTPException(409, "Cannot mix task tiers within a conversation")
             effective_session = conv.session_id  # Server owns the resumable session.
             previous, replay = history.reserve(
                 db, user.id, conv.id, run_id, body.question.strip(), body.modelMode,
@@ -133,6 +137,7 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
             async for line in runtime.stream(
                 body.question.strip(), run_id=run_id, session_id=effective_session,
                 model_mode=body.modelMode, public_gateway_consent=body.publicGatewayConsent,
+                task_tier=body.taskTier,
             ):
                 try:
                     event = json.loads(line)
