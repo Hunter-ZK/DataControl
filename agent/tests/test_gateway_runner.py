@@ -1,6 +1,8 @@
 import json
+from types import SimpleNamespace
 
 import pytest
+import dataagent_gateway.runner as runner_module
 
 from dataagent_gateway.runner import HarnessRunError, HeadlessHarnessRunner, parse_event_stream
 
@@ -279,3 +281,13 @@ def test_headless_command_never_contains_user_question_and_rejects_shell_like_se
 
     with pytest.raises(HarnessRunError, match="Invalid DataAgent session id"):
         runner._command("session-1 & whoami")
+
+
+def test_windows_headless_command_uses_node_entrypoint_without_shell(monkeypatch):
+    runner = HeadlessHarnessRunner()
+    monkeypatch.setattr(runner_module, "os", SimpleNamespace(name="nt"))
+    command = runner._command("session-1234")
+    assert command[:1] == ["node"]
+    assert command[1].replace("\\\\", "/").endswith("/@deepseek-ai/dsh/lib/bin.js")
+    assert "cmd.exe" not in command
+    assert command[-2:] == ["--session-id", "session-1234"]

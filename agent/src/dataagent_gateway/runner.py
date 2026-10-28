@@ -4,7 +4,6 @@ import asyncio
 import json
 import os
 import re
-import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -430,6 +429,9 @@ class HeadlessHarnessRunner:
         ).resolve()
         suffix = "dsh.cmd" if os.name == "nt" else "dsh"
         self.dsh_bin = self.agent_root / "dsh" / "node_modules" / ".bin" / suffix
+        self.dsh_js_entry = (
+            self.agent_root / "dsh" / "node_modules" / "@deepseek-ai" / "dsh" / "lib" / "bin.js"
+        )
         self.profile = os.getenv("DATACONTROL_DSH_PROFILE", "dataagent-headless")
 
     @property
@@ -445,7 +447,7 @@ class HeadlessHarnessRunner:
             return False
 
     async def health(self) -> dict[str, Any]:
-        dsh_installed = self.dsh_bin.exists()
+        dsh_installed = (self.dsh_js_entry if os.name == "nt" else self.dsh_bin).exists()
         profile_ready = (self.profile_dir / "package.json").exists()
         api_key_present = bool(os.getenv("DEEPSEEK_API_KEY"))
         mcp_reachable = await self._mcp_reachable()
@@ -470,7 +472,12 @@ class HeadlessHarnessRunner:
         }
 
     def _command(self, session_id: str | None) -> list[str]:
-        command = [str(self.dsh_bin), "--profile", self.profile, "--json"]
+        if os.name == "nt":
+            # Launch the actual pinned JS entrypoint, not npm's .cmd wrapper.
+            # This preserves Unicode checkout paths and avoids cmd.exe quoting.
+            command = ["node", str(self.dsh_js_entry), "--profile", self.profile, "--json"]
+        else:
+            command = [str(self.dsh_bin), "--profile", self.profile, "--json"]
         if session_id:
             command.extend(["--session-id", _safe_session_id(session_id)])
         return command
@@ -483,11 +490,8 @@ class HeadlessHarnessRunner:
             "stdout": asyncio.subprocess.PIPE,
             "stderr": asyncio.subprocess.PIPE,
         }
-        if os.name == "nt":
-            cmdline = subprocess.list2cmdline(command)
-            return await asyncio.create_subprocess_exec(
-                "cmd.exe", "/d", "/s", "/c", cmdline, **process_kwargs
-            )
+        # Argument-vector execution is safe for CJK/space-containing Windows
+        # paths because the Windows command begins with node.exe, not a .cmd file.
         return await asyncio.create_subprocess_exec(*command, **process_kwargs)
 
     async def run(self, question: str, *, session_id: str | None = None) -> dict[str, Any]:
