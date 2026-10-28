@@ -295,8 +295,15 @@ def test_windows_headless_command_uses_node_entrypoint_without_shell(monkeypatch
     assert "cmd.exe" not in command
     assert command[-2:] == ["--session-id", "session-1234"]
 
-def test_live_console_trace_logs_tools_without_payloads(caplog):
+async def _capture_test_events(events: list[dict], request_id: str) -> str:
+    # StreamReader must be created inside its running event loop (Python 3.13+).
     reader = asyncio.StreamReader()
+    reader.feed_data(_stream(events).encode("utf-8"))
+    reader.feed_eof()
+    return await HeadlessHarnessRunner()._capture_trace(reader, request_id)
+
+
+def test_live_console_trace_logs_tools_without_payloads(caplog):
     secret = "private-token-and-hidden-reasoning"
     events = [
         {"type": "thinking", "text": secret},
@@ -308,10 +315,8 @@ def test_live_console_trace_logs_tools_without_payloads(caplog):
          "input": {"api_key": secret}},
         {"type": "final", "text": secret},
     ]
-    reader.feed_data(_stream(events).encode("utf-8"))
-    reader.feed_eof()
     with caplog.at_level(logging.INFO, logger="uvicorn.error"):
-        output = asyncio.run(HeadlessHarnessRunner()._capture_trace(reader, "test1234"))
+        output = asyncio.run(_capture_test_events(events, "test1234"))
     assert secret in output
     assert "TOOL_START validate_sql" in caplog.text
     assert "TOOL_END validate_sql status=completed" in caplog.text
@@ -321,14 +326,12 @@ def test_live_console_trace_logs_tools_without_payloads(caplog):
 
 
 def test_console_trace_does_not_log_hidden_reasoning_or_raw_agent_content(caplog):
-    reader = asyncio.StreamReader()
-    reader.feed_data(_stream([
+    events = [
         {"type": "thinking", "text": "secret-thought"},
         {"type": "final", "text": "customer-secret"},
         {"type": "status", "phase": "turn_end", "reason": "completed"},
-    ]).encode("utf-8"))
-    reader.feed_eof()
+    ]
     with caplog.at_level(logging.INFO, logger="uvicorn.error"):
-        asyncio.run(HeadlessHarnessRunner()._capture_trace(reader, "test5678"))
+        asyncio.run(_capture_test_events(events, "test5678"))
     assert "secret-thought" not in caplog.text
     assert "customer-secret" not in caplog.text
