@@ -26,6 +26,7 @@ class AgentQuery(BaseModel):
     sessionId: str | None = Field(default=None, max_length=200)
     runId: UUID | None = None
     conversationId: UUID | None = None
+    displayQuestion: str | None = Field(default=None, max_length=4000)
     modelMode: Literal["deepseek", "free-test"] = "deepseek"
     publicGatewayConsent: bool = False
 
@@ -94,6 +95,7 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
             effective_session = conv.session_id  # Server owns the resumable session.
             previous, replay = history.reserve(
                 db, user.id, conv.id, run_id, body.question.strip(), body.modelMode,
+                display_question=body.displayQuestion,
             )
     if replay:
         async def cached():

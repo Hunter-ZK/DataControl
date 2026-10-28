@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api/v1/agent/conversations", tags=["agent-history"])
 class ConversationNew(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     modelMode: Literal["deepseek", "free-test"] = "deepseek"
+    contextAsset: dict[str, Any] | None = None
 
 
 class ConversationEdit(BaseModel):
@@ -52,7 +53,8 @@ def list_conversations(user: User = Depends(get_current_user)):
 def new_conversation(body: ConversationNew, user: User = Depends(get_current_user)):
     with SessionLocal() as db:
         return {"code": "OK", "data": history.serialize(db, history.create(
-            db, user.id, body.title.strip(), body.modelMode
+            db, user.id, body.title.strip(), body.modelMode,
+            context_asset=body.contextAsset,
         ))}
 
 

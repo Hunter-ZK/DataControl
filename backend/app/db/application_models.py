@@ -47,6 +47,7 @@ class AgentTurn(Base):
     conversation_id: Mapped[str] = mapped_column(ForeignKey("sys_agent_conversation.id"), nullable=False, index=True)
     model_mode: Mapped[str] = mapped_column(String(16), nullable=False)
     question: Mapped[str] = mapped_column(Text, nullable=False)
+    display_question: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
     result_json: Mapped[str | None] = mapped_column(Text)
     error: Mapped[str | None] = mapped_column(String(240))

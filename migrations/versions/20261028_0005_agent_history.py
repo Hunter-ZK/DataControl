@@ -35,12 +35,15 @@ def upgrade():
             sa.Column("conversation_id", sa.String(36), sa.ForeignKey("sys_agent_conversation.id"), nullable=False),
             sa.Column("model_mode", sa.String(16), nullable=False),
             sa.Column("question", sa.Text(), nullable=False),
+            sa.Column("display_question", sa.Text()),
             sa.Column("status", sa.String(24), nullable=False),
             sa.Column("result_json", sa.Text()),
             sa.Column("error", sa.String(240)),
             sa.Column("created_at", sa.DateTime(), nullable=False),
             sa.Column("finished_at", sa.DateTime()),
         )
+    elif "display_question" not in {c["name"] for c in inspector.get_columns("sys_agent_turn")}:
+        op.add_column("sys_agent_turn", sa.Column("display_question", sa.Text()))
     if not inspector.has_table("sys_agent_tool_event"):
         op.create_table(
             "sys_agent_tool_event",

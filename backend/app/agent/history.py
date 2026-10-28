@@ -90,7 +90,7 @@ def serialize(db: Session, conv: AgentConversation) -> dict:
         .order_by(AgentTurn.created_at, AgentTurn.id)
     ).scalars().all()
     for turn in turns:
-        messages.append({"role": "user", "text": turn.question})
+        messages.append({"role": "user", "text": turn.display_question or turn.question})
         if turn.status == "completed":
             result = _decode(turn.result_json, {})
             messages.append({
@@ -115,7 +115,7 @@ def serialize(db: Session, conv: AgentConversation) -> dict:
 
 
 def reserve(db: Session, user_id: int, conversation_id: str, run_id: str,
-            question: str, mode: str) -> tuple[AgentTurn, bool]:
+            question: str, mode: str, display_question: str | None = None) -> tuple[AgentTurn, bool]:
     conv = owned(db, user_id, conversation_id)
     if conv.model_mode != mode:
         raise HTTPException(409, "Cannot resume conversation with another model")
@@ -136,7 +136,8 @@ def reserve(db: Session, user_id: int, conversation_id: str, run_id: str,
         raise HTTPException(429, "User has reached the concurrent run limit")
     turn = AgentTurn(
         id=run_id, conversation_id=conversation_id, model_mode=mode,
-        question=question, status="queued", created_at=datetime.utcnow()
+        question=question, display_question=display_question or question,
+        status="queued", created_at=datetime.utcnow()
     )
     db.add(turn)
     try:
