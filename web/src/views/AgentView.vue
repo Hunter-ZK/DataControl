@@ -165,6 +165,7 @@ function chooseTier(value: 'standard' | 'multi') {
     return
   }
   taskTier.value = value
+  refreshStatus()
 }
 let statusRequestSerial = 0
 const agentUnavailableReason = computed(() => {
@@ -230,7 +231,7 @@ async function refreshStatus() {
   const serial = ++statusRequestSerial
   const chosen = modelMode.value
   try {
-    const state = await agentApi.status(chosen)
+    const state = await agentApi.status(chosen, taskTier.value)
     if (serial === statusRequestSerial && chosen === modelMode.value) status.value = state
   } catch {
     if (serial === statusRequestSerial) status.value = null

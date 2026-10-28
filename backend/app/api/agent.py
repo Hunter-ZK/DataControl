@@ -32,10 +32,11 @@ class AgentQuery(BaseModel):
 
 
 @router.get("/status")
-async def agent_status(modelMode: Literal["deepseek", "free-test"] = "deepseek"):
+async def agent_status(modelMode: Literal["deepseek", "free-test"] = "deepseek",
+                       taskTier: Literal["standard", "multi"] = "standard"):
     if modelMode != "deepseek":
         raise HTTPException(410, "Public free-model transport has been retired")
-    status = await EmbeddedAgentGateway().status(modelMode)
+    status = await EmbeddedAgentGateway().status(modelMode, taskTier)
     return {
         "code": "OK",
         "data": {
@@ -55,7 +56,7 @@ async def agent_query(body: AgentQuery, user: User = Depends(get_current_user)):
     if body.modelMode != "deepseek":
         raise HTTPException(410, detail="Public free-model transport has been retired")
     runtime = EmbeddedAgentGateway()
-    status = await runtime.status(body.modelMode)
+    status = await runtime.status(body.modelMode, body.taskTier)
     if not status.ready:
         raise HTTPException(
             503,
@@ -125,7 +126,7 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
                                    "runStatus": previous.status}, ensure_ascii=False) + "\n").encode("utf-8")
         return StreamingResponse(cached(), media_type="application/x-ndjson")
 
-    status = await runtime.status(body.modelMode)
+    status = await runtime.status(body.modelMode, body.taskTier)
     if not status.ready:
         if persisted:
             history.transition(run_id, "failed", error="Agent runtime not ready")

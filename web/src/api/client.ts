@@ -423,8 +423,9 @@ export const agentApi = {
     http.patch<{ code: string; data: ServerAgentConversation }>(`/agent/conversations/${id}`, data).then(r => r.data.data),
   deleteConversation: (id: string) => remove<{ deleted: boolean }>(`/agent/conversations/${id}`),
   runStatus: (runId: string) => get<{ status: string; runId: string; modelMode: AgentModelMode }>(`/agent/runs/${runId}`),
-  status: (modelMode: AgentModelMode = 'deepseek') =>
-    get<AgentStatus>('/agent/status', { params: { modelMode } }),
+  status: (modelMode: AgentModelMode = 'deepseek',
+    taskTier: 'standard' | 'multi' = 'standard') =>
+    get<AgentStatus>('/agent/status', { params: { modelMode, taskTier } }),
   query: (question: string, sessionId?: string | null, modelMode: AgentModelMode = 'deepseek') =>
     post<AgentResult>('/agent/query', {
       question, sessionId: sessionId || undefined, modelMode,

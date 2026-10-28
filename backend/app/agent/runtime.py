@@ -63,17 +63,20 @@ class EmbeddedAgentGateway:
     def _local_acceptance(self) -> dict[str, Any]:
         return self._read_json(self.agent_home.parent / ".local" / "p3-agent-acceptance.json")
 
-    async def _gateway_health(self, model_mode: str = "deepseek") -> tuple[bool, dict[str, Any]]:
+    async def _gateway_health(self, model_mode: str = "deepseek",
+                              task_tier: str = "standard") -> tuple[bool, dict[str, Any]]:
         try:
             # 8910 is a loopback process boundary. Ignore developer proxy env here.
             async with httpx.AsyncClient(timeout=1.5, trust_env=False) as client:
-                response = await client.get(f"{self.gateway_url}/health", params={"modelMode": model_mode})
+                response = await client.get(f"{self.gateway_url}/health",
+                                            params={"modelMode": model_mode, "taskTier": task_tier})
                 payload = response.json() if response.content else {}
                 return response.is_success, payload if isinstance(payload, dict) else {}
         except (httpx.HTTPError, ValueError):
             return False, {}
 
-    async def status(self, model_mode: str = "deepseek") -> RuntimeStatus:
+    async def status(self, model_mode: str = "deepseek",
+                     task_tier: str = "standard") -> RuntimeStatus:
         manifest = self._manifest()
         acceptance = self._local_acceptance()
         source_migrated = bool(manifest.get("sourceMigrated"))
@@ -106,7 +109,7 @@ class EmbeddedAgentGateway:
         elif not bridge_implemented:
             reason = "embedded DataAgent headless session bridge is not implemented"
         else:
-            reachable, gateway_health = await self._gateway_health(model_mode)
+            reachable, gateway_health = await self._gateway_health(model_mode, task_tier)
             if not reachable:
                 reason = f"embedded agent gateway is not reachable at {self.gateway_url}"
             elif not gateway_health.get("ready"):
@@ -139,7 +142,7 @@ class EmbeddedAgentGateway:
         model_mode: str = "deepseek", public_gateway_consent: bool = False,
         task_tier: str = "standard",
     ) -> dict[str, Any]:
-        status = await self.status(model_mode)
+        status = await self.status(model_mode, task_tier)
         if not status.ready:
             raise AgentRuntimeError(status.reason or "embedded Agent runtime is not ready")
         body: dict[str, Any] = {
@@ -178,7 +181,7 @@ class EmbeddedAgentGateway:
         model_mode: str = "deepseek", public_gateway_consent: bool = False,
         task_tier: str = "standard",
     ) -> AsyncIterator[bytes]:
-        status = await self.status(model_mode)
+        status = await self.status(model_mode, task_tier)
         if not status.ready:
             raise AgentRuntimeError(status.reason or "embedded Agent runtime is not ready")
         body: dict[str, Any] = {
