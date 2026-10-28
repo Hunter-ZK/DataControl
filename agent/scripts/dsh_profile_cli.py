@@ -7,6 +7,7 @@ Windows PowerShell 5.1 legacy console decoding/pipeline behavior.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -29,11 +30,22 @@ def main() -> int:
         parser.error("dsh CLI arguments are required")
     argv = [str(Path(options.executable).resolve()), *arguments]
     if os.name == "nt":
-        # Windows batch launch is explicit to avoid the cmd/code-page ambiguity
-        # of a PowerShell native stderr pipeline (especially with CJK paths).
-        exe, *rest = argv
-        tail = subprocess.list2cmdline(rest)
-        command = [os.environ.get("ComSpec", "cmd.exe"), "/d", "/s", "/c", f'""{exe}" {tail}"']
+        # Avoid cmd.exe and npm's dsh.cmd shim altogether. Windows cmd /s /c
+        # quoting is fragile for paths containing spaces/CJK characters.
+        # Invoke the pinned official JS bin using argument-vector subprocess.
+        package_json = Path(options.executable).parent.parent / "@deepseek-ai" / "dsh" / "package.json"
+        try:
+            pkg = json.loads(package_json.read_text(encoding="utf-8"))
+            if pkg.get("version") != "0.2.1-rc.3":
+                raise ValueError(f"unexpected installed dsh version: {pkg.get('version')}")
+            relative_bin = pkg["bin"]["dsh"]
+            entrypoint = (package_json.parent / relative_bin).resolve()
+            if not entrypoint.is_file():
+                raise FileNotFoundError(entrypoint)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            Path(options.stderr).write_text(f"Cannot resolve installed dsh JS entrypoint: {exc}\\n", encoding="utf-8")
+            return 125
+        command = ["node", str(entrypoint), *arguments]
     else:
         command = argv
     out_path, err_path = Path(options.stdout), Path(options.stderr)
