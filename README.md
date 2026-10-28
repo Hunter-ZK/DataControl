@@ -117,11 +117,26 @@ To stop stale DataControl listeners safely:
 ```
 
 ### macOS / Linux
+
+Recommended one-command launcher (first start installs missing dependencies, later
+starts reuse them):
+
 ```bash
-bash scripts/setup-dev.sh
-export DEEPSEEK_API_KEY="sk-..."    # required only for real Agent queries
-bash scripts/start-dev.sh
+bash start.sh          # setup if needed, then start Portal + Agent + Vue
+bash start.sh setup    # setup only; no services started
+bash start.sh repair   # repair Agent, then start
+bash start.sh stop     # stop stale DataControl backend services
 ```
+
+Requires Node.js 24+ and Python 3.13/3.14. On macOS, Homebrew users can install
+`python@3.14` and `node@24`. The start script can read
+`DEEPSEEK_API_KEY=...` from the private, git-ignored `.env`, without sourcing
+the file as shell commands. It also refreshes outdated Harness standard/multi
+profiles and applies Alembic schema upgrades without reseeding local data.
+
+For a full manual Mac checklist, see
+[docs/mac-manual-acceptance.md](docs/mac-manual-acceptance.md).
+
 
 To stop stale DataControl listeners safely:
 

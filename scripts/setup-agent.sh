@@ -49,7 +49,9 @@ echo "Installing wheel-compatible cryptography runtime..."
 "$PYTHON" -m pip install -e './agent[all]'
 
 (cd agent/dsh && npm install --no-audit --no-fund)
-(cd agent/guard-plugin && npm install --no-audit --no-fund && npm run build && npm test)
+# Installing or repairing a development runtime must not run its test suite.
+# CI retains the full guard-plugin tests; local setup only needs the built guard.
+(cd agent/guard-plugin && npm install --no-audit --no-fund && npm run build)
 DSH_HOME="$ROOT/.local/dsh-home-v0.2.1-rc.3" bash agent/scripts/setup_dataagent.sh
 
 "$PYTHON" -c 'import agent3, dataagent_gateway, cryptography; print("Agent Python imports OK; cryptography=" + cryptography.__version__)'
