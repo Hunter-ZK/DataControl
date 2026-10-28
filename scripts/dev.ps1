@@ -12,7 +12,7 @@ $local = Join-Path $root ".local"
 $python = Join-Path $root ".venv\Scripts\python.exe"
 $vite = Join-Path $root "web\node_modules\.bin\vite.cmd"
 $portalMarker = Join-Path $local "portal-setup-ready.txt"
-$agentMarker = Join-Path $local "agent-setup-v0.2.1-rc.3.ready"
+$agentMarker = Join-Path $local "agent-setup-v0.2.1-rc.3-profile2.ready"
 $dsh = Join-Path $root "agent\dsh\node_modules\.bin\dsh.cmd"
 $headless = Join-Path $local "dsh-home-v0.2.1-rc.3\profiles\dataagent-headless\package.json"
 

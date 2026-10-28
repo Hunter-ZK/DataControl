@@ -61,9 +61,6 @@
   disabled: true
 - id: tool-fs-search
   disabled: true
-- id: tool-ralph
-  disabled: true
-
 - id: skill-filesystem
   config:
     includeDefaultRoots: false

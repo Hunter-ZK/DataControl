@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -32,7 +33,6 @@ def test_headless_profile_enables_autonomy_but_blocks_unsafe_tools():
         "tool-jobs",
         "tool-fs",
         "tool-fs-search",
-        "tool-ralph",
         "tool-web",
     }
     enabled = {
@@ -74,3 +74,14 @@ def test_web_profile_uses_v021_declarative_preset_registry():
     assert "agent-preset-registry" in text
     assert "default: standard" in text
     assert "- id: agent-presets" not in text
+
+def test_overlays_reference_only_pinned_harness_plugin_ids():
+    """Guard against patching absent rows (e.g. removed tool-ralph)."""
+    registry = json.loads((AGENT_ROOT / "dsh" / "profile" / "pinned-plugin-ids.json").read_text(encoding="utf-8"))
+    assert registry["version"] == "0.2.1-rc.3"
+    for patch, mode in ((HEADLESS_PATCH, "headless"), (WEB_PATCH, "web")):
+        text = patch.read_text(encoding="utf-8")
+        root_ids = re.findall(r"(?m)^- id: ([\\w-]+)\\s*$", text)
+        unknown = sorted(set(root_ids) - set(registry[mode]))
+        assert not unknown, f"{patch.name} references absent dsh {mode} rows: {unknown}"
+    assert "tool-ralph" not in HEADLESS_PATCH.read_text(encoding="utf-8")

@@ -4,7 +4,7 @@ param([switch]$Repair)
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $local = Join-Path $root ".local"
-$marker = Join-Path $local "agent-setup-v0.2.1-rc.3.ready"
+$marker = Join-Path $local "agent-setup-v0.2.1-rc.3-profile2.ready"
 $dshRoot = Join-Path $root "agent\dsh"
 $dshModules = Join-Path $dshRoot "node_modules"
 $dshBin = Join-Path $dshModules ".bin\dsh.cmd"
@@ -45,16 +45,24 @@ try {
     & $python -c "import sys; raise SystemExit(0 if (3,13) <= sys.version_info[:2] < (3,15) else 1)"
     Assert-Exit "Python version validation"
 
-    if ($Repair -or -not (Test-Path $marker)) {
-      Remove-Item $marker -Force -ErrorAction SilentlyContinue
-      if (Test-Path $dshModules) {
-        Write-Host "[DataControl] Clearing only incomplete agent\dsh\node_modules..."
-        try {
-          Remove-Item -LiteralPath $dshModules -Recurse -Force -ErrorAction Stop
-        } catch {
-          throw "Cannot remove locked npm files. Close npm/Node.js processes using this folder, and retry .\start.bat repair. Details: $($_.Exception.Message)"
-        }
+    # A failed profile bootstrap must never trigger a full npm reinstall.
+    # Only a missing or wrong-version dsh dependency requires clearing its tree.
+    $installedPackage = Join-Path $dshModules "@deepseek-ai\\dsh\\package.json"
+    $installedVersion = ""
+    if (Test-Path $installedPackage) {
+      try { $installedVersion = (Get-Content $installedPackage -Raw -Encoding UTF8 | ConvertFrom-Json).version } catch {}
+    }
+    $requiresReinstall = (-not (Test-Path $dshBin)) -or ($installedVersion -ne "0.2.1-rc.3")
+    if ($requiresReinstall -and (Test-Path $dshModules)) {
+      Write-Host "[DataControl] Damaged/mismatched dsh package; rebuilding only node_modules..."
+      try {
+        Remove-Item -LiteralPath $dshModules -Recurse -Force -ErrorAction Stop
+      } catch {
+        throw "Cannot remove locked npm files. Close other Node/npm processes and retry. Details: $($_.Exception.Message)"
       }
+    }
+    if (-not $requiresReinstall) {
+      Write-Host "[DataControl] dsh 0.2.1-rc.3 installed; refreshing profile without npm reinstall."
     }
 
     & $python -m pip install --only-binary=:all: "cryptography>=48.0.1,<49"
