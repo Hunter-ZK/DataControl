@@ -102,9 +102,10 @@ async def query_stream(body: QueryRequest):
                 yield _json_line({"type": "result", "result": answer})
             except asyncio.CancelledError:
                 yield _json_line({"type": "cancelled"})
-            except HarnessRunError:
+            except HarnessRunError as exc:
                 LOG.exception("[AgentStream:%s] task failed", run_id[:8])
-                yield _json_line({"type": "error", "message": "Agent 处理失败，请查看服务端日志。"})
+                reason = "timeout" if "exceeded" in str(exc).lower() or "timeout" in str(exc).lower() else "failed"
+                yield _json_line({"type": "error", "reason": reason, "message": "Agent 处理失败，请查看服务端日志。"})
             except Exception:
                 LOG.exception("[AgentStream:%s] unexpected failure", run_id[:8])
                 yield _json_line({"type": "error", "message": "Agent 处理异常，请查看服务端日志。"})

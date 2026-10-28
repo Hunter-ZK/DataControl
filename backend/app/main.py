@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -17,7 +18,14 @@ from backend.app.db.application_models import AuditLog, SearchHistory, AgentConv
 
 P3_RUNTIME_CONTRACT = "embedded-agent-gateway-v1"
 
-app = FastAPI(title="DataControl API", version="0.5.0-p2")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from backend.app.agent.history import reconcile_startup
+    reconcile_startup()
+    yield
+
+
+app = FastAPI(title="DataControl API", version="0.5.0-p2", lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(assets_router)
 app.include_router(details_router)
@@ -84,9 +92,3 @@ def spa_fallback(full_path: str):
     if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="API route not found")
     return _spa_response(full_path)
-
-
-@app.on_event("startup")
-def recover_stale_agent_runs():
-    from backend.app.agent.history import reconcile_startup
-    reconcile_startup()
