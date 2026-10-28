@@ -10,7 +10,7 @@
       </div>
       <button @click="copySql"><Copy :size="15" />复制</button>
     </div>
-    <pre><code>{{ sql }}</code></pre>
+    <div class="code-editor" role="region" aria-label="生成的 SQL"><div class="editor-gutter"><span v-for="(_,i) in sqlLines" :key="i">{{i+1}}</span></div><pre><code>{{sql}}</code></pre></div>
   </section>
 </template>
 
@@ -23,6 +23,7 @@ import { displaySql, riskLabel, showRisk, sqlStatusText, statementLabel, validat
 
 const props = defineProps<{ message: AgentMessage }>()
 const sql = computed(() => displaySql(props.message))
+const sqlLines = computed(() => sql.value.split('\n'))
 
 async function copySql() {
   try {
@@ -52,4 +53,17 @@ async function copySql() {
 .risk-chip.risk-critical { color: #862929; background: #f1b3b3; }
 pre { margin: 0; padding: 18px 20px; overflow: auto; white-space: pre; tab-size: 2; }
 code { color: #e3eef4; font: 14px/1.75 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+
+
+.sql-card{background:#101d37;border-color:#abc5e9;border-radius:13px;box-shadow:0 7px 24px rgba(19,50,99,.13)}
+.block-head{background:linear-gradient(98deg,#f1f6ff,#fff);min-height:55px;padding:0 17px;border-color:#d5e3f6}
+.block-head b{font-size:14px;color:#203d67}
+.block-head button{font-size:13px;border-color:#c6d8f4;color:#285fc5;border-radius:8px;padding:7px 12px}
+.sql-type,.sql-state,.risk-chip{font-size:12px;border-radius:7px}
+.sql-type{background:#dfeaff;color:#2b64c7}
+.code-editor{display:flex;overflow:auto;background:linear-gradient(138deg,#0e1e3b,#142647);tab-size:2}
+.editor-gutter{position:sticky;left:0;flex:none;display:flex;flex-direction:column;padding:18px 11px 18px 17px;text-align:right;min-width:43px;background:#122340;color:#6280a7;user-select:none;font:13px/1.85 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;border-right:1px solid #2b4464}
+.code-editor pre{flex:1;min-width:max-content;padding:18px 19px;margin:0;overflow:visible;white-space:pre}
+.code-editor code{font:13px/1.85 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#d7e7ff}
+
 </style>

@@ -3,14 +3,14 @@
     <div class="dc-container agent-page">
       <header class="agent-head">
         <div>
-          <span class="dc-eyebrow">INTELLIGENT DATA Q&A</span>
-          <h1>DataAgent 智能工作台</h1>
-          <p>根据数据资产与指标口径生成可核验的 SQL 和开发草案；有歧义时先确认，不执行生产任务。</p>
+          <span class="dc-eyebrow">✦ DATA INTELLIGENCE COPILOT</span>
+          <h1>DataAgent <span>智能工作台</span></h1>
+          <p>让数仓知识参与每一次问答：检索数据资产、解释指标口径、生成 SQL 与开发草案。</p>
         </div>
         <span class="service-status" :class="{ ready: status?.ready }"><i></i>{{ status?.ready ? '服务正常' : '服务未就绪' }}</span>
       </header>
 
-      <section class="agent-workspace dc-card" :class="{ 'mobile-history-open': mobileHistoryOpen }">
+      <section class="agent-workspace dc-card" :class="{ 'mobile-history-open': mobileHistoryOpen, 'inspector-visible': inspectorOpen }">
         <AgentConversationSidebar
           :groups="conversationGroups"
           :count="conversations.length"
@@ -29,10 +29,8 @@
             <History :size="16"/> {{ mobileHistoryOpen ? '关闭历史' : '查看历史会话' }}
           </button>
           <div class="chat-model-bar">
-            <button class="inspector-toggle" @click="inspectorOpen=!inspectorOpen">
-              <PanelRight :size="15"/>{{ inspectorOpen ? '隐藏检查器' : '查看检查器' }}
-            </button>
-            <span class="chat-model-label">对话模型</span>
+            <div class="model-bar-brand"><Sparkles :size="21"/><span>DataAgent</span></div>
+            <span class="chat-model-label">模型</span>
             <div class="model-options" role="group" aria-label="选择当前对话模型">
               <button type="button" :class="{selected:modelMode==='deepseek'}" :disabled="loading" @click="chooseModel('deepseek')">DeepSeek 官方</button>
               <button type="button" :class="{selected:modelMode==='free-test'}" :disabled="loading" @click="chooseModel('free-test')"><FlaskConical :size="14"/>免费模型测试</button>
@@ -43,7 +41,9 @@
               <button type="button" :class="{active:taskTier==='multi'}" :disabled="loading"
                 @click="chooseTier('multi')">多步任务</button>
             </div>
-            <span class="model-context">{{ modelMode==='free-test' ? '第三方公共网关 · 模拟数据测试' : '官方 DeepSeek · '+(taskTier==='multi'?'多步规划':'标准 SQL 问数')+' · 不执行 SQL' }}</span>
+            <button class="inspector-toggle" :class="{active:inspectorOpen}" @click="inspectorOpen=!inspectorOpen">
+              <PanelRight :size="18"/>{{ inspectorOpen ? '收起工作面板' : '展开工作面板' }}
+            </button>
           </div>
           <div v-if="modelMode==='free-test'" class="runtime-warning"><TriangleAlert :size="18"/><span>免费模型使用第三方公共网关，可能记录问题及工具信息。仅测试模拟数据；不得输入真实业务、内部 SQL、账号或个人信息。</span></div>
           <div v-if="contextAsset" class="context-strip">
@@ -55,12 +55,18 @@
 
           <div ref="messageBox" class="messages">
             <div v-if="messages.length === 0" class="welcome">
-              <div class="welcome-icon"><Sparkles :size="26" /></div>
-              <h2>想查什么数据？</h2>
-              <p>我会先解析内部可信语义；如果一个问题对应多个统计口径，会直接给出选项让你确认。</p>
+              <div class="welcome-icon"><Sparkles :size="36" /></div>
+              <span class="welcome-label">YOUR DATA COPILOT</span>
+              <h2>今天，想探索什么数据？</h2>
+              <p>从一个问题开始，DataAgent 将结合现有元数据与业务口径，为你提供有依据的回答和经过静态校验的 SQL。</p>
+              <div class="prompt-heading"><span>你可以尝试</span><small>点击填入提问框</small></div>
               <div class="prompt-grid">
-                <button v-for="item in quickPrompts" :key="item" @click="usePrompt(item)">{{ item }}<ArrowUpRight :size="15" /></button>
+                <button v-for="(item,index) in quickPrompts" :key="item" @click="usePrompt(item)">
+                  <span class="prompt-icon"><component :is="[Database, ChartNoAxesCombined, Code2, ShieldCheck][index%4]" :size="24"/></span>
+                  <span>{{ item }}</span><ArrowUpRight :size="17" />
+                </button>
               </div>
+              <p class="welcome-note"><ShieldCheck :size="16"/>只生成与校验 SQL，不执行生产查询</p>
             </div>
 
             <AgentMessageView
@@ -105,13 +111,13 @@
                 @input="resizeComposer"
                 @keydown.enter.exact.prevent="submit"
               />
-              <button class="send" :disabled="!status?.ready || loading || !question.trim()" @click="submit"><Send :size="19" /></button>
+              <button class="send" :disabled="!status?.ready || loading || !question.trim()" @click="submit" title="发送问题" aria-label="发送问题"><ArrowUp :size="22" /></button>
             </div>
-            <div class="composer-hint"><span>Enter 发送 · Shift+Enter 换行</span><span><ShieldCheck :size="14" />内部证据 · 静态校验 · 不执行生产 SQL</span></div>
+            <div class="composer-hint"><span>Enter 发送 · Shift+Enter 换行</span><span><ShieldCheck :size="16" />资产依据 · SQL 静态校验 · 不执行查询</span></div>
           </div>
         </section>
         <aside v-if="inspectorOpen" class="agent-inspector" aria-label="依据与 SQL 检查器">
-          <header><b>结果检查器</b><small>来自实际工具与校验结果</small></header>
+          <header><div><b>工作面板</b><small>证据、SQL 和工具活动</small></div><button @click="inspectorOpen=false" title="收起面板" aria-label="收起面板"><X :size="17"/></button></header>
           <nav class="inspector-tabs" aria-label="检查器页面">
             <button :class="{active:inspectorTab==='evidence'}" @click="inspectorTab='evidence'">数据依据</button>
             <button :class="{active:inspectorTab==='sql'}" @click="inspectorTab='sql'">SQL 校验</button>
@@ -146,7 +152,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpRight, Copy, Database, FlaskConical, History, LoaderCircle, PanelRight, RotateCcw, Send, ShieldCheck, Sparkles, Square, ThumbsDown, ThumbsUp, TriangleAlert, X } from 'lucide-vue-next'
+import { ArrowUp, ArrowUpRight, ChartNoAxesCombined, Code2, Copy, Database, FlaskConical, History, LoaderCircle, PanelRight, RotateCcw, ShieldCheck, Sparkles, Square, ThumbsDown, ThumbsUp, TriangleAlert, X } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { agentApi, assetApi, type AgentActivity, type AgentModelMode, type AgentResult, type AgentStatus, type AgentStreamEvent, AgentTurnCancelledError } from '@/api/client'
 import AgentConversationSidebar from '@/components/agent/AgentConversationSidebar.vue'
@@ -204,7 +210,7 @@ const agentUnavailableReason = computed(() => {
     : 'Agent 暂不可用：请查看启动终端的 Gateway/MCP 状态和日志。'
 })
 const mobileHistoryOpen = ref(false)
-const inspectorOpen = ref(true)
+const inspectorOpen = ref(false)
 const inspectorTab = ref<'evidence' | 'sql' | 'steps'>('evidence')
 const question = ref('')
 const loading = ref(false)
@@ -741,4 +747,70 @@ onMounted(async () => {
 .answer-quick-actions button:hover,.followup-prompts button:hover{border-color:#bcd3f8;color:var(--dc-primary);background:#f8fbff}
 @media(max-width:1200px){.agent-workspace{grid-template-columns:205px minmax(0,1fr)}}
 @media(max-width:760px){.agent-screen{height:calc(100dvh - var(--dc-topbar));min-height:640px}.agent-head p{display:none}.agent-head h1{font-size:21px}.chat-model-bar{gap:6px;padding:8px}.model-context{display:none}.messages{padding:20px 12px}.agent-workspace{grid-template-columns:1fr}}
+
+
+/* Atlas Agent: AI-native conversation, more expressive but evidence-first */
+.agent-screen{background:radial-gradient(ellipse at 60% 0,#e2efff,transparent 47%),var(--dc-bg);height:calc(100dvh - var(--dc-topbar));min-height:680px;padding:15px 0 17px}
+.agent-page{width:min(calc(100% - 30px),1540px);max-width:1540px}
+.agent-head{align-items:center;padding-bottom:13px}
+.agent-head .dc-eyebrow{font-size:12px;letter-spacing:.105em}
+.agent-head h1{font-size:27px;letter-spacing:-.03em;font-weight:790;color:#1a3969;margin:2px 0}
+.agent-head h1 span{color:#396ed1}
+.agent-head p{font-size:13px;max-width:900px;color:#5e7596}
+.service-status{border-radius:9px;padding:8px 12px}
+.agent-workspace{grid-template-columns:248px minmax(0,1fr)!important;border-radius:16px;border-color:#bed3ee;box-shadow:0 16px 39px rgba(34,82,155,.13)}
+.agent-workspace.inspector-visible{grid-template-columns:248px minmax(0,1fr) 334px!important}
+.chat-shell{min-width:0;background:#fff}
+.chat-model-bar{display:flex;flex-wrap:wrap;align-items:center;gap:9px;padding:12px 19px;background:linear-gradient(100deg,#f8fbff,#fff);border-bottom:1px solid #dae6f7}
+.model-bar-brand{display:flex;align-items:center;gap:8px;margin-right:6px;color:#2b63d1;font-size:16px;font-weight:790;white-space:nowrap}
+.model-bar-brand svg{color:#3774eb}
+.chat-model-label{font-size:12px;color:#8698b1}
+.model-options,.tier-options{background:#ecf3ff;border:1px solid #cbdcf4;border-radius:10px;padding:4px;gap:2px}
+.model-options button,.tier-options button{font-size:13px;font-weight:650;padding:8px 11px;border-radius:7px}
+.model-options button.selected,.tier-options button.active{background:#fff;border-color:#c4d6f3;color:#286be4;box-shadow:0 3px 9px rgba(33,87,167,.11)}
+.inspector-toggle{margin-left:auto;display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid #d0def4;background:#fff;border-radius:9px;color:#4772b1;font-size:13px;font-weight:730}
+.inspector-toggle:hover,.inspector-toggle.active{background:#eaf2ff;color:#215fcf}
+.messages{background:radial-gradient(ellipse 600px 430px at 52% 0,#f5f9ff 0%,#fff 80%);padding:25px clamp(22px,3vw,48px)}
+.welcome{max-width:785px;margin:4vh auto 0;text-align:center}
+.welcome-icon{width:77px;height:77px;border-radius:24px;background:linear-gradient(145deg,#2b66e7,#59a0ff);color:#fff;border:1px solid #8abbff;box-shadow:0 16px 35px rgba(39,104,213,.25),inset 0 1px rgba(255,255,255,.3);margin:0 auto 17px}
+.welcome-label{display:block;letter-spacing:.14em;color:#5182d2;font-size:12px;font-weight:800;margin-bottom:8px}
+.welcome h2{font-size:32px;letter-spacing:-.025em;color:#193a69;font-weight:800}
+.welcome>p{font-size:15px;line-height:1.85;color:#6b81a2;max-width:630px;margin:11px auto 25px}
+.prompt-heading{display:flex;justify-content:space-between;align-items:center;text-align:left;margin:14px 1px 11px;color:#36567e;font-size:15px;font-weight:770}
+.prompt-heading small{font-size:12px;color:#9badc3;font-weight:550}
+.prompt-grid{gap:13px}
+.prompt-grid button{min-height:95px;display:flex;align-items:center;gap:13px;text-align:left;padding:18px;border-radius:13px;background:linear-gradient(145deg,#fff,#f7faff);border:1px solid #ccdff7;box-shadow:0 6px 17px rgba(45,91,158,.065);color:#304f76;font-size:14px;font-weight:660;transition:transform .17s,box-shadow .17s}
+.prompt-grid button:hover{transform:translateY(-2px);border-color:#91b8f4;background:#eef6ff;box-shadow:0 12px 29px rgba(38,100,183,.14)}
+.prompt-grid button>span:nth-child(2){flex:1}
+.prompt-icon{display:grid;place-items:center;width:47px;height:47px;flex:none;border-radius:13px;background:#e6f0ff;color:#3477e2}
+.prompt-grid button:nth-child(2) .prompt-icon{background:#efeaff;color:#7d65d2}
+.prompt-grid button:nth-child(3) .prompt-icon{background:#e3f7ff;color:#1486b7}
+.prompt-grid button:nth-child(4) .prompt-icon{background:#e4f7ef;color:#0e8c6a}
+.welcome>p.welcome-note{margin:22px auto 0;display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:#8ba0ba}
+.runtime-warning{font-size:13px}
+.messages .loading-answer{background:#fff;border:1px solid #d3e2f6;box-shadow:0 9px 24px rgba(40,89,162,.06);padding:18px 20px;border-radius:14px}
+.loading-answer p{margin-left:40px;font-size:13px}
+.agent-avatar{background:#e7f0ff;color:#2769d7}
+.composer-wrap{padding:14px 23px 16px;border-top:1px solid #dce7f8;background:#fff}
+.composer{border:1.5px solid #b5ccef;border-radius:14px;padding:10px 10px 10px 17px;background:#fff;box-shadow:0 5px 19px rgba(36,88,163,.08)}
+.composer:focus-within{border-color:#5590ef;box-shadow:0 0 0 4px rgba(37,99,235,.08),0 9px 25px rgba(36,88,163,.1)}
+.composer textarea{font-size:15px;color:#213e68;padding:6px 4px;line-height:1.6}
+.composer textarea::placeholder{color:#99aac3}
+.send{width:44px;height:44px;border-radius:10px;background:linear-gradient(125deg,#2a66eb,#4c8cf3);box-shadow:0 6px 17px rgba(43,103,219,.19)}
+.send:hover{background:#1c5bda}
+.composer-hint{font-size:12px;margin-top:8px;color:#90a2b9}
+.agent-inspector{background:#f9fbff;border-left:1px solid #d4e2f6}
+.agent-inspector header{display:flex;align-items:center;justify-content:space-between;padding:17px 17px 13px;gap:10px;border-bottom:1px solid #e5edf8}
+.agent-inspector header>div{display:grid;gap:3px}
+.agent-inspector header b{font-size:17px;color:#24436c}
+.agent-inspector header small{font-size:12px;color:#8ba0ba}
+.agent-inspector header button{border:0;border-radius:7px;display:grid;place-items:center;width:29px;height:29px;background:#eaf2ff;color:#477aca;cursor:pointer}
+.inspector-tabs{padding:9px 10px;border-bottom:1px solid #dce6f5}
+.inspector-tabs button{font-size:13px;font-weight:630}
+.inspector-tabs button.active{background:#e6f0ff;color:#2769d8}
+.inspector-content{padding:15px}
+.answer-quick-actions button,.followup-prompts button{font-size:13px;padding:9px 12px}
+@media(max-width:1250px){.agent-workspace{grid-template-columns:220px minmax(0,1fr)!important}.agent-workspace.inspector-visible{grid-template-columns:220px minmax(0,1fr)!important}.agent-inspector{display:flex!important;position:absolute;right:0;top:0;bottom:0;width:min(355px,90vw);z-index:25;box-shadow:-12px 0 32px rgba(15,53,113,.19)}.agent-workspace{position:relative}}
+@media(max-width:760px){.agent-screen{padding:8px 0 10px;min-height:600px}.agent-page{width:calc(100% - 16px)}.agent-head{padding:0 5px 10px}.agent-head h1{font-size:21px}.agent-head p{display:none}.agent-workspace{grid-template-columns:1fr!important}.agent-workspace.inspector-visible{grid-template-columns:1fr!important}.chat-model-bar{padding:9px;gap:7px}.model-bar-brand{font-size:14px}.model-bar-brand svg{width:17px}.model-options button,.tier-options button{padding:7px 9px;font-size:12px}.chat-model-label{display:none}.inspector-toggle{margin-left:0}.welcome{margin:3vh auto 0}.welcome h2{font-size:24px}.welcome>p{font-size:13px}.welcome-icon{width:60px;height:60px}.prompt-grid{grid-template-columns:1fr 1fr;gap:8px}.prompt-grid button{min-height:88px;padding:12px;flex-direction:column;align-items:flex-start;font-size:12px;gap:7px}.prompt-icon{width:35px;height:35px}.composer-wrap{padding:9px}.composer textarea{font-size:14px}.messages{padding:18px 13px}}
+
 </style>

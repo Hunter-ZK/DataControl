@@ -17,7 +17,7 @@
           {{ sqlStatusText(message) }}
         </span>
       </div>
-      <AgentTaskJourney v-if="message.events?.length" :events="message.events" :tier="tier" :running="false"/>
+      <details v-if="message.events?.length" class="answer-progress"><summary><ListChecks :size="17"/>任务执行进度 <ChevronDown :size="17"/></summary><AgentTaskJourney :events="message.events" :tier="tier" :running="false"/></details>
       <div class="answer-content">
         <AgentMarkdown :text="message.text" />
         <AgentClarification
@@ -50,7 +50,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { AlertCircle, CheckCircle2, ChevronDown, FileSearch, Sparkles } from 'lucide-vue-next'
+import { AlertCircle, CheckCircle2, ChevronDown, FileSearch, ListChecks, Sparkles } from 'lucide-vue-next'
 import AgentClarification from '@/components/agent/AgentClarification.vue'
 import AgentEvidence from '@/components/agent/AgentEvidence.vue'
 import AgentMarkdown from '@/components/agent/AgentMarkdown.vue'
@@ -119,4 +119,25 @@ const hasSupportingDetails = computed(() => {
 .supporting-details{background:#fbfcff;border-color:var(--dc-border)}
 .supporting-details summary{color:#526986}
 .details-meta{font-size:12px}
+
+
+.message{margin-bottom:27px}
+.user-bubble{max-width:min(82%,760px);font-size:15px;line-height:1.75;background:linear-gradient(110deg,#e9f2ff,#f2f7ff);color:#25456e;border-color:#c7dbfa;padding:15px 19px;border-radius:16px 16px 5px 16px}
+.assistant-answer{max-width:1000px;background:#fff;border:1px solid #d5e3f6;border-radius:15px;padding:21px 23px;box-shadow:0 7px 25px rgba(30,83,159,.055)}
+.assistant-identity{font-size:15px;color:#203f6d}
+.agent-avatar{width:36px;height:36px;border-radius:11px;background:linear-gradient(125deg,#e0ebff,#eff5ff);color:#3477e6}
+.assistant-caption{font-size:12px}
+.answer-content{padding:19px 0 6px}
+.answer-status{font-size:12px;font-weight:700}
+.answer-progress{margin-top:12px;background:#f6f9ff;border:1px solid #e0eafa;border-radius:10px}
+.answer-progress summary{display:flex;align-items:center;gap:9px;cursor:pointer;padding:12px 14px;font-size:13px;color:#3970cb;font-weight:730;list-style:none}
+.answer-progress summary::-webkit-details-marker{display:none}
+.answer-progress summary>svg:last-child{margin-left:auto;transition:transform .17s}
+.answer-progress[open] summary>svg:last-child{transform:rotate(180deg)}
+.answer-progress :deep(.task-journey){border:0;border-top:1px solid #e0eafa;margin:0;border-radius:0;background:#f9fbff}
+.supporting-details{background:#f7faff;border-color:#d7e5f9}
+.supporting-details summary{font-size:13px;color:#3c639b}
+.details-summary{font-size:13px}
+@media(max-width:760px){.assistant-answer{padding:15px;border-radius:12px}.user-bubble{max-width:96%;font-size:14px}.answer-content{padding:13px 0}}
+
 </style>

@@ -38,4 +38,18 @@ const html = computed(() => renderAgentMarkdown(props.text, props.summary))
 .agent-markdown :deep(tr:nth-child(even) td) { background:#fafcfd; }
 .agent-markdown :deep(a) { color:#16739a; text-decoration:underline; text-underline-offset:2px; }
 .agent-markdown :deep(hr) { border:0; border-top:1px solid #e3edf2; margin:17px 0; }
+
+
+.agent-markdown{font-size:15px;color:#324b6f;line-height:1.9}
+.agent-markdown :deep(h1),.agent-markdown :deep(h2),.agent-markdown :deep(h3){color:#193965}
+.agent-markdown :deep(h2){font-size:19px}
+.agent-markdown :deep(h3){font-size:16px}
+.agent-markdown :deep(strong){color:#1b4a88}
+.agent-markdown :deep(blockquote){border-color:#6da0ef;background:#edf5ff;color:#46688f}
+.agent-markdown :deep(code){font-size:13px;background:#eaf2ff;color:#285fc1}
+.agent-markdown :deep(pre){background:#111f3b}
+.agent-markdown :deep(th){background:#ecf3ff;color:#2d517b}
+.agent-markdown :deep(td){font-size:14px}
+.agent-markdown :deep(a){color:#276bd8}
+
 </style>
