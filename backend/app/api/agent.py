@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 import json
 import logging
+import os
 from uuid import UUID
 from typing import Literal
 
@@ -31,11 +32,24 @@ class AgentQuery(BaseModel):
     publicGatewayConsent: bool = False
 
 
+def check_public_test(mode: str, consent: bool = False) -> None:
+    if mode != "free-test":
+        return
+    if os.getenv("DATACONTROL_ENABLE_FREE_TEST") != "1":
+        raise HTTPException(403, "Public model tests must be explicitly enabled on this local installation")
+    if not consent:
+        raise HTTPException(403, "Public model test requires explicit consent for each turn")
+
+
 @router.get("/status")
 async def agent_status(modelMode: Literal["deepseek", "free-test"] = "deepseek",
                        taskTier: Literal["standard", "multi"] = "standard"):
-    if modelMode != "deepseek":
-        raise HTTPException(410, "Public free-model transport has been retired")
+    if modelMode == "free-test" and os.getenv("DATACONTROL_ENABLE_FREE_TEST") != "1":
+        return {"code": "OK", "data": {
+            "ready": False, "reason": "公开免费模型测试默认关闭；仅在本机用 DATACONTROL_ENABLE_FREE_TEST=1 启用",
+            "modelMode": "free-test", "sqlExecutionEnabled": False,
+            "hiddenReasoningExposed": False,
+        }}
     status = await EmbeddedAgentGateway().status(modelMode, taskTier)
     return {
         "code": "OK",
@@ -53,8 +67,7 @@ async def agent_query(body: AgentQuery, user: User = Depends(get_current_user)):
     # A caller-controlled dsh session could otherwise cross user boundaries.
     if body.sessionId or body.conversationId:
         raise HTTPException(400, detail="Use authenticated conversation stream for continuation")
-    if body.modelMode != "deepseek":
-        raise HTTPException(410, detail="Public free-model transport has been retired")
+    check_public_test(body.modelMode, body.publicGatewayConsent)
     runtime = EmbeddedAgentGateway()
     status = await runtime.status(body.modelMode, body.taskTier)
     if not status.ready:
@@ -87,8 +100,7 @@ LOG = logging.getLogger("uvicorn.error")
 async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_optional_user)):
     if body.runId is None:
         raise HTTPException(422, detail="runId is required")
-    if body.modelMode != "deepseek":
-        raise HTTPException(410, detail="Public free-model transport has been retired")
+    check_public_test(body.modelMode, body.publicGatewayConsent)
     if user is None:
         raise HTTPException(401, detail="Agent login is required")
     if body.conversationId is None:

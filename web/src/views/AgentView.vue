@@ -34,7 +34,8 @@
             </button>
             <span class="chat-model-label">对话模型</span>
             <div class="model-options" role="group" aria-label="选择当前对话模型">
-              <span class="fixed-model">DeepSeek 官方</span>
+              <button type="button" :class="{selected:modelMode==='deepseek'}" :disabled="loading" @click="chooseModel('deepseek')">DeepSeek 官方</button>
+              <button type="button" :class="{selected:modelMode==='free-test'}" :disabled="loading" @click="chooseModel('free-test')"><FlaskConical :size="14"/>免费模型测试</button>
             </div>
             <div class="tier-options" role="group" aria-label="选择任务类型">
               <button type="button" :class="{active:taskTier==='standard'}" :disabled="loading"
@@ -42,8 +43,9 @@
               <button type="button" :class="{active:taskTier==='multi'}" :disabled="loading"
                 @click="chooseTier('multi')">多步任务</button>
             </div>
-            <span class="model-context">官方 DeepSeek · {{taskTier==='multi'?'多步规划':'标准 SQL 问数'}} · 不执行 SQL</span>
+            <span class="model-context">{{ modelMode==='free-test' ? '第三方公共网关 · 模拟数据测试' : '官方 DeepSeek · '+(taskTier==='multi'?'多步规划':'标准 SQL 问数')+' · 不执行 SQL' }}</span>
           </div>
+          <div v-if="modelMode==='free-test'" class="runtime-warning"><TriangleAlert :size="18"/><span>免费模型使用第三方公共网关，可能记录问题及工具信息。仅测试模拟数据；不得输入真实业务、内部 SQL、账号或个人信息。</span></div>
           <div v-if="contextAsset" class="context-strip">
             <Database :size="17" />
             <div><span>当前数据资产</span><b>{{ contextAsset.bizName || contextAsset.tableName }}</b><code>{{ contextAsset.tableName }}</code></div>
@@ -141,7 +143,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpRight, Copy, Database, History, LoaderCircle, PanelRight, RotateCcw, Send, ShieldCheck, Sparkles, Square, ThumbsDown, ThumbsUp, TriangleAlert, X } from 'lucide-vue-next'
+import { ArrowUpRight, Copy, Database, FlaskConical, History, LoaderCircle, PanelRight, RotateCcw, Send, ShieldCheck, Sparkles, Square, ThumbsDown, ThumbsUp, TriangleAlert, X } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { agentApi, assetApi, type AgentActivity, type AgentModelMode, type AgentResult, type AgentStatus, type AgentStreamEvent, AgentTurnCancelledError } from '@/api/client'
 import AgentConversationSidebar from '@/components/agent/AgentConversationSidebar.vue'
@@ -157,6 +159,20 @@ const route = useRoute()
 const router = useRouter()
 const status = ref<AgentStatus | null>(null)
 const modelMode = ref<AgentModelMode>('deepseek')
+async function chooseModel(value: AgentModelMode) {
+  if (loading.value || modelMode.value === value) return
+  if (messages.value.length) {
+    ElMessage.warning('请新建会话后切换模型，防止第三方与官方上下文混用。')
+    return
+  }
+  if (value === 'free-test' && contextAsset.value) {
+    ElMessage.warning('已绑定资产的会话不能切换到公共网关测试模式。请使用纯模拟问题。')
+    return
+  }
+  modelMode.value = value
+  taskTier.value = 'standard'
+  await refreshStatus()
+}
 const taskTier = ref<'standard' | 'multi'>('standard')
 function chooseTier(value: 'standard' | 'multi') {
   if (loading.value) return
@@ -254,7 +270,7 @@ async function loadContext() {
 
 function restoreConversation(conversation: AgentConversation) {
   taskTier.value = conversation.taskTier === 'multi' ? 'multi' : 'standard'
-  modelMode.value = 'deepseek'
+  modelMode.value = conversation.modelMode
   sessionId.value = null
   messages.value = [...conversation.messages]
   contextAsset.value = conversation.contextAsset ? { ...conversation.contextAsset } : null
@@ -410,11 +426,24 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
     return
   }
   const existing = conversations.value.find(c => c.id === activeConversationId.value)
-  if (existing?.modelMode === 'free-test') {
-    ElMessage.warning('旧免费测试会话只可查看，请创建新的官方模型会话。')
+  const selectedMode = modelMode.value
+  if (existing && existing.modelMode !== selectedMode) {
+    ElMessage.warning('会话模型不一致，请新建会话。')
     return
   }
-  const selectedMode: AgentModelMode = 'deepseek'
+  if (selectedMode === 'free-test') {
+    if (contextAsset.value) {
+      ElMessage.error('公共测试模式不允许绑定业务资产。')
+      return
+    }
+    try {
+      await ElMessageBox.confirm(
+        '这次提问及模型请求中的工具资料会传输到第三方公共模型网关，并可能被记录。仅限本地模拟数据，不得传输内部资料。确认继续本轮测试？',
+        '第三方模型：每轮确认',
+        { confirmButtonText:'确认发送模拟数据', cancelButtonText:'取消', type:'warning' },
+      )
+    } catch { return }
+  }
   if (!activeConversationId.value) {
     createConversation(createTitle || displayText, contextAsset.value, selectedMode, taskTier.value)
   }
@@ -432,7 +461,7 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
         loading.value = false
         ElMessage.error('无法创建服务端会话，已阻止本轮请求，请检查登录状态和服务。')
         messages.value.pop()
-        syncActive(messages.value, null, contextAsset.value, 'deepseek')
+        syncActive(messages.value, null, contextAsset.value, selectedMode)
         return
       }
     }
@@ -446,7 +475,7 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
     const serverId = conversations.value.find((c) => c.id === activeConversationId.value)?.serverId || null
     const result = await agentApi.stream(prompt, sessionId.value, activeRunId,
       onAgentStreamEvent, activeController.signal, selectedMode, serverId, displayText,
-      taskTier.value)
+      taskTier.value, selectedMode==='free-test')
     reportAgentDevtools(result)
     if (result.sessionId) sessionId.value = result.sessionId
     messages.value.push(assistantMessage(result))

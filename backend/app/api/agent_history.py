@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/v1/agent/conversations", tags=["agent-history"])
 
 class ConversationNew(BaseModel):
     title: str = Field(min_length=1, max_length=200)
-    modelMode: Literal["deepseek"] = "deepseek"
+    modelMode: Literal["deepseek", "free-test"] = "deepseek"
     taskTier: Literal["standard", "multi"] = "standard"
     contextAsset: dict[str, Any] | None = None
 
@@ -53,6 +53,9 @@ def list_conversations(user: User = Depends(get_current_user)):
 
 @router.post("")
 def new_conversation(body: ConversationNew, user: User = Depends(get_current_user)):
+    if body.modelMode == "free-test":
+        from backend.app.api.agent import check_public_test
+        check_public_test(body.modelMode, True)
     with SessionLocal() as db:
         return {"code": "OK", "data": history.serialize(db, history.create(
             db, user.id, body.title.strip(), body.modelMode,

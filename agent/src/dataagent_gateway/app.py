@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from typing import Any, Literal
 from uuid import UUID
 
@@ -24,9 +25,21 @@ class QueryRequest(BaseModel):
     publicGatewayConsent: bool = False
 
 
+def allow_public_test(mode: str, consent: bool = False) -> None:
+    if mode != "free-test":
+        return
+    if os.getenv("DATACONTROL_ENABLE_FREE_TEST") != "1":
+        raise HTTPException(403, "Public model test is disabled. Set DATACONTROL_ENABLE_FREE_TEST=1 for local synthetic trials.")
+    if consent is False:
+        raise HTTPException(403, "Public model test requires explicit per-turn consent")
+
+
 @app.get("/health")
 async def health(modelMode: Literal["deepseek", "free-test"] | None = None,
                  taskTier: Literal["standard", "multi"] = "standard"):
+    if modelMode == "free-test" and os.getenv("DATACONTROL_ENABLE_FREE_TEST") != "1":
+        return {"status": "degraded", "ready": False, "reason": "Optional public model test is disabled",
+                "modelMode": "free-test", "sqlExecutionEnabled": False, "hiddenReasoningExposed": False}
     status = await HeadlessHarnessRunner(model_mode=modelMode, task_tier=taskTier).health()
     return {
         "status": "ok" if status["ready"] else "degraded",
@@ -39,8 +52,7 @@ async def health(modelMode: Literal["deepseek", "free-test"] | None = None,
 
 @app.post("/v1/query")
 async def query(body: QueryRequest):
-    if body.modelMode != "deepseek":
-        raise HTTPException(410, detail="Public free-model transport has been retired")
+    allow_public_test(body.modelMode, body.publicGatewayConsent)
     runner = HeadlessHarnessRunner(model_mode=body.modelMode, **(
         {"task_tier": "multi"} if body.taskTier == "multi" else {}
     ))
@@ -64,8 +76,7 @@ def _json_line(value: dict[str, Any]) -> str:
 
 @app.post("/v1/query/stream")
 async def query_stream(body: QueryRequest):
-    if body.modelMode != "deepseek":
-        raise HTTPException(410, detail="Public free-model transport has been retired")
+    allow_public_test(body.modelMode, body.publicGatewayConsent)
     if body.runId is None:
         raise HTTPException(422, detail="runId is required for cancellation")
     run_id = str(body.runId)
@@ -73,8 +84,6 @@ async def query_stream(body: QueryRequest):
         raise HTTPException(409, detail="Agent run is already active")
     if sum(not task.done() for task in ACTIVE_TURNS.values()) >= 4:
         raise HTTPException(429, detail="Agent gateway is at its concurrent run limit")
-    if body.modelMode == "free-test" and not body.publicGatewayConsent:
-        raise HTTPException(403, detail="Public gateway requires explicit per-turn consent")
     runner = HeadlessHarnessRunner(model_mode=body.modelMode, **(
         {"task_tier": "multi"} if body.taskTier == "multi" else {}
     ))

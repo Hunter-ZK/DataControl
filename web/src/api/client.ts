@@ -231,6 +231,7 @@ export async function streamAgentTurn(
   conversationId: string | null = null,
   displayQuestion: string | null = null,
   taskTier: 'standard' | 'multi' = 'standard',
+  publicGatewayConsent = false,
 ): Promise<AgentResult> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   const token = localStorage.getItem('datacontrol_token')
@@ -242,7 +243,7 @@ export async function streamAgentTurn(
       question, runId, modelMode,
       conversationId: conversationId || undefined,
       displayQuestion: displayQuestion || undefined, taskTier,
-      publicGatewayConsent: false,
+      publicGatewayConsent,
     }),
     signal,
   })

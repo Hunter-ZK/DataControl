@@ -461,8 +461,8 @@ class HeadlessHarnessRunner:
         self.model_mode = model_mode if model_mode is not None else os.getenv(
             "DATACONTROL_AGENT_MODEL_MODE", "deepseek"
         )
-        if self.model_mode != "deepseek":
-            raise ValueError("Only the official DeepSeek model is supported; public gateway retired")
+        if self.model_mode not in ("deepseek", "free-test"):
+            raise ValueError("Unsupported DataAgent model mode")
         self.free_test = self.model_mode == "free-test"
         self.profile = (
             "dataagent-headless-free" if self.free_test
@@ -528,8 +528,8 @@ class HeadlessHarnessRunner:
             blockers.append("DeepSeek Harness is not installed")
         if not profile_ready:
             blockers.append(
-                "Free model test profile needs setup: .\\\\scripts\\\\setup-free-model-test.ps1"
-                if self.free_test else "DataAgent profile is missing/outdated: .\\\\start.bat repair"
+                "Free model test profile missing; run the optional scripts/setup-free-model-test installer"
+                if self.free_test else "DataAgent profile is missing/outdated: rerun setup-agent"
             )
         if not key_ready:
             blockers.append("DEEPSEEK_API_KEY is not set")
