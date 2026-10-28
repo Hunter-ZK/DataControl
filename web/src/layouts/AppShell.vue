@@ -12,7 +12,7 @@
           <div class="nav-section">{{ group.title }}</div>
           <RouterLink v-for="item in group.items" :key="item.to" :to="item.to"
             class="nav-item" :title="item.label">
-            <AssetIcon v-if="'assetType' in item && item.assetType" :type="item.assetType" :size="21" mode="inline"/>
+            <AssetIcon v-if="'assetType' in item && item.assetType" :type="String(item.assetType)" :size="21" mode="inline"/>
             <component :is="item.icon" v-else :size="21" :stroke-width="1.9"/>
             <span>{{ item.label }}</span>
           </RouterLink>
@@ -56,7 +56,7 @@
     <el-drawer v-model="mobileNavOpen" title="DataControl 导航" direction="ltr" size="min(300px,85vw)">
       <div class="mobile-links">
         <RouterLink v-for="item in [...primary,...secondary]" :key="item.to" :to="item.to" @click="mobileNavOpen=false">
-          <AssetIcon v-if="item.assetType" :type="item.assetType" :size="18" mode="inline"/>
+          <AssetIcon v-if="'assetType' in item && item.assetType" :type="String(item.assetType)" :size="18" mode="inline"/>
           <component :is="item.icon" v-else :size="18"/>{{item.label}}
         </RouterLink>
       </div>

@@ -24,7 +24,7 @@ test('unified search keeps asset search and Agent Q&A as explicit choices', asyn
   await page.getByRole('button', { name: '检索资产' }).click()
   await expect(page.getByText('贷款余额汇总')).toBeVisible()
   await expect(page).toHaveURL(/\/$/)
-  await page.getByRole('button', { name: '问 DataAgent' }).click()
+  await page.getByRole('button', { name: '向 DataAgent 提问' }).click()
   // The Agent route is protected, so anonymous users are sent to login.
   await expect(page).toHaveURL(/\/login\?redirect=/)
 })
@@ -33,7 +33,7 @@ for (const width of [1440, 1024, 390]) {
   test(`homepage renders at ${width}px without unusable input`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 850 })
     await page.goto('/')
-    await expect(page.getByRole('heading', { name: '从一个问题开始，找到可信数据' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /数据触手可及/ })).toBeVisible()
     await expect(page.getByRole('button', { name: '检索资产' })).toBeVisible()
     await expect(page.getByRole('button', { name: '问 DataAgent' })).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath(`homepage-${width}.png`), fullPage: true })

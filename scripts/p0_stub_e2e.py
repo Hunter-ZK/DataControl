@@ -243,7 +243,7 @@ def main() -> None:
             raise AssertionError(f"unexpected SQL source: {sql}")
         if "region_code" not in sql or "GROUP BY region_code" not in sql:
             raise AssertionError(f"stub did not preserve the regional dimension: {sql}")
-        if "MAX(stat_month)" not in sql:
+        if "stat_month = '${dt}'" not in sql:
             raise AssertionError(f"LATEST semantic was not compiled deterministically: {sql}")
 
         validation = result.get("validation")

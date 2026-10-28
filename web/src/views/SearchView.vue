@@ -157,14 +157,7 @@ const visiblePages = computed(() => {
 })
 const typeFacetItems = computed<FacetItem[]>(() => Object.entries(facets.value.assetTypes).sort((a,b)=>Number(b[1])-Number(a[1])).map(([key,count])=>({key,label:label(key),count:Number(count)})))
 const layerFacetItems = computed<FacetItem[]>(() => Object.entries(facets.value.layers).sort((a,b)=>Number(b[1])-Number(a[1])).map(([key,count])=>({key,label:key,count:Number(count)})))
-const catalogFacetItems = computed<FacetItem[]>(() => Object.entries(facets.value.catalogs).sort((a,b)=>Number(b[1])-Number(a[1])).slice(0,8).map(([key,count])=>({key,label:key,count:Number(count)})))
 const statusFacetItems = computed<FacetItem[]>(() => Object.entries(facets.value.statuses).sort((a,b)=>Number(b[1])-Number(a[1])).map(([key,count])=>({key,label:statusText(key),count:Number(count)})))
-const totalForAll = computed(() => Object.values(facets.value.assetTypes).reduce((sum,count)=>sum+Number(count),0) || total.value)
-const bestRows = computed(() => {
-  const preferred = ['METRIC','TABLE','COLUMN','STANDARD']
-  return [...rows.value].sort((a,b)=>preferred.indexOf(a.assetType)-preferred.indexOf(b.assetType) || a.score-b.score).slice(0,2)
-})
-
 function label(value: string) { return typeLabels[value] || value }
 function statusText(value?: string | null) { return value ? (statusLabels[value] || value) : '—' }
 function escapeHtml(value: string) { return value.replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'} as Record<string,string>)[ch]) }
