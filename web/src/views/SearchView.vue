@@ -1,108 +1,118 @@
 <template>
-  <div class="dc-page search-v2">
-    <div class="dc-container">
-      <div class="search-heading"><span class="dc-eyebrow">ASSET DISCOVERY</span><h1 class="dc-title">全局资产检索</h1><p class="dc-subtitle">在统一目录中查找数据集、字段、指标、标准和码表。</p></div>
-      <section class="search-hero dc-card">
-        <div class="search-box-wrap">
-          <div class="search-box">
-            <Search :size="20" />
-            <input
-              v-model="q"
-              placeholder="搜索数据集、字段、指标、标准…"
-              @input="loadSuggestions"
-              @focus="showSuggestions = true"
-              @keydown.enter="runSearch(true)"
-            />
-            <button @click="runSearch(true)"><Search :size="16" />搜索</button>
+  <div class="dc-page atlas-search"><div class="dc-container">
+    <header class="search-heading"><div><span class="dc-eyebrow">UNIFIED ASSET SEARCH</span><h1 class="dc-title">全局资产检索</h1>
+      <p class="dc-subtitle">找表、找字段、查指标、查标准。搜索结果按资产类型分组，一眼看清来源与层级。</p></div>
+      <RouterLink to="/catalog" class="catalog-switch"><FolderTree :size="19"/> 按业务目录浏览 <ArrowRight :size="16"/></RouterLink>
+    </header>
+    <section class="search-hero">
+      <div class="search-box-wrap">
+        <div class="search-box"><Search :size="23"/><input v-model="q" placeholder="输入中文业务名称、技术名或字段名称…"
+          @input="loadSuggestions" @focus="showSuggestions=true" @keydown.enter.prevent="runSearch(true)" aria-label="全局资产搜索"/>
+          <button @click="runSearch(true)">搜索资产 <ArrowRight :size="18"/></button>
+        </div>
+        <div v-if="showSuggestions&&suggestions.length" class="suggestions">
+          <button v-for="item in suggestions" :key="item.assetType+item.assetId" @mousedown.prevent="openSuggestion(item)">
+            <AssetIcon :type="item.assetType" :size="21"/><span><b>{{item.title}}</b><code>{{item.technicalName}}</code></span><ArrowRight :size="17"/>
+          </button>
+        </div>
+      </div>
+      <div class="search-actions"><div v-if="q.trim()" class="query-meta"><span>关键词</span>
+        <b v-for="term in terms" :key="term">{{term}}</b><span v-if="total">匹配 {{total}} 项</span>
+      </div><div v-else class="query-meta"><span>支持按业务词、字段技术名、标准编码检索</span></div>
+      <button @click="askAgent"><Sparkles :size="17"/>让 DataAgent 解释相关资产 <ArrowRight :size="16"/></button></div>
+    </section>
+    <section v-if="q.trim() && typeHighlights.length" class="type-highlights" aria-label="按资产类型查看">
+      <button v-for="item in typeHighlights" :key="item.key" @click="selectType(item.key)" :class="{active:type===item.key}">
+        <AssetIcon :type="item.key" :size="25"/><span><b>{{item.count}}</b><small>{{item.label}}</small></span><ArrowRight :size="16"/>
+      </button>
+    </section>
+    <button class="mobile-filter-toggle" @click="filtersOpen=!filtersOpen"><Filter :size="19"/>筛选范围 <span>{{filtersOpen?'收起':'展开'}}</span></button>
+    <div class="search-grid">
+      <aside class="filter-panel dc-card" :class="{'mobile-open':filtersOpen}">
+        <div class="filter-head"><b><Filter :size="19"/>筛选数据资产</b><button @click="clearFilters">清除</button></div>
+        <div class="filter-section">
+          <div class="filter-title"><FolderTree :size="17"/>业务目录层级</div>
+          <button class="all-catalog" :class="{active:!catalog}" @click="selectCatalog('')">全部目录</button>
+          <div v-if="catalogTree.length" class="facet-tree">
+            <el-tree :data="catalogTree" node-key="code" :props="{label:'name',children:'children'}"
+              default-expand-all :expand-on-click-node="false" @node-click="chooseCatalogNode">
+              <template #default="{data}"><span class="facet-node" :class="{selected:catalog===data.code}">
+                <FolderTree :size="15"/><span>{{data.name}}</span>
+              </span></template>
+            </el-tree>
           </div>
-          <div v-if="showSuggestions && suggestions.length" class="suggestions dc-card">
-            <button v-for="item in suggestions" :key="item.assetId" @mousedown.prevent="openSuggestion(item)">
-              <AssetIcon :type="item.assetType" :size="15" mode="inline"/><span class="asset-chip">{{ label(item.assetType) }}</span>
-              <div><b>{{ item.title }}</b><code>{{ item.technicalName }}</code></div>
-              <ArrowRight :size="15" />
-            </button>
-          </div>
+          <div v-else class="facet-empty">目录未加载，仍可按其他条件检索。</div>
+          <p v-if="catalog" class="selected-catalog">已选择：{{catalogName}}</p>
         </div>
-        <div class="query-meta" v-if="q.trim()">
-          <span>搜索关键词：</span>
-          <b v-for="term in terms" :key="term">{{ term }}</b>
-          <span>全部关键词同时匹配</span>
-          <strong>共 {{ total }} 条</strong>
+        <FilterGroup title="资产类型" :items="typeFacetItems" :selected="type" @select="selectType"/>
+        <FilterGroup title="数仓层级" :items="layerFacetItems" :selected="layer" @select="selectLayer"/>
+        <FilterGroup title="状态" :items="statusFacetItems" :selected="status" @select="selectStatus"/>
+        <p class="facet-note">目录层级由系统中的真实父子关系生成。筛选仅约束当前目录，不自动合并下级目录结果。</p>
+      </aside>
+      <main class="search-main">
+        <div class="results-head"><div><span class="dc-eyebrow">SEARCH RESULTS</span><h2>搜索结果 <em>{{total}}</em></h2></div>
+          <button class="clear-chip" v-if="type||layer||catalog||status" @click="clearFilters">清除全部筛选</button>
         </div>
-        <div class="agent-intent" v-if="q.trim()">
-          <div><Sparkles :size="17" /><span>想用自然语言理解这些数据或生成 SQL？</span></div>
-          <button @click="askAgent"><WandSparkles :size="15" />转到 DataAgent <ArrowRight :size="14"/></button>
+        <div v-if="type||layer||catalog||status" class="active-chips">
+          <button v-if="type" @click="selectType(type)">{{label(type)}} ×</button>
+          <button v-if="layer" @click="selectLayer(layer)">{{layer}} ×</button>
+          <button v-if="catalog" @click="selectCatalog(catalog)">{{catalogName}} ×</button>
+          <button v-if="status" @click="selectStatus(status)">{{statusText(status)}} ×</button>
         </div>
-      </section>
-
-      <button class="mobile-filter-toggle" :aria-expanded="filtersOpen" @click="filtersOpen=!filtersOpen"><Filter :size="16"/>筛选资产 <span>{{ filtersOpen ? '收起' : '展开' }}</span></button>
-      <div class="search-grid">
-        <aside class="filter-panel dc-card" :class="{'mobile-open':filtersOpen}">
-          <div class="filter-head"><b><Filter :size="16"/> 筛选</b><button @click="clearFilters">清除</button></div>
-          <FilterGroup title="资产类型" :items="typeFacetItems" :selected="type" @select="selectType" />
-          <FilterGroup title="数仓层级" :items="layerFacetItems" :selected="layer" @select="selectLayer" />
-          <FilterGroup title="主题目录" :items="catalogFacetItems" :selected="catalog" @select="selectCatalog" />
-          <FilterGroup title="状态" :items="statusFacetItems" :selected="status" @select="selectStatus" />
-          <p class="facet-note">计数按“排除本组筛选”计算，选择一个类型后仍可看到其它类型的真实命中数。</p>
-        </aside>
-
-        <main class="search-main">
-          <section v-if="bestRows.length" class="best-section">
-            <div class="section-title"><span>最佳匹配</span><small>名称、技术名与业务定义综合排序</small></div>
-            <div class="best-grid">
-              <article v-for="item in bestRows" :key="item.assetId" class="best-card dc-card" role="link" tabindex="0" @click="open(item)" @keydown.enter="open(item)">
-                <div class="best-tags"><AssetIcon :type="item.assetType" :size="19"/><span class="asset-chip">{{ label(item.assetType) }}</span><span v-if="item.layerCode" class="layer-chip" :data-layer="item.layerCode">{{ item.layerCode }}</span><span>{{ statusText(item.status) }}</span></div>
-                <h2 v-html="safeMarkHtml(item.titleHighlight || item.title)" />
-                <code v-html="safeMarkHtml(item.technicalNameHighlight || item.technicalName)" />
-                <p v-html="safeMarkHtml(item.snippet || '点击查看资产定义、字段与治理信息。')" />
-                <div class="best-actions"><button @click.stop="open(item)">查看详情</button><button v-if="item.assetType==='METRIC' || item.assetType==='TABLE'" class="primary" @click.stop="askAbout(item)"><Sparkles :size="14" />用此资产提问</button></div>
+        <div v-if="!q.trim()" class="search-empty-state dc-card"><Search :size="39"/><h3>输入关键词，开始发现数据</h3><p>统一搜索数据集、字段、指标、码表、数据标准与统计制度。</p></div>
+        <div v-else-if="loading" class="search-empty-state dc-card"><Search :size="33"/><h3>正在检索统一资产索引…</h3></div>
+        <div v-else-if="!rows.length" class="search-empty-state dc-card"><Database :size="37"/><h3>没有找到符合条件的资产</h3><p>尝试更换关键词、清除目录筛选，或向 DataAgent 描述你的需求。</p></div>
+        <template v-else>
+          <section v-for="group in groupedRows" :key="group.assetType" class="result-group dc-card">
+            <header class="result-group-head">
+              <AssetIcon :type="group.assetType" :size="25"/>
+              <div><h3>{{label(group.assetType)}}</h3><p>本页 {{group.items.length}} 条相关资产</p></div>
+              <button v-if="type!==group.assetType" @click="selectType(group.assetType)">只看{{label(group.assetType)}} <ChevronRight :size="17"/></button>
+            </header>
+            <div class="group-items">
+              <article v-for="item in group.items" :key="item.assetType+item.assetId"
+                class="result-asset" role="link" tabindex="0" @click="open(item)" @keydown.enter="open(item)">
+                <div class="asset-headline"><h4 v-html="safeMarkHtml(item.titleHighlight||item.title)"/>
+                  <span v-if="item.layerCode" class="layer-tag" :data-layer="item.layerCode">{{item.layerCode}}</span>
+                  <span v-if="item.status" class="status-tag">{{statusText(item.status)}}</span>
+                </div>
+                <code v-html="safeMarkHtml(item.technicalNameHighlight||item.technicalName)"/>
+                <p v-html="safeMarkHtml(item.snippet||'打开资产详情查看业务定义与关联信息。')"/>
+                <div class="asset-footer"><span v-if="item.catalogCode"><FolderTree :size="14"/>{{item.catalogCode}}</span>
+                  <button v-if="item.assetType==='TABLE'||item.assetType==='METRIC'" @click.stop="askAbout(item)"><WandSparkles :size="14"/>用此资产提问</button>
+                  <span class="detail-link">查看详情 <ArrowRight :size="15"/></span>
+                </div>
               </article>
             </div>
           </section>
-
-          <section class="results dc-card">
-            <div class="result-tabs">
-              <button :class="{active:!type}" @click="selectType('')">全部 <b>{{ totalForAll }}</b></button>
-              <button v-for="item in typeFacetItems.slice(0,4)" :key="item.key" :class="{active:type===item.key}" @click="selectType(item.key)">{{ item.label }} <b>{{ item.count }}</b></button>
-              <span class="sort">排序：相关度</span>
-            </div>
-
-            <div v-if="loading" class="dc-empty">正在检索统一资产索引…</div>
-            <div v-else-if="rows.length===0" class="dc-empty">没有找到匹配资产。可以尝试业务词、字段英文名或标准编号。</div>
-            <article v-for="item in rows" :key="item.assetId" class="result-row" role="link" tabindex="0" @click="open(item)" @keydown.enter="open(item)">
-              <div class="row-tags"><AssetIcon :type="item.assetType" :size="18"/><span class="asset-chip">{{ label(item.assetType) }}</span><span v-if="item.layerCode" class="layer-chip" :data-layer="item.layerCode">{{ item.layerCode }}</span><span v-if="item.catalogCode">{{ item.catalogCode }}</span></div>
-              <div class="row-body">
-                <div><h3 v-html="safeMarkHtml(item.titleHighlight || item.title)" /><code v-html="safeMarkHtml(item.technicalNameHighlight || item.technicalName)" /></div>
-                <p v-html="safeMarkHtml(item.snippet || '点击查看资产详情。')" />
-              </div>
-              <ArrowRight :size="17" />
-            </article>
-
-            <footer v-if="total > 0" class="pagination">
-              <span>第 {{ offset + 1 }}–{{ Math.min(offset + pageSize, total) }} 条，共 {{ total }} 条</span>
-              <div>
-                <button :disabled="currentPage===1" @click="goPage(currentPage-1)">上一页</button>
-                <button v-for="page in visiblePages" :key="page" :class="{active:page===currentPage}" @click="goPage(page)">{{ page }}</button>
-                <button :disabled="currentPage===totalPages" @click="goPage(currentPage+1)">下一页</button>
-              </div>
-            </footer>
-          </section>
-        </main>
-      </div>
+          <footer v-if="total>pageSize" class="pagination">
+            <span>第 {{offset+1}}–{{Math.min(offset+pageSize,total)}} 条，共 {{total}} 条</span>
+            <div><button :disabled="currentPage===1" @click="goPage(currentPage-1)">上一页</button>
+              <button v-for="p in visiblePages" :key="p" :class="{active:p===currentPage}" @click="goPage(p)">{{p}}</button>
+              <button :disabled="currentPage===totalPages" @click="goPage(currentPage+1)">下一页</button></div>
+          </footer>
+        </template>
+      </main>
     </div>
-  </div>
+  </div></div>
 </template>
-
 <script setup lang="ts">
 import { computed, defineComponent, h, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ArrowRight, Filter, Search, Sparkles, WandSparkles } from 'lucide-vue-next'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { ArrowRight, ChevronRight, Database, Filter, FolderTree, Search, Sparkles, WandSparkles } from 'lucide-vue-next'
 import AssetIcon from '@/components/AssetIcon.vue'
+import { buildCatalogTree, flattenCatalogs, type CatalogEntry, type CatalogNode } from '@/utils/catalogTree'
 import { activityApi, assetApi, type SearchItem, type SearchSuggestion } from '@/api/client'
 
 interface FacetItem { key: string; label: string; count: number }
 
 const filtersOpen = ref(false)
+const catalogEntries=ref<CatalogEntry[]>([])
+const catalogTree=computed(()=>buildCatalogTree(catalogEntries.value))
+const catalogName=computed(()=>flattenCatalogs(catalogTree.value).find(x=>x.code===catalog.value)?.name||catalog.value)
+const groupOrder=['TABLE','COLUMN','METRIC','CODE_TABLE','STANDARD','WORD_ROOT','STAT_SYSTEM']
+const groupedRows=computed(()=>groupOrder.map(assetType=>({assetType,items:rows.value.filter(row=>row.assetType===assetType)})).filter(group=>group.items.length))
+const typeHighlights=computed(()=>groupOrder.map(key=>({key,label:typeLabels[key],count:Number(facets.value.assetTypes[key]||0)})).filter(x=>x.count>0))
 const FilterGroup = defineComponent({
   props: { title: { type: String, required: true }, items: { type: Array as () => FacetItem[], required: true }, selected: { type: String, default: '' } },
   emits: ['select'],
@@ -191,6 +201,7 @@ async function loadSuggestions() {
 function selectType(value: string) { type.value = type.value === value ? '' : value; runSearch(true) }
 function selectLayer(value: string) { layer.value = layer.value === value ? '' : value; runSearch(true) }
 function selectCatalog(value: string) { catalog.value = catalog.value === value ? '' : value; runSearch(true) }
+function chooseCatalogNode(node:CatalogNode){ selectCatalog(node.code) }
 function selectStatus(value: string) { status.value = status.value === value ? '' : value; runSearch(true) }
 function clearFilters() { type.value=''; layer.value=''; catalog.value=''; status.value=''; runSearch(true) }
 function goPage(page: number) { const next = Math.min(Math.max(1,page), totalPages.value); offset.value=(next-1)*pageSize; runSearch(false); window.scrollTo({top:0,behavior:'smooth'}) }
@@ -200,94 +211,100 @@ function openSuggestion(item: SearchSuggestion) { showSuggestions.value=false; c
 function askAgent() { router.push({ name:'agent', query:{ q:`请根据 DataControl 中可信的指标、数据集和统计口径回答：${agentQuestion.value}。如需 SQL，请生成并静态校验 MaxCompute SQL。` } }) }
 function askAbout(item: SearchItem) { router.push({ name:'agent', query:{ ...(item.assetType==='TABLE'?{asset:item.assetId}:{}), q:`请基于“${item.title}”（${item.technicalName}）回答我的数据问题，并优先使用该资产的可信口径。` } }) }
 watch(() => route.query.q, (value) => { if (typeof value === 'string' && value !== q.value) { q.value=value; runSearch(true) } })
-onMounted(() => { if (q.value) runSearch(false) })
+onMounted(async() => {try{catalogEntries.value=await assetApi.catalogs() as CatalogEntry[]}catch{catalogEntries.value=[]};if(q.value)runSearch(false)})
 </script>
-
 <style scoped>
-.search-v2{background:#eef6fa;min-height:100%}.search-hero{padding:18px 20px 14px}.search-box-wrap{position:relative}.search-box{height:52px;display:flex;align-items:center;gap:10px;border:1.5px solid #5eabc9;border-radius:10px;background:#fff;padding:4px 5px 4px 14px;color:#2e7897;box-shadow:0 3px 10px rgba(34,108,142,.06)}.search-box input{flex:1;border:0;outline:0;background:transparent;font-size:15px;color:#173f54}.search-box>button{height:40px;border:0;border-radius:8px;background:#177da7;color:#fff;padding:0 17px;display:flex;align-items:center;gap:6px;font-weight:700;cursor:pointer}.suggestions{position:absolute;left:0;right:0;top:58px;z-index:40;padding:7px;box-shadow:0 18px 42px rgba(38,94,126,.15)}.suggestions button{width:100%;border:0;background:#fff;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;text-align:left;padding:10px;border-radius:8px;cursor:pointer}.suggestions button:hover{background:#eef8fc}.suggestions div{min-width:0;display:grid;gap:3px}.suggestions b{font-size:13px}.suggestions code{font-size:11px;color:#55778a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.query-meta{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:9px 2px 0;font-size:11px;color:#607b8a}.query-meta b{padding:3px 8px;border-radius:999px;background:#dff1f8;color:#1f6f91}.query-meta strong{margin-left:auto;color:#355c70}.agent-intent{margin-top:10px;padding:10px 12px;border:1px solid #cce7df;background:#effaf6;border-radius:9px;display:flex;align-items:center;justify-content:space-between;gap:16px;color:#2f6959;font-size:12px}.agent-intent>div{display:flex;align-items:center;gap:8px}.agent-intent button{border:0;border-radius:8px;background:#137da5;color:#fff;padding:8px 12px;display:flex;gap:6px;align-items:center;cursor:pointer;font-size:11px}.search-grid{display:grid;grid-template-columns:220px minmax(0,1fr);gap:14px;margin-top:14px;align-items:start}.filter-panel{padding:14px 14px 16px;position:sticky;top:78px}.filter-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.filter-head b{font-size:13px}.filter-head button{border:0;background:transparent;color:#177da7;font-size:11px;cursor:pointer}.filter-panel :deep(.filter-group){padding:10px 0;border-top:1px solid #e6eef2}.filter-panel :deep(.filter-group h4){font-size:10px;color:#6c8493;margin:0 0 5px}.filter-panel :deep(.filter-group button){width:100%;border:0;background:transparent;display:grid;grid-template-columns:14px 1fr auto;align-items:center;gap:7px;padding:5px 2px;color:#4c6a7a;text-align:left;cursor:pointer;font-size:11px}.filter-panel :deep(.filter-group button i){width:11px;height:11px;border:1px solid #a8c1cd;border-radius:2px;background:#fff}.filter-panel :deep(.filter-group button.checked i){background:#1b83aa;border-color:#1b83aa;box-shadow:inset 0 0 0 2px #fff}.filter-panel :deep(.filter-group button b){font-size:10px;color:#6c8796}.facet-note{font-size:9px;line-height:1.55;color:#8498a4;margin:10px 0 0}.search-main{min-width:0}.section-title{display:flex;align-items:center;gap:10px;margin:2px 2px 8px}.section-title span{font-size:12px;font-weight:750;color:#34596c}.section-title small{font-size:10px;color:#8397a3}.best-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.best-card{padding:16px;cursor:pointer;border-color:#d1e3ec}.best-tags,.row-tags{display:flex;align-items:center;gap:6px;color:#718895;font-size:9px}.asset-chip{display:inline-flex;padding:3px 7px;border-radius:999px;background:#e3f3f8;color:#176f91;font-size:9px;font-weight:750}.layer-chip{padding:3px 6px;border-radius:5px;background:#edf3f6;color:#476575;font-weight:800}.layer-chip[data-layer="ODS"]{background:#eeeafd;color:#4f3fa8}.layer-chip[data-layer="DWD"]{background:#e2f4f1;color:#0d6f68}.layer-chip[data-layer="DWS"]{background:#e3f1f8;color:#126b93}.layer-chip[data-layer="ADS"]{background:#fff3da;color:#83570a}.layer-chip[data-layer="DIM"]{background:#edf1f4;color:#44596a}.best-card h2{font-size:16px;margin:9px 0 5px;color:#214c62}.best-card code{font-size:10px;color:#547687}.best-card p{font-size:11px;color:#607987;line-height:1.6;min-height:34px}.best-actions{display:flex;gap:7px;margin-top:12px}.best-actions button{border:1px solid #c7dbe4;background:#fff;color:#476e82;border-radius:7px;padding:7px 9px;font-size:10px;cursor:pointer}.best-actions button.primary{background:#177da7;border-color:#177da7;color:#fff;display:flex;align-items:center;gap:4px}.results{margin-top:12px;overflow:hidden}.result-tabs{height:47px;display:flex;align-items:center;border-bottom:1px solid #e1eaef;padding:0 10px;gap:2px}.result-tabs button{height:100%;border:0;border-bottom:2px solid transparent;background:transparent;padding:0 10px;color:#5f7785;font-size:10px;cursor:pointer}.result-tabs button.active{color:#15789f;border-bottom-color:#15789f;font-weight:800}.result-tabs b{font-size:9px}.sort{margin-left:auto;font-size:9px;color:#8094a0;padding-right:8px}.result-row{display:grid;grid-template-columns:130px minmax(0,1fr) auto;gap:10px;align-items:center;padding:13px 16px;border-bottom:1px solid #edf2f5;cursor:pointer}.result-row:hover{background:#f7fbfd}.row-body{min-width:0;display:grid;gap:6px}.row-body>div{display:flex;align-items:baseline;gap:8px;min-width:0}.row-body h3{font-size:13px;color:#234e63;margin:0}.row-body code{font-size:9px;color:#6d8795;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row-body p{margin:0;font-size:10px;color:#647d8b;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.results :deep(mark),.best-section :deep(mark){background:#fff0a8;color:#284f61}.pagination{display:flex;align-items:center;justify-content:space-between;padding:12px 15px;font-size:10px;color:#718794}.pagination>div{display:flex;gap:5px}.pagination button{min-width:29px;height:27px;border:1px solid #d1e0e7;border-radius:6px;background:#fff;color:#537184;font-size:10px;cursor:pointer}.pagination button.active{border-color:#2c8db4;color:#16749a;background:#edf8fc}.pagination button:disabled{opacity:.4;cursor:not-allowed}@media(max-width:980px){.search-grid{grid-template-columns:1fr}.filter-panel{position:static}.best-grid{grid-template-columns:1fr}.agent-intent{align-items:flex-start;flex-direction:column}.result-row{grid-template-columns:1fr auto}.row-tags{grid-column:1/-1}}@media(max-width:620px){.search-box>button{padding:0 11px}.query-meta strong{margin-left:0}.filter-panel{display:none}.result-tabs button:nth-of-type(n+4){display:none}.row-body>div{display:grid}.pagination{align-items:flex-start;flex-direction:column;gap:8px}}
- .suggestions button{grid-template-columns:auto auto minmax(0,1fr) auto}
- .best-tags,.row-tags{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
- .filter-head b{display:inline-flex;align-items:center;gap:6px}
- .best-card,.results,.filter-panel,.search-hero{border-color:var(--dc-border);box-shadow:var(--dc-shadow-sm)}
- .best-card:hover,.result-row:hover{background:#f8fbff}
- .asset-chip{border-color:#dbeafe;background:var(--dc-primary-soft);color:var(--dc-primary)}
-
-/* B2: unified professional search result density and accessible mobile facets */
-.search-v2{background:var(--dc-bg)}
-.search-heading{margin-bottom:18px}
-.search-heading .dc-title{font-size:25px}
-.search-hero{padding:16px 20px;background:#fff;border-radius:12px}
-.search-box{height:52px;border:1px solid #c4d5f1;border-radius:9px;box-shadow:none;color:#2563eb}
-.search-box:focus-within{border-color:#5d8fe8;box-shadow:0 0 0 3px rgba(37,99,235,.08)}
-.search-box input{font-size:14px;color:var(--dc-text)}
-.search-box>button,.agent-intent button{background:var(--dc-primary);font-size:13px}
-.suggestions{border-radius:10px;box-shadow:0 12px 30px rgba(31,69,129,.1)}
-.suggestions button:hover{background:#f7faff}
-.suggestions b{font-size:13px}.suggestions code{font-size:12px}
-.query-meta{font-size:12px;color:var(--dc-text-2);margin-top:10px}
-.query-meta b{background:#eef4ff;color:var(--dc-primary);font-size:12px}
-.query-meta strong{color:var(--dc-text);font-size:12px}
-.agent-intent{padding:10px 11px;margin-top:10px;border-color:#e2ebfa;background:#f7faff;color:var(--dc-text-2);font-size:12px}
-.agent-intent button{white-space:nowrap;font-size:12px}
-.search-grid{grid-template-columns:226px minmax(0,1fr);gap:16px;margin-top:16px}
-.filter-panel{border-radius:12px;padding:18px 15px;top:82px}
-.filter-head b{display:flex;align-items:center;font-size:13px}
-.filter-head button{font-size:12px;color:var(--dc-primary)}
-.filter-panel :deep(.filter-group){border-top:1px solid #edf2f9;padding:13px 0}
-.filter-panel :deep(.filter-group h4){font-size:12px;font-weight:710;color:#6a7e98}
-.filter-panel :deep(.filter-group button){font-size:12px;color:#516984;padding:7px 4px}
-.filter-panel :deep(.filter-group button.checked i){background:var(--dc-primary);border-color:var(--dc-primary)}
-.filter-panel :deep(.filter-group button b){font-size:12px}
-.facet-note{font-size:12px;line-height:1.65;color:#95a3b5}
-.section-title{margin:0 1px 9px}.section-title span{color:var(--dc-text);font-size:14px}
-.section-title small{font-size:12px;color:var(--dc-text-3)}
-.best-grid{gap:12px}
-.best-card{padding:17px;border-color:var(--dc-border);border-radius:12px;box-shadow:none}
-.best-card:hover{border-color:#afcdfa;box-shadow:var(--dc-shadow-sm)}
-.best-card h2{font-size:15px;color:var(--dc-text);margin:12px 0 5px}
-.best-card code{font-size:12px;color:#6e829d}
-.best-card p{font-size:12px;color:var(--dc-text-2);line-height:1.6}
-.best-tags,.row-tags{color:var(--dc-text-2);font-size:12px}
-.asset-chip{background:#eef4ff;color:var(--dc-primary);font-size:12px;border-radius:6px}
-.best-actions button{font-size:12px;border-radius:7px}
-.best-actions button.primary{background:var(--dc-primary);border-color:var(--dc-primary)}
-.results{border-radius:12px;overflow:hidden}
-.result-tabs{height:50px;padding:0 14px;border-bottom-color:var(--dc-border)}
-.result-tabs button{font-size:12px;color:var(--dc-text-2)}
-.result-tabs button.active{color:var(--dc-primary);border-bottom-color:var(--dc-primary)}
-.result-tabs b,.sort{font-size:12px}
-.result-row{grid-template-columns:120px minmax(0,1fr) auto;padding:17px 18px;gap:14px;border-bottom-color:#edf2f8}
-.result-row:hover{background:#f7faff}
-.row-body{gap:7px}
-.row-body h3{font-size:14px;color:var(--dc-text)}
-.row-body code{font-size:12px;color:#6f829a}
-.row-body p{font-size:12px;color:var(--dc-text-2)}
-.pagination{font-size:12px;padding:14px 18px}
-.pagination button{height:32px;min-width:32px;border-color:var(--dc-border);font-size:12px}
-.pagination button.active{color:var(--dc-primary);border-color:#c0d5fb;background:#eef4ff}
+.atlas-search{min-height:100%}
+.search-heading{display:flex;align-items:end;justify-content:space-between;gap:18px;margin-bottom:20px}
+.catalog-switch{display:flex;align-items:center;gap:9px;color:#2b66cf;background:#fff;border:1px solid #c6dbf8;border-radius:10px;padding:12px 16px;font-size:14px;font-weight:730;box-shadow:var(--dc-shadow-sm);white-space:nowrap}
+.catalog-switch:hover{background:#ecf4ff}
+.search-hero{position:relative;padding:23px 27px;border-radius:17px;border:1px solid #cbdffa;background:linear-gradient(130deg,#fff,#f2f7ff 70%,#e6f1ff);box-shadow:0 12px 29px rgba(39,86,155,.09)}
+.search-hero:after{content:'';position:absolute;right:32px;top:8px;width:170px;height:90px;pointer-events:none;background:radial-gradient(circle,#c8e0ff85,transparent 70%)}
+.search-box-wrap{position:relative;z-index:2}
+.search-box{height:60px;display:flex;align-items:center;gap:13px;border:1.5px solid #a8c7f1;background:white;padding:7px 8px 7px 17px;border-radius:11px;color:#387be5;box-shadow:0 5px 18px rgba(36,96,177,.07)}
+.search-box:focus-within{border-color:#4d8df1;box-shadow:0 0 0 4px rgba(37,99,235,.09)}
+.search-box input{flex:1;min-width:0;outline:0;border:0;background:transparent;font-size:15px;color:#253e63}
+.search-box>button{height:44px;display:flex;align-items:center;gap:9px;background:linear-gradient(105deg,#2363eb,#4f8ef4);color:white;border:0;border-radius:9px;padding:0 20px;font-size:14px;font-weight:730;cursor:pointer}
+.suggestions{position:absolute;left:0;right:0;top:65px;z-index:30;padding:9px;background:#fff;border:1px solid #bed4f2;border-radius:11px;box-shadow:0 15px 39px #1f529b23}
+.suggestions button{width:100%;display:flex;align-items:center;gap:13px;padding:12px;border:0;border-radius:8px;background:white;cursor:pointer;text-align:left}
+.suggestions button:hover{background:#f1f7ff}
+.suggestions button span:nth-child(2){flex:1;min-width:0;display:grid;gap:3px}
+.suggestions b{font-size:14px;color:#243b5d}
+.suggestions code{font:12px var(--dc-mono);color:#7286a3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 3px 0;position:relative;z-index:1}
+.query-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;color:#6e84a2;font-size:13px}
+.query-meta b{background:#e4efff;border:1px solid #cbdffa;color:#2a66cd;border-radius:8px;padding:5px 9px;font-size:13px}
+.search-actions>button{border:0;display:flex;align-items:center;gap:8px;background:#e4efff;border-radius:8px;padding:9px 13px;color:#285fc6;font-weight:700;font-size:13px;cursor:pointer}
+.search-actions>button:hover{background:#d7e7ff}
+.type-highlights{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;margin-top:17px}
+.type-highlights button{display:flex;align-items:center;gap:11px;text-align:left;min-height:90px;padding:15px 13px;border:1px solid #cbdff7;background:linear-gradient(145deg,#fff,#f7fbff);border-radius:13px;box-shadow:0 6px 17px rgba(39,91,163,.075);cursor:pointer}
+.type-highlights button:hover,.type-highlights button.active{border-color:#86b4f5;background:#eef5ff;box-shadow:0 10px 24px rgba(33,91,177,.14)}
+.type-highlights button span:nth-child(2){display:grid;flex:1;gap:2px}
+.type-highlights b{font-size:23px;color:#1b4589;font-weight:800;font-variant-numeric:tabular-nums}
+.type-highlights small{font-size:13px;color:#6580a3}
+.type-highlights button>svg:last-child{color:#91aacd;flex:none}
+.search-grid{display:grid;grid-template-columns:276px minmax(0,1fr);gap:18px;align-items:start;margin-top:19px}
+.filter-panel{padding:19px 17px;position:sticky;top:83px;max-height:calc(100dvh - 100px);overflow:auto;background:linear-gradient(145deg,#fff,#fafcff)}
+.filter-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-bottom:15px}
+.filter-head b{display:flex;align-items:center;gap:10px;font-size:16px;color:#1d3e70}
+.filter-head button,.clear-chip{border:0;background:transparent;color:#3475dd;font-size:13px;cursor:pointer}
+.filter-section,.filter-panel :deep(.filter-group){padding:14px 0;border-top:1px solid #e1eafa}
+.filter-title{display:flex;align-items:center;gap:7px;color:#34547c;font-size:14px;font-weight:720;margin-bottom:10px}
+.all-catalog{padding:9px 10px;color:#5d7494;border:0;background:transparent;border-radius:7px;cursor:pointer;text-align:left;width:100%;font-size:13px}
+.all-catalog.active,.all-catalog:hover{background:#e8f2ff;color:#2265cf}
+.facet-tree{max-height:290px;overflow:auto}
+.facet-tree :deep(.el-tree){background:transparent;--el-tree-node-hover-bg-color:#edf5ff}
+.facet-tree :deep(.el-tree-node__content){height:37px;border-radius:7px}
+.facet-node{min-width:0;display:flex;align-items:center;gap:6px;font-size:13px;color:#577398}
+.facet-node span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.facet-node.selected{color:#1b61d5;font-weight:800}
+.selected-catalog{margin:9px 0 0;color:#2c66ca;font-size:12px}
+.facet-empty,.facet-note{color:#899ab0;font-size:12px;line-height:1.7}
+.filter-panel :deep(.filter-group h4){font-size:14px;color:#35557d;font-weight:710;margin:0 0 7px}
+.filter-panel :deep(.filter-group button){display:grid;grid-template-columns:17px 1fr auto;align-items:center;gap:9px;text-align:left;width:100%;border:0;padding:10px 7px;background:transparent;border-radius:7px;cursor:pointer;color:#536e90;font-size:13px}
+.filter-panel :deep(.filter-group button:hover){background:#f1f7ff}
+.filter-panel :deep(.filter-group button i){width:15px;height:15px;border:1px solid #aac1df;background:white;border-radius:4px}
+.filter-panel :deep(.filter-group button.checked i){background:#3778ec;border-color:#3778ec;box-shadow:inset 0 0 0 3px #fff}
+.filter-panel :deep(.filter-group button b){font-size:12px;color:#889cb5}
+.search-main{min-width:0}
+.results-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 0 14px}
+.results-head h2{font-size:22px;color:#1b3559;margin:5px 0 0}
+.results-head em{font-style:normal;color:#326ee5;font-size:14px;margin-left:7px;background:#e3efff;border-radius:9px;padding:4px 9px}
+.active-chips{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.active-chips button{border:1px solid #bdd4fa;background:#e8f2ff;color:#2865d1;padding:6px 10px;font-size:13px;border-radius:7px;cursor:pointer}
+.result-group{margin-bottom:16px;overflow:hidden;border-color:#cddff5;box-shadow:0 9px 24px rgba(38,86,159,.09)}
+.result-group-head{display:flex;align-items:center;gap:13px;padding:18px 20px;background:linear-gradient(100deg,#f2f7ff,#fff);border-bottom:1px solid #dce8f8;position:relative}
+.result-group-head:before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;background:#3479ec}
+.result-group-head div{flex:1;display:grid;gap:3px}
+.result-group-head h3{margin:0;font-size:18px;color:#24446e}
+.result-group-head p{margin:0;font-size:12px;color:#8a9db6}
+.result-group-head button{display:flex;align-items:center;gap:3px;background:transparent;border:0;color:#2d6dda;font-size:13px;cursor:pointer}
+.group-items{display:grid;gap:0;padding:0 19px}
+.result-asset{padding:18px 4px;border-bottom:1px solid #e8eff9;cursor:pointer;transition:background .12s}
+.result-asset:last-child{border-bottom:0}
+.result-asset:hover{background:#f9fbff}
+.asset-headline{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.asset-headline h4{font-size:16px;margin:0;color:#1c3b63;font-weight:750}
+.layer-tag{padding:3px 9px;border-radius:7px;background:#eaf3ff;color:#2766d2;font-size:12px;font-weight:750}
+.layer-tag[data-layer="DWD"]{color:#05836f;background:#e0f7f1}
+.layer-tag[data-layer="ADS"]{color:#93631d;background:#fff1db}
+.status-tag{font-size:12px;color:#7891af}
+.result-asset>code{display:block;margin:6px 0;font:13px var(--dc-mono);color:#687f9e;overflow-wrap:anywhere}
+.result-asset>p{margin:6px 0 13px;font-size:14px;color:#5f7695;line-height:1.75}
+.asset-footer{display:flex;align-items:center;gap:10px;color:#8b9db4;font-size:12px}
+.asset-footer>span:first-child{display:inline-flex;align-items:center;gap:5px}
+.asset-footer button{margin-left:auto;border:1px solid #d4e4fb;border-radius:7px;padding:6px 9px;color:#2868d4;background:#f4f8ff;display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer}
+.asset-footer .detail-link{margin-left:auto;color:#2e6cd8;display:inline-flex;align-items:center;gap:5px}
+.result-asset :deep(mark){background:#fff0b8;color:#314e76;border-radius:3px}
+.search-empty-state{padding:65px 20px;text-align:center;display:grid;justify-items:center;gap:12px;color:#5787cb}
+.search-empty-state h3{color:#2b4466;margin:0;font-size:18px}
+.search-empty-state p{color:#7489a5;font-size:14px;margin:0}
+.pagination{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:18px;color:#7c90aa;font-size:13px}
+.pagination>div{display:flex;gap:5px}
+.pagination button{border:1px solid #c6d9f2;background:white;padding:7px 11px;border-radius:7px;cursor:pointer;color:#46688d}
+.pagination button.active{background:#e8f2ff;color:#2765d1;border-color:#a9c8f8}
+.pagination button:disabled{opacity:.4;cursor:default}
 .mobile-filter-toggle{display:none}
-@media(max-width:980px){
-  .search-grid{grid-template-columns:1fr}
-  .filter-panel{position:static}
-  .best-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-}
-@media(max-width:620px){
-  .search-heading .dc-title{font-size:23px}
-  .search-hero{padding:12px}
-  .search-box>button{font-size:12px}
-  .agent-intent{align-items:stretch}
-  .agent-intent button{align-self:flex-start}
-  .mobile-filter-toggle{display:flex;align-items:center;gap:8px;width:100%;padding:11px 13px;border:1px solid var(--dc-border);background:#fff;border-radius:9px;color:var(--dc-primary);font-weight:680;cursor:pointer;margin:13px 0 0}
-  .mobile-filter-toggle span{margin-left:auto;font-size:12px}
-  .filter-panel:not(.mobile-open){display:none}
-  .filter-panel.mobile-open{display:block}
-  .best-grid{grid-template-columns:1fr}
-  .result-row{grid-template-columns:minmax(0,1fr) auto;padding:15px 12px}
-  .row-tags{grid-column:1/-1}
-  .row-body h3{font-size:13px}
-  .row-body>div{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
-  .result-tabs{overflow-x:auto;white-space:nowrap}
-  .result-tabs button:nth-of-type(n+4){display:inline-block}
-  .sort{display:none}
-}
+@media(max-width:1020px){.search-grid{grid-template-columns:1fr}.filter-panel{position:static;max-height:none}.search-heading{align-items:flex-start}.type-highlights{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:680px){.search-heading{display:grid}.catalog-switch{justify-self:start}.search-hero{padding:16px}.search-box{height:auto;min-height:55px;flex-wrap:wrap}.search-box input{flex-basis:calc(100% - 45px);font-size:14px}.search-box>button{width:100%;justify-content:center}.search-actions{flex-direction:column;align-items:flex-start}.type-highlights{grid-template-columns:repeat(2,minmax(0,1fr))}.mobile-filter-toggle{display:flex;align-items:center;gap:8px;width:100%;margin:15px 0 0;padding:12px;background:white;border:1px solid #cbdcf4;border-radius:9px;color:#2667d6;font-weight:730}.mobile-filter-toggle span{margin-left:auto}.filter-panel:not(.mobile-open){display:none}.filter-panel.mobile-open{display:block}.result-group-head{padding:14px}.result-group-head h3{font-size:16px}.group-items{padding:0 13px}.result-asset>p{font-size:13px}.result-asset>code{font-size:12px}.pagination{flex-direction:column;align-items:flex-start}}
 </style>
