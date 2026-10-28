@@ -4,8 +4,8 @@
       <header class="agent-head">
         <div>
           <span class="dc-eyebrow">INTELLIGENT DATA Q&A</span>
-          <h1>智能问数</h1>
-          <p>面向数据查询与开发场景检索内部可信指标、资产和口径；存在业务分歧时先让你选择，再生成经过静态校验的 MaxCompute SQL。系统不执行生产 SQL，也不访问外部网络补全口径。</p>
+          <h1>DataAgent 智能工作台</h1>
+          <p>根据数据资产与指标口径生成可核验的 SQL 和开发草案；有歧义时先确认，不执行生产任务。</p>
         </div>
         <span class="service-status" :class="{ ready: status?.ready }"><i></i>{{ status?.ready ? '服务正常' : '服务未就绪' }}</span>
       </header>
@@ -67,6 +67,7 @@
               v-for="(item, index) in messages"
               :key="index"
               :message="item"
+              :tier="taskTier"
               @clarify="submitClarification(index, $event)"
             />
             <div v-if="latestAnswer && !loading" class="answer-quick-actions">
@@ -89,7 +90,7 @@
                 <button class="stop-turn" :disabled="stopRequested" @click="stopAgentTurn"><Square :size="12" />停止</button>
               </div>
               <p>{{ liveEvents.length ? '以下步骤来自真实 Agent3 工具调用，完成后将展示证据与最终答案。' : '已开始处理，等待 Agent3 返回实际工具步骤。' }}</p>
-              <AgentTrace v-if="liveEvents.length" :events="liveEvents" />
+              <AgentTaskJourney :events="liveEvents" :tier="taskTier" :running="true"/>
             </article>
           </div>
 
@@ -129,6 +130,8 @@
               <p v-else class="inspector-empty">本轮尚无生成的 SQL。</p>
             </template>
             <template v-if="inspectorTab==='steps'">
+              <AgentTaskJourney v-if="loading" :events="liveEvents" :tier="taskTier" :running="true"/>
+              <AgentTaskJourney v-else-if="latestAnswer?.events?.length" :events="latestAnswer.events" :tier="taskTier" :running="false"/>
               <AgentTrace v-if="loading && liveEvents.length" :events="liveEvents"/>
               <AgentTrace v-else-if="latestAnswer?.events?.length" :events="latestAnswer.events"/>
               <p v-else class="inspector-empty">真实工具调用会在这里逐步显示，不展示模型隐藏推理。</p>
@@ -149,6 +152,7 @@ import { agentApi, assetApi, type AgentActivity, type AgentModelMode, type Agent
 import AgentConversationSidebar from '@/components/agent/AgentConversationSidebar.vue'
 import AgentMessageView from '@/components/agent/AgentMessage.vue'
 import AgentTrace from '@/components/agent/AgentTrace.vue'
+import AgentTaskJourney from '@/components/agent/AgentTaskJourney.vue'
 import AgentEvidence from '@/components/agent/AgentEvidence.vue'
 import AgentSqlCard from '@/components/agent/AgentSqlCard.vue'
 import AgentValidationPanel from '@/components/agent/AgentValidationPanel.vue'
@@ -693,4 +697,48 @@ onMounted(async () => {
  .stop-turn { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border: 1px solid #b8cdd9; border-radius: 8px; background: #fff; color: #516b7a; cursor: pointer; font-size: 12px; font-weight: 650; }
 .stop-turn:hover:not(:disabled) { border-color: #d78b8b; color: #a64a4a; background: #fff6f6; }
 .stop-turn:disabled { cursor: wait; opacity: .6; }
+
+/* B3: quiet IDE-like Agent workspace, with task state first and visual clutter last */
+.agent-screen{background:var(--dc-bg);min-height:680px;padding:14px 0;overflow:hidden}
+.agent-page{max-width:1510px}
+.agent-head{padding:0 3px 13px;align-items:center;gap:16px}
+.agent-head h1{font-size:24px;font-weight:750;color:var(--dc-text);margin:3px 0 4px;letter-spacing:-.02em}
+.agent-head p{font-size:12px;color:var(--dc-text-2);line-height:1.6;max-width:880px}
+.service-status{background:#fff5e8;border:1px solid #f0dbb5;color:#99600c;padding:7px 11px;font-size:12px;font-weight:680}
+.service-status.ready{background:#ebf8f2;border-color:#d1ebdf;color:#087e66}
+.agent-workspace{grid-template-columns:216px minmax(0,1fr) 292px;border:1px solid var(--dc-border);border-radius:12px;box-shadow:var(--dc-shadow-sm)}
+.chat-shell{background:#fff}
+.chat-model-bar{padding:10px 15px;gap:8px;background:#fff;border-bottom:1px solid var(--dc-border);flex-wrap:wrap}
+.chat-model-label{font-size:12px;color:var(--dc-text-3)}
+.model-options,.tier-options{border-color:#e1e9f5;background:#f6f9fd;border-radius:8px}
+.model-options button{padding:7px 9px;color:#607692;font-size:12px;border-radius:6px}
+.model-options button.selected,.tier-options button.active{background:#fff;border-color:#d8e4f7;color:var(--dc-primary);box-shadow:0 1px 4px rgba(27,73,143,.05)}
+.model-context{color:var(--dc-text-3);font-size:12px}
+.inspector-toggle{color:var(--dc-primary);font-size:12px}
+.context-strip{background:#f2f7ff;border-color:#dfeafc;color:#335b96;padding:9px 15px}
+.context-strip span,.context-strip code{color:#7289a9}
+.runtime-warning{background:#fff9ed;border-color:#f0dfbf;color:#8b661e;padding:9px 15px;font-size:12px;font-weight:550}
+.messages{padding:25px clamp(18px,3vw,46px)}
+.welcome{margin:7vh auto 0;max-width:680px}
+.welcome-icon{background:#edf4ff;color:var(--dc-primary);border:1px solid #dce8fc;box-shadow:none;border-radius:15px}
+.welcome h2{font-size:24px;color:var(--dc-text)}
+.welcome p{font-size:13px;color:var(--dc-text-2)}
+.prompt-grid button{min-height:55px;background:#fff;border:1px solid var(--dc-border);color:#435b7a;font-size:13px;font-weight:570;border-radius:9px}
+.prompt-grid button:hover{background:#f7faff;border-color:#bfd4fa;color:var(--dc-primary)}
+.loading-label{color:var(--dc-text);font-size:13px}
+.agent-avatar{background:#eaf2ff;color:var(--dc-primary)}
+.loading-answer p{font-size:12px;color:var(--dc-text-3)}
+.composer-wrap{background:#fff;border-top:1px solid var(--dc-border);padding:13px 17px 14px;box-shadow:none}
+.composer{border:1px solid #bdcfec;box-shadow:none;border-radius:11px}
+.composer:focus-within{border-color:#6295ec;box-shadow:0 0 0 3px rgba(37,99,235,.09)}
+.composer textarea{font-size:14px;color:var(--dc-text)}
+.send{background:var(--dc-primary);border-radius:8px}
+.send:hover{background:var(--dc-primary-strong)}
+.composer-hint{font-size:12px;color:var(--dc-text-3)}
+.agent-inspector{background:#fbfcff;border-color:var(--dc-border)}
+.agent-inspector header{padding:15px 14px 9px}
+.inspector-tabs button.active{background:#eaf2ff;color:var(--dc-primary)}
+.answer-quick-actions button:hover,.followup-prompts button:hover{border-color:#bcd3f8;color:var(--dc-primary);background:#f8fbff}
+@media(max-width:1200px){.agent-workspace{grid-template-columns:205px minmax(0,1fr)}}
+@media(max-width:760px){.agent-screen{height:calc(100dvh - var(--dc-topbar));min-height:640px}.agent-head p{display:none}.agent-head h1{font-size:21px}.chat-model-bar{gap:6px;padding:8px}.model-context{display:none}.messages{padding:20px 12px}.agent-workspace{grid-template-columns:1fr}}
 </style>

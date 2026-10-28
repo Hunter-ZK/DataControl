@@ -17,6 +17,7 @@
           {{ sqlStatusText(message) }}
         </span>
       </div>
+      <AgentTaskJourney v-if="message.events?.length" :events="message.events" :tier="tier" :running="false"/>
       <div class="answer-content">
         <AgentMarkdown :text="message.text" />
         <AgentClarification
@@ -55,11 +56,12 @@ import AgentEvidence from '@/components/agent/AgentEvidence.vue'
 import AgentMarkdown from '@/components/agent/AgentMarkdown.vue'
 import AgentSqlCard from '@/components/agent/AgentSqlCard.vue'
 import AgentTrace from '@/components/agent/AgentTrace.vue'
+import AgentTaskJourney from '@/components/agent/AgentTaskJourney.vue'
 import AgentValidationPanel from '@/components/agent/AgentValidationPanel.vue'
 import { sqlStatusText, validationState, validationTone } from '@/components/agent/presentation'
 import type { AgentMessage } from '@/components/agent/types'
 
-const props = defineProps<{ message: AgentMessage }>()
+const props = withDefaults(defineProps<{ message: AgentMessage; tier?: 'standard' | 'multi' }>(), { tier:'standard' })
 const emit = defineEmits<{
   clarify: [payload: { values: string[]; labels: string[]; custom?: string }]
 }>()
@@ -104,4 +106,17 @@ const hasSupportingDetails = computed(() => {
 .details-body { padding: 0 15px 15px; border-top: 1px solid #e9f0f4; }
 .details-body :deep(.evidence-area),.details-body :deep(.analysis-trace) { margin-top:12px; }
 @media(max-width:760px){.user-bubble{max-width:94%}.details-meta{font-size:0}.details-meta svg{font-size:initial}}
+
+.message{margin-bottom:25px}
+.user-bubble{background:#edf4ff;border-color:#dbe8fc;color:#2c486e;border-radius:12px 12px 3px 12px}
+.assistant-answer{color:var(--dc-text)}
+.answer-toolbar{border-color:var(--dc-border)}
+.assistant-identity{color:var(--dc-text)}
+.agent-avatar{background:#eaf2ff;color:var(--dc-primary)}
+.assistant-caption{color:var(--dc-text-3);font-size:12px}
+.answer-status{font-size:12px}
+.answer-content{padding:13px 0 1px}
+.supporting-details{background:#fbfcff;border-color:var(--dc-border)}
+.supporting-details summary{color:#526986}
+.details-meta{font-size:12px}
 </style>

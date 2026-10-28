@@ -43,4 +43,13 @@ const steps = computed(() => processSteps(props.events))
 .trace-index { width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; background: rgba(32,120,158,.13); font-size: 10px; font-weight: 800; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+.analysis-trace{background:#f8faff;border:1px solid var(--dc-border);border-radius:10px}
+.trace-icon{background:#eaf2ff;color:var(--dc-primary)}
+.trace-head b{color:var(--dc-text)}
+.trace-head span{font-size:12px;color:var(--dc-text-3)}
+.trace-step{background:#fff;border-color:#e0e7f3;color:var(--dc-text-2);font-size:12px}
+.trace-step.done{background:#ebf8f2;border-color:#cce9dc;color:#087e66}
+.trace-step.error{background:#fff0f1;border-color:#f1d6da;color:#b33a44}
+.trace-index{font-size:12px}
 </style>
