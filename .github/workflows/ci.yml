@@ -117,17 +117,22 @@ jobs:
           . ./scripts/agent-profile-state.ps1
           $fixtureRoot = Join-Path $env:RUNNER_TEMP '学习 Agent readiness'
           $headlessSource = Join-Path $fixtureRoot 'agent/dsh/profile/headless.patch.yml'
+          $multiSource = Join-Path $fixtureRoot 'agent/dsh/profile/headless-multi.patch.yml'
           $webSource = Join-Path $fixtureRoot 'agent/dsh/profile/cordis.patch.yml'
           $headlessProfile = Join-Path $fixtureRoot '.local/dsh-home-v0.2.1-rc.3/profiles/dataagent-headless'
+          $multiProfile = Join-Path $fixtureRoot '.local/dsh-home-v0.2.1-rc.3/profiles/dataagent-headless-multi'
           $webProfile = Join-Path $fixtureRoot '.local/dsh-home-v0.2.1-rc.3/profiles/dataagent'
-          foreach ($path in @((Split-Path $headlessSource), (Split-Path $webSource), $headlessProfile, $webProfile)) {
+          foreach ($path in @((Split-Path $headlessSource), (Split-Path $webSource), $headlessProfile, $multiProfile, $webProfile)) {
             New-Item -ItemType Directory -Force -Path $path | Out-Null
           }
           Copy-Item -LiteralPath 'agent/dsh/profile/headless.patch.yml' -Destination $headlessSource
+          Copy-Item -LiteralPath 'agent/dsh/profile/headless-multi.patch.yml' -Destination $multiSource
           Copy-Item -LiteralPath 'agent/dsh/profile/cordis.patch.yml' -Destination $webSource
           Copy-Item -LiteralPath $headlessSource -Destination (Join-Path $headlessProfile 'cordis.patch.yml')
+          Copy-Item -LiteralPath $multiSource -Destination (Join-Path $multiProfile 'cordis.patch.yml')
           Copy-Item -LiteralPath $webSource -Destination (Join-Path $webProfile 'cordis.patch.yml')
           '{}' | Set-Content -LiteralPath (Join-Path $headlessProfile 'package.json') -Encoding UTF8
+          '{}' | Set-Content -LiteralPath (Join-Path $multiProfile 'package.json') -Encoding UTF8
           '{}' | Set-Content -LiteralPath (Join-Path $webProfile 'package.json') -Encoding UTF8
           $originalHome = $HOME
           if (-not (Test-DataAgentProfilesCurrent -RepoRoot $fixtureRoot)) { throw 'Current profiles were not recognized' }
