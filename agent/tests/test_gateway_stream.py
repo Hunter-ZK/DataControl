@@ -68,6 +68,9 @@ def test_stream_only_emits_sanitized_events_and_final_result(monkeypatch):
     import dataagent_gateway.app as gateway_app
 
     class FakeRunner:
+        def __init__(self, *, model_mode=None):
+            assert model_mode == "deepseek"
+
         async def run(self, question, *, session_id=None, on_activity=None):
             assert question == "本期贷款余额"
             on_activity({"type": "tool_call", "callId": "c1", "tool": "resolve_metric"})
@@ -132,3 +135,34 @@ def test_cancelled_runner_kills_child_process(monkeypatch):
             pass
         assert process.killed
     asyncio.run(scenario())
+
+
+def test_public_model_requests_require_explicit_consent():
+    from uuid import UUID
+    from fastapi import HTTPException
+    from dataagent_gateway.app import query as direct_query
+
+    async def scenario():
+        free_request = QueryRequest(
+            question="synthetic test", modelMode="free-test",
+            runId=UUID("46b6c16a-627c-4ea4-bdbd-f58f85fe362b")
+        )
+        for handler in (query_stream, direct_query):
+            try:
+                await handler(free_request)
+            except HTTPException as exc:
+                assert exc.status_code == 403
+            else:
+                raise AssertionError("Public gateway access requires consent")
+
+    asyncio.run(scenario())
+
+
+def test_selected_model_uses_independent_harness_profile(monkeypatch):
+    monkeypatch.delenv("DATACONTROL_AGENT_MODEL_MODE", raising=False)
+    standard = HeadlessHarnessRunner(model_mode="deepseek")
+    free = HeadlessHarnessRunner(model_mode="free-test")
+    assert standard.profile == "dataagent-headless"
+    assert free.profile == "dataagent-headless-free"
+    assert standard._command(None)[-3:] == ["--profile", "dataagent-headless", "--json"]
+    assert free._command(None)[-3:] == ["--profile", "dataagent-headless-free", "--json"]

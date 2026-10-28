@@ -33,6 +33,23 @@ describe('Agent NDJSON stream contract', () => {
     expect(observed).toEqual(['started', 'activity', 'result'])
   })
 
+  it('sends explicit mode and public-provider consent only for free test', async () => {
+    let body: Record<string, unknown> = {}
+    globalThis.fetch = vi.fn(async (_url, init) => {
+      body = JSON.parse(String(init?.body)) as Record<string, unknown>
+      return {
+        ok: true,
+        body: chunks(['{"type":"result","result":{"answer":"模拟结果","sqlExecuted":false,"hiddenReasoningExposed":false}}\n']),
+      }
+    }) as unknown as typeof fetch
+    await streamAgentTurn('synthetic question', null, 'r-free', () => {}, new AbortController().signal, 'free-test')
+    expect(body.modelMode).toBe('free-test')
+    expect(body.publicGatewayConsent).toBe(true)
+    await streamAgentTurn('synthetic question', null, 'r-official', () => {}, new AbortController().signal)
+    expect(body.modelMode).toBe('deepseek')
+    expect(body.publicGatewayConsent).toBe(false)
+  })
+
   it('never fabricates a completed response after cancellation', async () => {
     globalThis.fetch = vi.fn(async () => ({
       ok: true,

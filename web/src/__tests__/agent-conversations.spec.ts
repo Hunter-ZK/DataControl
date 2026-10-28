@@ -36,6 +36,20 @@ describe('useAgentConversations', () => {
     expect(restored?.pinned).toBe(true)
   })
 
+  it('remembers free-test mode per chat while keeping official chats separate', () => {
+    const store = useAgentConversations()
+    store.load()
+    const official = store.create('正常指标查询')
+    const free = store.create('模拟数据测试', null, 'free-test')
+    expect(official.modelMode).toBe('deepseek')
+    expect(free.modelMode).toBe('free-test')
+    store.syncActive([{ role: 'user', text: '模拟数据测试' }], 'free-test:sample123', null, 'free-test')
+    const reloaded = useAgentConversations()
+    reloaded.load()
+    expect(reloaded.activate(free.id)?.modelMode).toBe('free-test')
+    expect(reloaded.activate(official.id)?.modelMode).toBe('deepseek')
+  })
+
   it('migrates older local history that has no pinned field', () => {
     localStorage.setItem(
       'datacontrol_agent_conversations_v1',

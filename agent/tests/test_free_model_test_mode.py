@@ -15,7 +15,7 @@ def test_default_mode_is_deepseek(monkeypatch):
     assert not runner.free_test
 
 
-def test_free_test_is_separate_profile_and_requires_explicit_consent(monkeypatch, tmp_path):
+def test_free_test_is_separate_profile_and_does_not_require_deepseek_key(monkeypatch, tmp_path):
     monkeypatch.setenv("DATACONTROL_AGENT_MODEL_MODE", "free-test")
     monkeypatch.delenv("DATACONTROL_FREE_TEST_ACCEPT_PUBLIC_GATEWAY", raising=False)
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
@@ -50,12 +50,9 @@ def test_free_test_is_separate_profile_and_requires_explicit_consent(monkeypatch
     monkeypatch.setattr(runner, "_mcp_reachable", reachable)
     runner.dsh_bin = tmp_path / "dsh"
     runner.dsh_bin.touch()
-    blocked = asyncio.run(runner.health())
-    assert blocked["profileReady"] and not blocked["ready"]
-    assert blocked["modelMode"] == "free-test"
-    assert blocked["apiKeyRequired"] is False
-    monkeypatch.setenv("DATACONTROL_FREE_TEST_ACCEPT_PUBLIC_GATEWAY", "1")
-    permitted = asyncio.run(runner.health())
-    assert permitted["ready"]
-    assert permitted["provider"] == "our-free-model"
-    assert permitted["model"] == "kilo-auto/free"
+    available = asyncio.run(runner.health())
+    assert available["profileReady"] and available["ready"]
+    assert available["modelMode"] == "free-test"
+    assert available["apiKeyRequired"] is False
+    assert available["provider"] == "our-free-model"
+    assert available["model"] == "kilo-auto/free"
