@@ -273,7 +273,7 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
   await scrollBottom()
   try {
     const result = await agentApi.stream(prompt, sessionId.value, activeRunId, onAgentStreamEvent, activeController.signal)
-    if (stopRequested.value) return
+    if (stopRequested.value) throw new AgentTurnCancelledError()
     reportAgentDevtools(result)
     if (result.sessionId) sessionId.value = result.sessionId
     messages.value.push(assistantMessage(result))
