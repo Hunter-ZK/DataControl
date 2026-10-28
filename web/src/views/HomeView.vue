@@ -52,7 +52,7 @@
           <RouterLink to="/agent">全部会话</RouterLink>
         </div>
         <div class="recent-chat-list">
-          <RouterLink v-for="chat in recentChats" :key="chat.id" to="/agent" class="recent-chat">
+          <RouterLink v-for="chat in recentChats" :key="chat.id" :to="{name:'agent',query:{conversationId:chat.id}}" class="recent-chat">
             <Sparkles :size="16"/><span>{{ chat.title }}</span><ArrowUpRight :size="14"/>
           </RouterLink>
         </div>

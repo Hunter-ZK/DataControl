@@ -526,6 +526,14 @@ onMounted(async () => {
   }
   await refreshStatus()
   await refreshServerHistory()
+  const requestedId = typeof route.query.conversationId === 'string' ? route.query.conversationId : null
+  if (requestedId) {
+    const matching = conversations.value.find(c => c.serverId === requestedId || c.id === requestedId)
+    if (matching) {
+      const selected = activateConversation(matching.id)
+      if (selected) restoreConversation(selected)
+    }
+  }
   resizeComposer()
 })
 </script>
