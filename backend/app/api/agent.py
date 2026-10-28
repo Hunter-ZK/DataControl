@@ -4,6 +4,7 @@ from dataclasses import asdict
 import json
 import logging
 from uuid import UUID
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -18,11 +19,13 @@ class AgentQuery(BaseModel):
     question: str = Field(min_length=2, max_length=4000)
     sessionId: str | None = Field(default=None, max_length=200)
     runId: UUID | None = None
+    modelMode: Literal["deepseek", "free-test"] = "deepseek"
+    publicGatewayConsent: bool = False
 
 
 @router.get("/status")
-async def agent_status():
-    status = await EmbeddedAgentGateway().status()
+async def agent_status(modelMode: Literal["deepseek", "free-test"] = "deepseek"):
+    status = await EmbeddedAgentGateway().status(modelMode)
     return {
         "code": "OK",
         "data": {
@@ -35,8 +38,10 @@ async def agent_status():
 
 @router.post("/query")
 async def agent_query(body: AgentQuery):
+    if body.modelMode == "free-test" and not body.publicGatewayConsent:
+        raise HTTPException(403, detail="Free-test public gateway requires explicit consent")
     runtime = EmbeddedAgentGateway()
-    status = await runtime.status()
+    status = await runtime.status(body.modelMode)
     if not status.ready:
         raise HTTPException(
             503,
@@ -51,7 +56,10 @@ async def agent_query(body: AgentQuery):
             },
         )
     try:
-        data = await runtime.run(body.question.strip(), session_id=body.sessionId)
+        data = await runtime.run(
+            body.question.strip(), session_id=body.sessionId,
+            model_mode=body.modelMode, public_gateway_consent=body.publicGatewayConsent,
+        )
     except AgentRuntimeError as exc:
         raise HTTPException(502, detail=str(exc)) from exc
     return {"code": "OK", "data": data}
@@ -63,15 +71,18 @@ LOG = logging.getLogger("uvicorn.error")
 async def agent_query_stream(body: AgentQuery):
     if body.runId is None:
         raise HTTPException(422, detail="runId is required")
+    if body.modelMode == "free-test" and not body.publicGatewayConsent:
+        raise HTTPException(403, detail="Free-test public gateway requires explicit consent")
     runtime = EmbeddedAgentGateway()
-    status = await runtime.status()
+    status = await runtime.status(body.modelMode)
     if not status.ready:
         raise HTTPException(503, detail=status.reason or "Agent runtime is not ready")
 
     async def events():
         try:
             async for line in runtime.stream(
-                body.question.strip(), run_id=str(body.runId), session_id=body.sessionId
+                body.question.strip(), run_id=str(body.runId), session_id=body.sessionId,
+                model_mode=body.modelMode, public_gateway_consent=body.publicGatewayConsent
             ):
                 yield line
         except AgentRuntimeError:

@@ -426,7 +426,7 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
 
 
 class HeadlessHarnessRunner:
-    def __init__(self, *, timeout_seconds: float | None = None) -> None:
+    def __init__(self, *, timeout_seconds: float | None = None, model_mode: str | None = None) -> None:
         self.repo_root = Path(__file__).resolve().parents[3]
         self.agent_root = self.repo_root / "agent"
         self.timeout_seconds = timeout_seconds or float(
@@ -440,7 +440,13 @@ class HeadlessHarnessRunner:
         self.dsh_js_entry = (
             self.agent_root / "dsh" / "node_modules" / "@deepseek-ai" / "dsh" / "lib" / "bin.js"
         )
-        self.free_test = os.getenv("DATACONTROL_AGENT_MODEL_MODE") == "free-test"
+        # An explicit request choice always wins over legacy process-level settings.
+        self.model_mode = model_mode if model_mode is not None else os.getenv(
+            "DATACONTROL_AGENT_MODEL_MODE", "deepseek"
+        )
+        if self.model_mode not in ("deepseek", "free-test"):
+            raise ValueError("Unsupported DataAgent model mode")
+        self.free_test = self.model_mode == "free-test"
         self.profile = (
             "dataagent-headless-free" if self.free_test
             else os.getenv("DATACONTROL_DSH_PROFILE", "dataagent-headless")
@@ -492,10 +498,11 @@ class HeadlessHarnessRunner:
                 plugin_ok = False
         profile_ready = profile_package_ready and patch_ok and plugin_ok
         api_key_present = bool(os.getenv("DEEPSEEK_API_KEY"))
-        opt_in = not self.free_test or os.getenv("DATACONTROL_FREE_TEST_ACCEPT_PUBLIC_GATEWAY") == "1"
+        # Public gateway consent belongs to each request, not the server process.
+        # This health check reports whether the optional profile is installed.
         key_ready = self.free_test or api_key_present
         mcp_reachable = await self._mcp_reachable()
-        ready = dsh_installed and profile_ready and key_ready and opt_in and mcp_reachable
+        ready = dsh_installed and profile_ready and key_ready and mcp_reachable
         blockers: list[str] = []
         if not dsh_installed:
             blockers.append("DeepSeek Harness is not installed")
@@ -504,8 +511,6 @@ class HeadlessHarnessRunner:
                 "Free model test profile needs setup: .\\\\scripts\\\\setup-free-model-test.ps1"
                 if self.free_test else "DataAgent profile is missing/outdated: .\\\\start.bat repair"
             )
-        if not opt_in:
-            blockers.append("Start free model only via start-free-test.ps1")
         if not key_ready:
             blockers.append("DEEPSEEK_API_KEY is not set")
         if not mcp_reachable:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
@@ -19,11 +19,13 @@ class QueryRequest(BaseModel):
     question: str = Field(min_length=2, max_length=4000)
     sessionId: str | None = Field(default=None, max_length=200)
     runId: UUID | None = None
+    modelMode: Literal["deepseek", "free-test"] = "deepseek"
+    publicGatewayConsent: bool = False
 
 
 @app.get("/health")
-async def health():
-    status = await HeadlessHarnessRunner().health()
+async def health(modelMode: Literal["deepseek", "free-test"] | None = None):
+    status = await HeadlessHarnessRunner(model_mode=modelMode).health()
     return {
         "status": "ok" if status["ready"] else "degraded",
         "component": "embedded-dataagent-gateway",
@@ -35,7 +37,9 @@ async def health():
 
 @app.post("/v1/query")
 async def query(body: QueryRequest):
-    runner = HeadlessHarnessRunner()
+    if body.modelMode == "free-test" and not body.publicGatewayConsent:
+        raise HTTPException(403, detail="Public gateway requires explicit per-turn consent")
+    runner = HeadlessHarnessRunner(model_mode=body.modelMode)
     try:
         result = await runner.run(body.question.strip(), session_id=body.sessionId)
     except HarnessRunError as exc:
@@ -61,7 +65,9 @@ async def query_stream(body: QueryRequest):
     run_id = str(body.runId)
     if run_id in ACTIVE_TURNS:
         raise HTTPException(409, detail="Agent run is already active")
-    runner = HeadlessHarnessRunner()
+    if body.modelMode == "free-test" and not body.publicGatewayConsent:
+        raise HTTPException(403, detail="Public gateway requires explicit per-turn consent")
+    runner = HeadlessHarnessRunner(model_mode=body.modelMode)
     events: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
 
     def on_activity(activity: dict[str, Any]) -> None:
