@@ -29,4 +29,6 @@ watch(()=>route.params.id,async(value)=>{const id=String(value);field.value=null
 .side a{display:inline-flex;align-items:center;gap:5px;color:var(--dc-primary);font-size:13px;font-weight:670}
 .lineage-callout p,.lineage-callout a{font-size:12px}
 .lineage-callout{background:#f4f8ff;border-color:#dfebfa;color:#285fba}
+
+.field-head{background:linear-gradient(115deg,#fff,#f2f8ff);border-color:#cbdff8;box-shadow:var(--dc-shadow-md);padding:28px}.field-head h1{color:#1c3e6e;font-size:28px}.field-grid{gap:18px}.info,.side{border-color:#d4e3f8;background:#fff;box-shadow:var(--dc-shadow-sm)}.info h2,.side h3{font-size:19px;color:#26456f}.info>p{font-size:14px}.kv div,.side div{border-color:#dbe8f8;background:#f8fbff}.kv span,.side span{font-size:13px}.kv b,.kv code,.side b{font-size:14px}.lineage-callout{background:#ebf4ff;border-color:#c5dbfa;color:#2b68c5}.lineage-callout b,.lineage-callout p,.lineage-callout a{font-size:13px}
 </style>

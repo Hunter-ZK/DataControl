@@ -17,4 +17,6 @@ watch(()=>route.params.no,async(value)=>{const no=String(value);data.value=null;
 </script>
 <style scoped>
 .head{padding:25px 28px;display:flex;justify-content:space-between;gap:20px;align-items:center}.head h1{font-size:28px;margin:10px 0 5px}.head code{font-size:12px}.head p{margin:8px 0 0;color:var(--dc-text-2);font-size:12px}.status{padding:6px 10px;border-radius:999px;background:#edf8f3;color:#2f8b6c;font-size:11px;font-weight:700}.values{padding:20px;margin-top:16px}.value-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px}.value-head h2{font-size:18px;margin:5px 0 0}.value-head :deep(.el-input){width:260px}@media(max-width:620px){.head,.value-head{align-items:flex-start;flex-direction:column}.value-head :deep(.el-input){width:100%}}
+
+.head{border-color:#c8ddf7;border-radius:15px;background:linear-gradient(110deg,#fff,#f2f8ff);box-shadow:var(--dc-shadow-md);padding:29px}.head h1{color:#1b3d6b;font-size:29px}.head code{font-size:13px}.head p{font-size:14px;line-height:1.8}.status{font-size:13px}.values{padding:25px;border-color:#d5e3f6;border-radius:14px}.value-head h2{font-size:21px;color:#234875}.value-head :deep(.el-input){width:315px}.dc-table th,.dc-table td{font-size:14px}@media(max-width:620px){.head{padding:19px}.head h1{font-size:23px}.value-head :deep(.el-input){width:100%}}
 </style>
