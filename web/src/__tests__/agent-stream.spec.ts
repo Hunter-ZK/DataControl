@@ -73,7 +73,7 @@ describe('Agent NDJSON stream contract', () => {
       body = JSON.parse(String(init?.body)) as Record<string, unknown>
       return {
         ok: true,
-        body: chunks(['{"type":"result","result":{"answer":"可信结果","sqlExecuted":false,"hiddenReasoningExposed":false}}\\n']),
+        body: chunks(['{"type":"result","result":{"answer":"可信结果","sqlExecuted":false,"hiddenReasoningExposed":false}}\n']),
       }
     }) as unknown as typeof fetch
     await streamAgentTurn(
