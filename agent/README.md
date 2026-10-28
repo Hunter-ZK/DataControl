@@ -40,6 +40,9 @@ A successful local acceptance writes `.local/p3-agent-acceptance.json`; Portal s
 
 - Pinned dsh: `@deepseek-ai/dsh@0.2.1-rc.3`. A separate default home at
   `.local/dsh-home-v0.2.1-rc.3` leaves the previous `.local/dsh-home` intact for rollback.
+- The optional Harness Web debugger now uses the v0.2.1 declarative
+  `agent-preset-registry` and the shipped `standard` preset; the old
+  file-based `dataagent-query` directory is retained only as migration history.
 - The headless profile exposes Goal / Todo / subagents / workflow / Plan Mode
   integration and compaction. Model-driven multi-step planning works without
   requiring the interactive Plan Mode approval UI; do not enter interactive

@@ -42,7 +42,7 @@ setup_profile() {
     grep -q "$required" "$out" || { echo "DataAgent profile $name missing $required" >&2; rm -f "$out" "$err"; exit 1; }
   done
   if [ "$name" = "dataagent" ]; then
-    grep -q 'dataagent-query' "$out" || { echo "DataAgent web profile missing dataagent-query preset" >&2; rm -f "$out" "$err"; exit 1; }
+    grep -q 'agent-preset-registry' "$out" || { echo "DataAgent web profile missing agent-preset-registry" >&2; rm -f "$out" "$err"; exit 1; }
   else
     grep -q 'DataControl DataAgent' "$out" || { echo "DataAgent headless profile missing restricted DataControl persona" >&2; rm -f "$out" "$err"; exit 1; }
     if grep -q 'agent-presets' "$out"; then

@@ -69,7 +69,8 @@ def test_dataagent_skill_discovery_is_embedded_and_deterministic():
     assert "approval: ask" in headless
 
 
-def test_web_profile_still_uses_dataagent_query_preset():
+def test_web_profile_uses_v021_declarative_preset_registry():
     text = WEB_PATCH.read_text(encoding="utf-8")
-    assert "agent-presets" in text
-    assert "default: dataagent-query" in text
+    assert "agent-preset-registry" in text
+    assert "default: standard" in text
+    assert "agent-presets" not in text

@@ -48,7 +48,7 @@ try {
       if ($config -notmatch [regex]::Escape($required)) { throw "DataAgent profile $name missing $required" }
     }
     if ($name -eq 'dataagent') {
-      if ($config -notmatch 'dataagent-query') { throw "DataAgent web profile missing dataagent-query preset" }
+      if ($config -notmatch 'agent-preset-registry') { throw "DataAgent web profile missing agent-preset-registry" }
     } else {
       if ($config -notmatch 'DataControl DataAgent') { throw "DataAgent headless profile missing restricted DataControl persona" }
       if ($config -match 'agent-presets') { throw "DataAgent headless profile must not compose the agent-preset roster" }
