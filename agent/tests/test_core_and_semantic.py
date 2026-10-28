@@ -40,25 +40,26 @@ def test_natural_language_metric_resolution_ignores_time_and_query_noise():
         assert result["metric"]["id"] == "loan_balance"
 
 
-def test_latest_period_compiles_to_max_governed_time_field():
+def test_latest_period_uses_dataworks_parameter():
     core = build_demo_core()
     compiled = core.compile_query(
         AuthzContext.system(),
         QueryIR(metric_id="loan_balance", dimensions=("region_code",), time_values=("LATEST",)),
     )
     sql = compiled["sql"]
-    assert "dt = (SELECT MAX(dt) FROM dw.dwd_loan_snapshot)" in sql
+    assert "dt = '${dt}'" in sql
+    assert "SELECT MAX" not in sql
     assert "GROUP BY region_code" in sql
     assert compiled["validation"]["valid"] is True
 
 
-def test_previous_period_is_deterministic():
+def test_previous_period_requires_governed_calendar():
     core = build_demo_core()
-    sql = core.compile_query(
-        AuthzContext.system(),
-        QueryIR(metric_id="loan_balance", time_values=("PREVIOUS",)),
-    )["sql"]
-    assert "MAX(dt)" in sql and "dt < (SELECT MAX(dt)" in sql
+    with pytest.raises(SemanticCompileError, match="governed MONTH"):
+        core.compile_query(
+            AuthzContext.system(),
+            QueryIR(metric_id="loan_balance", time_values=("PREVIOUS",)),
+        )
 
 
 def test_non_additive_metric_rejects_multiple_snapshots():
@@ -276,7 +277,8 @@ def test_p2_latest_comparison_uses_dynamic_governed_period_offset():
         ),
     )
     sql = compiled["sql"]
-    assert "MAX(stat_month)" in sql
+    assert "'${dt}'" in sql
+    assert "MAX(stat_month)" not in sql
     assert "LPAD" in sql
     assert compiled["validation"]["valid"] is True
 

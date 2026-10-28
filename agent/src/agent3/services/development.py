@@ -95,7 +95,7 @@ def generate_etl(source_table: str, target_table: str,
         part = identifier(source_partition)
         if part not in available_columns:
             raise ValueError("Partition field not present in governed source")
-        statement += f"\nWHERE src.{part} = '${{bizdate}}'"
+        statement += f"\nWHERE src.{part} = '${{dt}}'"
     return {
         "sql": statement + ";", "status": "draft_requires_human_review",
         "execution_allowed": False, "requiresApproval": True,

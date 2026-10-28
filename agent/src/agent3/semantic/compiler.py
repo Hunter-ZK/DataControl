@@ -23,6 +23,8 @@ _DERIVED_YOY = re.compile(
 )
 _LATEST = {"LATEST", "CURRENT", "本期", "当期", "当前", "最新", "最近一期"}
 _PREVIOUS = {"PREVIOUS", "PRIOR", "上期", "上一期"}
+# Governed DataWorks scheduling parameter, not an inferred maximum partition.
+_CURRENT_PARAMETER = "'${dt}'"
 
 
 class SemanticCompileError(ValueError):
@@ -283,20 +285,19 @@ class SemanticCompiler:
 
     @staticmethod
     def _current_period_expression(metric: MetricDefinition, table_name: str, values: tuple[str, ...]) -> str:
-        time_field = _ident(metric.time_field)
+        _ = _ident(metric.time_field), _table(table_name)
         if not values:
-            return f"(SELECT MAX({time_field}) FROM {table_name})"
+            return _CURRENT_PARAMETER
         if len(values) != 1:
             raise SemanticCompileError("comparison accepts exactly one current period anchor")
         value = str(values[0]).strip()
         upper = value.upper()
         if upper in _LATEST or value in _LATEST:
-            return f"(SELECT MAX({time_field}) FROM {table_name})"
+            return _CURRENT_PARAMETER
         if upper in _PREVIOUS or value in _PREVIOUS:
-            return (
-                f"(SELECT MAX({time_field}) FROM {table_name} "
-                f"WHERE {time_field} < (SELECT MAX({time_field}) FROM {table_name}))"
-            )
+            if metric.time_grain.strip().upper() != "MONTH":
+                raise SemanticCompileError("previous period requires governed MONTH calendar or explicit period")
+            return _dynamic_month_offset(_CURRENT_PARAMETER, -1)
         return _literal(value)
 
     @staticmethod
@@ -485,17 +486,16 @@ class SemanticCompiler:
             value = str(ir.time_values[0]).strip()
             upper = value.upper()
             if upper in _LATEST or value in _LATEST:
-                where_parts.append(
-                    f"{period_field} = (SELECT MAX({period_field}) FROM {table_name})"
-                )
+                where_parts.append(f"{period_field} = {_CURRENT_PARAMETER}")
             elif upper in _PREVIOUS or value in _PREVIOUS:
-                where_parts.append(
-                    f"{period_field} = (SELECT MAX({period_field}) FROM {table_name} "
-                    f"WHERE {period_field} < (SELECT MAX({period_field}) FROM {table_name}))"
-                )
+                if primary.time_grain.strip().upper() != "MONTH":
+                    raise SemanticCompileError("previous period requires governed MONTH calendar or explicit period")
+                where_parts.append(f"{period_field} = {_dynamic_month_offset(_CURRENT_PARAMETER, -1)}")
             else:
                 where_parts.append(f"{period_field} = {_literal(value)}")
-        elif len(ir.time_values) > 1:
+        elif not ir.time_values:
+            where_parts.append(f"{period_field} = {_CURRENT_PARAMETER}")
+        else:
             values = ", ".join(_literal(value) for value in ir.time_values)
             where_parts.append(f"{period_field} IN ({values})")
 
