@@ -18,6 +18,7 @@ from agent3.semantic.models import (
 )
 from agent3.semantic.registry import SemanticRegistry
 from agent3.semantic.revision import revise_plan
+from agent3.services import development as dw
 from agent3.semantic.validator import SemanticPlanValidator
 from agent3.sql.analysis.analyzer import SQLAnalysisError, SQLAnalyzer
 from agent3.sql.validation.validator import SQLValidator
@@ -327,6 +328,35 @@ class Agent3Core:
                 metrics=metrics,
             )
         )
+
+    def check_naming(self, authz: AuthzContext, name: str) -> dict[str, Any]:
+        root_provider = getattr(self.metadata, "word_roots", None)
+        roots = root_provider(authz) if root_provider is not None else None
+        return dw.check_naming(name, roots=roots)
+
+    def generate_ddl(self, authz: AuthzContext, table: str,
+                     columns: list[dict[str, Any]], comment: str = "",
+                     partition_key: str | None = None) -> dict[str, Any]:
+        _ = authz
+        return dw.generate_ddl(table, columns, comment=comment, partition_key=partition_key)
+
+    def generate_etl(self, authz: AuthzContext, source_table: str,
+                     target_table: str, mappings: list[dict[str, str]],
+                     source_partition: str | None = None) -> dict[str, Any]:
+        table = self.metadata.get_table(authz, source_table)
+        if table is None:
+            raise ValueError("Source table not found in governed metadata")
+        return dw.generate_etl(table.full_name, target_table, mappings, table.column_names,
+                               source_partition=source_partition)
+
+    def generate_dq_checks(self, authz: AuthzContext, table_name: str,
+                           required_columns: list[str] | None = None,
+                           unique_keys: list[str] | None = None) -> dict[str, Any]:
+        table = self.metadata.get_table(authz, table_name)
+        if table is None:
+            raise ValueError("Table not found in governed metadata")
+        return dw.generate_dq_checks(table.full_name, table.column_names,
+                                     required_columns=required_columns, unique_keys=unique_keys)
 
     def submit_ddl(self, authz: AuthzContext, ddl: str) -> dict[str, Any]:
         _ = authz, ddl

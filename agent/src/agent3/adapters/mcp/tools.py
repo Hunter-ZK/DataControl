@@ -120,5 +120,24 @@ class MCPToolAdapter:
         )
         return self._core.compile_query(self._authz(), ir)
 
+    def check_naming(self, name: str) -> dict[str, Any]:
+        return self._core.check_naming(self._authz(), name)
+
+    def generate_ddl(self, table: str, columns: list[dict[str, Any]],
+                     comment: str = "", partition_key: str | None = None) -> dict[str, Any]:
+        return self._core.generate_ddl(self._authz(), table, columns,
+                                       comment=comment, partition_key=partition_key)
+
+    def generate_etl(self, source_table: str, target_table: str,
+                     mappings: list[dict[str, str]],
+                     source_partition: str | None = None) -> dict[str, Any]:
+        return self._core.generate_etl(self._authz(), source_table, target_table, mappings,
+                                       source_partition=source_partition)
+
+    def generate_dq_checks(self, table_name: str, required_columns: list[str] | None = None,
+                           unique_keys: list[str] | None = None) -> dict[str, Any]:
+        return self._core.generate_dq_checks(self._authz(), table_name, required_columns,
+                                             unique_keys)
+
     def submit_ddl(self, ddl: str) -> dict[str, Any]:
         return self._core.submit_ddl(self._authz(), ddl)

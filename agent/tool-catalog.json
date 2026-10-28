@@ -16,6 +16,10 @@
     "validate_sql",
     "explain_sql",
     "compile_query",
+    "check_naming",
+    "generate_ddl",
+    "generate_etl",
+    "generate_dq_checks",
     "submit_ddl"
   ]
 }

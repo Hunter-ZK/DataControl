@@ -85,6 +85,12 @@ class PortalMetadataProvider:
             aliases=tuple(value for value in (row.get("bizName"),) if value),
         )
 
+    def word_roots(self, authz: AuthzContext) -> set[str]:
+        _ = authz
+        rows = self._get("/word-roots")
+        return {str(item.get("root") or "").casefold()
+                for item in rows if isinstance(item, dict) and item.get("root")}
+
     def search_assets(self, authz: AuthzContext, query: str, *, limit: int = 12) -> dict[str, Any]:
         _ = authz
         data = self._get("/search", params={"q": _search_phrase(query), "limit": max(1, min(limit, 40))})
