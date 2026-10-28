@@ -32,6 +32,8 @@ class AgentQuery(BaseModel):
 
 @router.get("/status")
 async def agent_status(modelMode: Literal["deepseek", "free-test"] = "deepseek"):
+    if modelMode != "deepseek":
+        raise HTTPException(410, "Public free-model transport has been retired")
     status = await EmbeddedAgentGateway().status(modelMode)
     return {
         "code": "OK",

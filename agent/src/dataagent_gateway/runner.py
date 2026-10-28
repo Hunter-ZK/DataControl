@@ -455,8 +455,8 @@ class HeadlessHarnessRunner:
         self.model_mode = model_mode if model_mode is not None else os.getenv(
             "DATACONTROL_AGENT_MODEL_MODE", "deepseek"
         )
-        if self.model_mode not in ("deepseek", "free-test"):
-            raise ValueError("Unsupported DataAgent model mode")
+        if self.model_mode != "deepseek":
+            raise ValueError("Only the official DeepSeek model is supported; public gateway retired")
         self.free_test = self.model_mode == "free-test"
         self.profile = (
             "dataagent-headless-free" if self.free_test

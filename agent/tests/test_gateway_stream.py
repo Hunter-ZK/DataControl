@@ -151,7 +151,7 @@ def test_public_model_requests_require_explicit_consent():
             try:
                 await handler(free_request)
             except HTTPException as exc:
-                assert exc.status_code == 403
+                assert exc.status_code == 410
             else:
                 raise AssertionError("Public gateway access requires consent")
 
@@ -161,11 +161,11 @@ def test_public_model_requests_require_explicit_consent():
 def test_selected_model_uses_independent_harness_profile(monkeypatch):
     monkeypatch.delenv("DATACONTROL_AGENT_MODEL_MODE", raising=False)
     standard = HeadlessHarnessRunner(model_mode="deepseek")
-    free = HeadlessHarnessRunner(model_mode="free-test")
+    import pytest
     assert standard.profile == "dataagent-headless"
-    assert free.profile == "dataagent-headless-free"
     assert standard._command(None)[-3:] == ["--profile", "dataagent-headless", "--json"]
-    assert free._command(None)[-3:] == ["--profile", "dataagent-headless-free", "--json"]
+    with pytest.raises(ValueError):
+        HeadlessHarnessRunner(model_mode="free-test")
 
 
 def test_early_cancel_before_stream_iterator_consumed(monkeypatch):

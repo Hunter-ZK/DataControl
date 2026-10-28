@@ -37,8 +37,8 @@ async def health(modelMode: Literal["deepseek", "free-test"] | None = None):
 
 @app.post("/v1/query")
 async def query(body: QueryRequest):
-    if body.modelMode == "free-test" and not body.publicGatewayConsent:
-        raise HTTPException(403, detail="Public gateway requires explicit per-turn consent")
+    if body.modelMode != "deepseek":
+        raise HTTPException(410, detail="Public free-model transport has been retired")
     runner = HeadlessHarnessRunner(model_mode=body.modelMode)
     try:
         result = await runner.run(body.question.strip(), session_id=body.sessionId)
@@ -60,6 +60,8 @@ def _json_line(value: dict[str, Any]) -> str:
 
 @app.post("/v1/query/stream")
 async def query_stream(body: QueryRequest):
+    if body.modelMode != "deepseek":
+        raise HTTPException(410, detail="Public free-model transport has been retired")
     if body.runId is None:
         raise HTTPException(422, detail="runId is required for cancellation")
     run_id = str(body.runId)

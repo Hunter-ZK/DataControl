@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/v1/agent/conversations", tags=["agent-history"])
 
 class ConversationNew(BaseModel):
     title: str = Field(min_length=1, max_length=200)
-    modelMode: Literal["deepseek", "free-test"] = "deepseek"
+    modelMode: Literal["deepseek"] = "deepseek"
     contextAsset: dict[str, Any] | None = None
 
 
@@ -79,7 +79,7 @@ def import_legacy(body: ImportRequest, user: User = Depends(get_current_user)):
                 session = None
             conv = history.create(
                 db, user.id, item.title, mode, legacy_messages=rows,
-                session_id=session, pinned=item.pinned, context_asset=item.contextAsset,
+                session_id=None, pinned=item.pinned, context_asset=item.contextAsset,
             )
             imported.append(history.serialize(db, conv))
     return {"code": "OK", "data": imported}
