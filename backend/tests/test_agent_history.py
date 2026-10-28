@@ -59,6 +59,7 @@ def test_run_idempotency_and_one_active_turn(store):
         "answer": "已验证", "sessionId": "session-test", "sqlExecuted": False,
         "hiddenReasoningExposed": False,
     })
+    store.expire_all()
     repeated, replay = history.reserve(store, 1, conv.id, run_id, "question one", "deepseek")
     assert replay is True and repeated.status == "completed"
     with pytest.raises(HTTPException):
@@ -87,6 +88,7 @@ def test_result_and_events_never_persist_raw_tool_input(store):
         ], "rawProviderPayload": secret, "sqlExecuted": False,
         "hiddenReasoningExposed": False,
     })
+    store.expire_all()
     saved = store.get(AgentTurn, run_id)
     assert secret not in saved.result_json
     assert "rawProviderPayload" not in saved.result_json
@@ -100,8 +102,10 @@ def test_failed_or_cancelled_run_must_invalidate_session(store):
     history.reserve(store, 1, conv.id, run_id, "question", "deepseek")
     history.transition(run_id, "cancel_requested")
     history.transition(run_id, "running")  # delayed startup cannot override stop
+    store.expire_all()
     assert store.get(AgentTurn, run_id).status == "cancel_requested"
     history.transition(run_id, "cancelled")
+    store.expire_all()
     assert history.serialize(store, conv)["sessionId"] is None
     history.transition(run_id, "completed", result={"answer": "late result"})
     assert store.get(AgentTurn, run_id).status == "cancelled"
@@ -113,6 +117,7 @@ def test_displayed_question_differs_from_internal_prompt(store):
     history.reserve(store, 1, conv.id, run_id, "internal asset context + question",
                     "deepseek", display_question="字段是什么意思？")
     history.transition(run_id, "failed")
+    store.expire_all()
     assert history.serialize(store, conv)["messages"][-2]["text"] == "字段是什么意思？"
 
 
