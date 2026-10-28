@@ -22,7 +22,7 @@ export NO_PROXY="127.0.0.1,localhost,::1${NO_PROXY:+,$NO_PROXY}"
 export no_proxy="$NO_PROXY"
 
 if [ "$SKIP_AGENT" -eq 0 ]; then
-  if ! "$PYTHON" -c 'import agent3, dataagent_gateway' >/dev/null 2>&1 || [ ! -x agent/dsh/node_modules/.bin/dsh ] || [ ! -f .local/dsh-home/profiles/dataagent-headless/package.json ]; then
+  if ! "$PYTHON" -c 'import agent3, dataagent_gateway' >/dev/null 2>&1 || [ ! -x agent/dsh/node_modules/.bin/dsh ] || [ ! -f .local/dsh-home-v0.2.1-rc.3/profiles/dataagent-headless/package.json ]; then
     echo "Embedded DataAgent setup is incomplete; bootstrapping it in the shared .venv now..."
     bash ./scripts/setup-agent.sh
   fi
@@ -124,7 +124,7 @@ PY
 
   export AGENT3_MCP_POC_MODE=1
   export DATACONTROL_PORTAL_URL=http://127.0.0.1:8000/api/v1
-  export DSH_HOME="$ROOT/.local/dsh-home"
+  export DSH_HOME="$ROOT/.local/dsh-home-v0.2.1-rc.3"
   export DSH_TELEMETRY_MODE=DISABLED
   (cd agent && "$PYTHON" -m agent3.adapters.mcp.server) >.local/agent-mcp.log 2>.local/agent-mcp.err.log & MCP_PID=$!
   wait_tcp "$MCP_PID" 8900 "Agent3 MCP" .local/agent-mcp.err.log 30

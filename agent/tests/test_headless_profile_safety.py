@@ -23,7 +23,7 @@ def test_headless_profile_is_direct_and_does_not_depend_on_agent_presets():
     assert "mode: native" in text
 
 
-def test_headless_profile_disables_general_purpose_model_tools():
+def test_headless_profile_enables_autonomy_but_blocks_unsafe_tools():
     text = HEADLESS_PATCH.read_text(encoding="utf-8")
     blocked = {
         "tool-plugin-manager",
@@ -32,6 +32,10 @@ def test_headless_profile_disables_general_purpose_model_tools():
         "tool-jobs",
         "tool-fs",
         "tool-fs-search",
+        "tool-ralph",
+        "tool-web",
+    }
+    enabled = {
         "command-goal",
         "tool-goal",
         "plan-mode",
@@ -44,12 +48,13 @@ def test_headless_profile_disables_general_purpose_model_tools():
         "tool-subagent-fork",
         "workflow-ptc",
         "tool-workflow",
-        "tool-ralph",
         "tool-todo",
-        "tool-web",
     }
     missing = sorted(row_id for row_id in blocked if not _row_disabled(text, row_id))
     assert missing == [], f"headless safety tombstones missing: {missing}"
+    still_disabled = sorted(row_id for row_id in enabled if _row_disabled(text, row_id))
+    assert still_disabled == [], f"autonomous planning tools still disabled: {still_disabled}"
+    assert "Decompose complex user tasks" in text
 
 
 def test_dataagent_skill_discovery_is_embedded_and_deterministic():

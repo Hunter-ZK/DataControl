@@ -38,7 +38,7 @@ try {
   Push-Location agent\guard-plugin
   try{npm install --no-audit --no-fund;npm run build;npm test;if($LASTEXITCODE -ne 0){throw "guard plugin verification failed"}}finally{Pop-Location}
 
-  & .\agent\scripts\setup_dataagent.ps1 -DshHome (Join-Path $root ".local\dsh-home")
+  & .\agent\scripts\setup_dataagent.ps1 -DshHome (Join-Path $root ".local\dsh-home-v0.2.1-rc.3")
   & $python -c "import agent3, dataagent_gateway, cryptography; print('Agent Python imports OK; cryptography=' + cryptography.__version__)"
   if($LASTEXITCODE -ne 0){throw "Agent imports failed after setup"}
   Write-Host "Embedded DataAgent setup complete (shared .venv + local dsh profile)."

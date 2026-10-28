@@ -2,7 +2,7 @@
 set -euo pipefail
 AGENT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_ROOT="$(cd "$AGENT_ROOT/.." && pwd)"
-DSH_HOME="${DSH_HOME:-$REPO_ROOT/.local/dsh-home}"
+DSH_HOME="${DSH_HOME:-$REPO_ROOT/.local/dsh-home-v0.2.1-rc.3}"
 export DSH_HOME DSH_TELEMETRY_MODE=DISABLED
 DSH_DIR="$AGENT_ROOT/dsh"
 GUARD_DIR="$AGENT_ROOT/guard-plugin"

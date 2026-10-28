@@ -50,10 +50,10 @@ echo "Installing wheel-compatible cryptography runtime..."
 
 (cd agent/dsh && npm install --no-audit --no-fund)
 (cd agent/guard-plugin && npm install --no-audit --no-fund && npm run build && npm test)
-DSH_HOME="$ROOT/.local/dsh-home" bash agent/scripts/setup_dataagent.sh
+DSH_HOME="$ROOT/.local/dsh-home-v0.2.1-rc.3" bash agent/scripts/setup_dataagent.sh
 
 "$PYTHON" -c 'import agent3, dataagent_gateway, cryptography; print("Agent Python imports OK; cryptography=" + cryptography.__version__)'
 [ -x agent/dsh/node_modules/.bin/dsh ] || { echo "dsh installation did not produce agent/dsh/node_modules/.bin/dsh" >&2; exit 1; }
-[ -f .local/dsh-home/profiles/dataagent-headless/package.json ] || { echo "DataAgent headless profile bootstrap did not complete." >&2; exit 1; }
+[ -f .local/dsh-home-v0.2.1-rc.3/profiles/dataagent-headless/package.json ] || { echo "DataAgent headless profile bootstrap did not complete." >&2; exit 1; }
 
 echo "Embedded DataAgent setup complete (shared .venv + local dsh profile)."

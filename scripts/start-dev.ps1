@@ -7,7 +7,7 @@ Set-Location $root
 
 $python=Join-Path $root ".venv\Scripts\python.exe"
 $dshBin=Join-Path $root "agent\dsh\node_modules\.bin\dsh.cmd"
-$headlessProfile=Join-Path $root ".local\dsh-home\profiles\dataagent-headless\package.json"
+$headlessProfile=Join-Path $root ".local\dsh-home-v0.2.1-rc.3\profiles\dataagent-headless\package.json"
 $localDir=Join-Path $root ".local"
 $backendOut=Join-Path $localDir "backend.log"
 $backendErr=Join-Path $localDir "backend.err.log"
@@ -99,7 +99,7 @@ try {
 
     $env:AGENT3_MCP_POC_MODE="1"
     $env:DATACONTROL_PORTAL_URL="http://127.0.0.1:8000/api/v1"
-    $env:DSH_HOME=(Join-Path $root ".local\dsh-home")
+    $env:DSH_HOME=(Join-Path $root ".local\dsh-home-v0.2.1-rc.3")
     $env:DSH_TELEMETRY_MODE="DISABLED"
     $mcp=Start-Process -FilePath $python -ArgumentList "-m","agent3.adapters.mcp.server" -WorkingDirectory (Join-Path $root "agent") -RedirectStandardOutput $mcpOut -RedirectStandardError $mcpErr -PassThru
     Wait-ServicePort $mcp 8900 "Agent3 MCP" $mcpErr 30

@@ -426,7 +426,7 @@ class HeadlessHarnessRunner:
             os.getenv("DATACONTROL_AGENT_RUN_TIMEOUT", "120")
         )
         self.dsh_home = Path(
-            os.getenv("DSH_HOME", str(self.repo_root / ".local" / "dsh-home"))
+            os.getenv("DSH_HOME", str(self.repo_root / ".local" / "dsh-home-v0.2.1-rc.3"))
         ).resolve()
         suffix = "dsh.cmd" if os.name == "nt" else "dsh"
         self.dsh_bin = self.agent_root / "dsh" / "node_modules" / ".bin" / suffix
