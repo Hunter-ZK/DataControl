@@ -12,7 +12,37 @@ PYTHON="$ROOT/.venv/bin/python"
   echo "DataControl .venv must use Python 3.13 or 3.14; found $($PYTHON --version 2>&1)." >&2
   exit 1
 }
-command -v npm >/dev/null 2>&1 || { echo "npm is required." >&2; exit 1; }
+command -v npm >/dev/null 2>&1 || { echo "Node.js 24+ and npm are required." >&2; exit 1; }
+node_major="$(node -p 'Number(process.versions.node.split(".")[0])')" || exit 1
+if [ "$node_major" -lt 24 ]; then
+  echo "Node.js 24+ is required; found $(node --version)." >&2
+  exit 1
+fi
+
+# Read only DEEPSEEK_API_KEY from .env. Never source arbitrary shell commands
+# from a configuration file, and never print the credential to startup logs.
+if [ -z "${DEEPSEEK_API_KEY:-}" ] && [ -f "$ROOT/.env" ]; then
+  local_deepseek_key="$("$PYTHON" - "$ROOT/.env" <<'PY'
+import re
+import sys
+from pathlib import Path
+for line in Path(sys.argv[1]).read_text(encoding="utf-8-sig").splitlines():
+    match = re.fullmatch(r"\s*(?:export\s+)?DEEPSEEK_API_KEY\s*=\s*(.*?)\s*", line)
+    if not match:
+        continue
+    value = match.group(1).strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+        value = value[1:-1]
+    print(value, end="")
+    break
+PY
+  )"
+  if [ -n "$local_deepseek_key" ]; then
+    export DEEPSEEK_API_KEY="$local_deepseek_key"
+    echo "Official DeepSeek credential: loaded from private .env"
+  fi
+  unset local_deepseek_key
+fi
 [ -x web/node_modules/.bin/vite ] || { echo "Frontend dependencies are missing. Run ./scripts/setup-dev.sh (or npm install inside web) first." >&2; exit 1; }
 mkdir -p .local
 
@@ -21,10 +51,35 @@ mkdir -p .local
 export NO_PROXY="127.0.0.1,localhost,::1${NO_PROXY:+,$NO_PROXY}"
 export no_proxy="$NO_PROXY"
 
+# This is the same profile root used by the running Gateway and dsh.
+export DSH_HOME="${DSH_HOME:-$ROOT/.local/dsh-home-v0.2.1-rc.3}"
 if [ "$SKIP_AGENT" -eq 0 ]; then
-  if ! "$PYTHON" -c 'import agent3, dataagent_gateway' >/dev/null 2>&1 || [ ! -x agent/dsh/node_modules/.bin/dsh ] || [ ! -f .local/dsh-home-v0.2.1-rc.3/profiles/dataagent-headless/package.json ]; then
-    echo "Embedded DataAgent setup is incomplete; bootstrapping it in the shared .venv now..."
+  if ! "$PYTHON" -c 'import agent3, dataagent_gateway' >/dev/null 2>&1 \
+      || [ ! -x agent/dsh/node_modules/.bin/dsh ] \
+      || [ ! -f agent/guard-plugin/dist/index.js ]; then
+    echo "Installing missing Agent dependencies..."
     bash ./scripts/setup-agent.sh
+  else
+    # Profile text changes are common during git pull. Rebuild profile
+    # overlays without unnecessarily reinstalling Python/npm dependencies.
+    profiles_current=1
+    for spec in "dataagent:cordis.patch.yml" \
+                "dataagent-headless:headless.patch.yml" \
+                "dataagent-headless-multi:headless-multi.patch.yml"; do
+      profile_name="${spec%%:*}"
+      source_name="${spec#*:}"
+      active="$DSH_HOME/profiles/$profile_name"
+      if [ ! -f "$active/package.json" ] \
+          || [ ! -f "$active/cordis.patch.yml" ] \
+          || ! cmp -s "agent/dsh/profile/$source_name" "$active/cordis.patch.yml"; then
+        profiles_current=0
+        break
+      fi
+    done
+    if [ "$profiles_current" -eq 0 ]; then
+      echo "Agent profile configuration changed; refreshing all profiles..."
+      bash agent/scripts/setup_dataagent.sh
+    fi
   fi
   "$PYTHON" -c 'import agent3, dataagent_gateway' >/dev/null 2>&1 || { echo "Embedded DataAgent Python package is unavailable after setup." >&2; exit 1; }
 fi
@@ -67,7 +122,15 @@ wait_tcp() {
     if ! kill -0 "$pid" >/dev/null 2>&1; then
       echo "$name exited before binding port $port." >&2; echo "--- $name stderr ---" >&2; tail -n 40 "$errlog" 2>/dev/null || true; return 1
     fi
-    if (echo >/dev/tcp/127.0.0.1/"$port") >/dev/null 2>&1; then return 0; fi
+    if "$PYTHON" - "$port" <<'PY' >/dev/null 2>&1
+import socket, sys
+try:
+    with socket.create_connection(("127.0.0.1", int(sys.argv[1])), timeout=0.4):
+        pass
+except OSError:
+    raise SystemExit(1)
+PY
+    then return 0; fi
     sleep .25
   done
   echo "$name did not bind port $port within ${timeout}s." >&2; tail -n 40 "$errlog" 2>/dev/null || true; return 1
@@ -124,7 +187,7 @@ PY
 
   export AGENT3_MCP_POC_MODE=1
   export DATACONTROL_PORTAL_URL=http://127.0.0.1:8000/api/v1
-  export DSH_HOME="$ROOT/.local/dsh-home-v0.2.1-rc.3"
+  export DSH_HOME
   export DSH_TELEMETRY_MODE=DISABLED
   (cd agent && "$PYTHON" -m agent3.adapters.mcp.server) >.local/agent-mcp.log 2>.local/agent-mcp.err.log & MCP_PID=$!
   wait_tcp "$MCP_PID" 8900 "Agent3 MCP" .local/agent-mcp.err.log 30
