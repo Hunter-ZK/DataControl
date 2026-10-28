@@ -107,7 +107,7 @@ def serialize(db: Session, conv: AgentConversation) -> dict:
         "id": conv.id, "serverId": conv.id, "title": conv.title,
         "modelMode": conv.model_mode, "sessionId": conv.session_id,
         "pinned": conv.pinned, "messages": messages[-80:],
-        "contextAsset": _decode(conv.context_asset_json, {}),
+        "contextAsset": _decode(conv.context_asset_json, {}) if conv.context_asset_json else None,
         "createdAt": int(conv.created_at.timestamp() * 1000),
         "updatedAt": int(conv.updated_at.timestamp() * 1000),
         "lastRunStatus": turns[-1].status if turns else None,
