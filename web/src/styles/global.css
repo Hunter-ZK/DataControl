@@ -56,3 +56,21 @@ a { text-decoration: none; color: inherit; }
   .dc-toolbar { align-items: stretch; flex-direction: column; }
   .dc-toolbar > * { width: 100%; }
 }
+
+
+/* Atlas 2.0: high-contrast readable surfaces and deliberate depth */
+body{background:radial-gradient(ellipse 1200px 540px at 76% -210px,#daeaff 0,transparent 80%),var(--dc-bg);font-size:15px}
+.dc-page{padding-top:30px}
+.dc-eyebrow{font-size:13px;letter-spacing:.08em}
+.dc-title{font-size:30px;font-weight:790;color:#14284c}
+.dc-subtitle{font-size:15px;color:#536987}
+.dc-card{border:1px solid var(--dc-border);box-shadow:0 8px 24px rgba(37,85,156,.065);border-radius:14px}
+.dc-card:hover{border-color:#c4d7f0}
+.dc-chip{font-size:13px;padding:5px 10px}
+.dc-section-title{font-size:20px}
+.dc-table th{background:#edf5ff;color:#49617f;font-size:13px;padding:15px 16px}
+.dc-table td{font-size:14px;padding:15px 16px}
+.dc-list-item{background:linear-gradient(145deg,#fff,#fbfdff);border-color:#d7e6f6;box-shadow:0 3px 12px rgba(32,83,153,.045)}
+.dc-list-item:hover{box-shadow:0 10px 26px rgba(32,83,153,.12)}
+.dc-page-head{margin-bottom:23px}
+@media(max-width:720px){.dc-title{font-size:26px}.dc-page{padding-top:20px}.dc-table th,.dc-table td{padding:12px}}

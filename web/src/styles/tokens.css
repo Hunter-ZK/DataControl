@@ -1,10 +1,10 @@
 :root {
   /* DataControl professional light workspace */
-  --dc-bg: #f5f8fc;
+  --dc-bg: #edf4fd;
   --dc-surface: #ffffff;
-  --dc-surface-soft: #f8faff;
-  --dc-border: #e3eaf4;
-  --dc-border-strong: #cad8eb;
+  --dc-surface-soft: #f1f7ff;
+  --dc-border: #d6e3f5;
+  --dc-border-strong: #b8cdea;
   --dc-text: #172c4d;
   --dc-text-2: #586c87;
   --dc-text-3: #8393a8;
@@ -18,17 +18,17 @@
   --dc-radius-sm: 8px;
   --dc-radius-md: 12px;
   --dc-radius-lg: 16px;
-  --dc-shadow-sm: 0 2px 9px rgba(26, 65, 131, 0.035);
-  --dc-shadow-md: 0 12px 38px rgba(30, 76, 143, 0.075);
+  --dc-shadow-sm: 0 4px 16px rgba(31, 76, 151, 0.075);
+  --dc-shadow-md: 0 16px 42px rgba(26, 69, 141, 0.13);
   --dc-container: 1450px;
   --dc-sidebar: 228px;
   --dc-agent: #2563eb;
   --dc-agent-soft: #eef4ff;
-  --dc-font-xs: 12px;
+  --dc-font-xs: 13px;
   --dc-font-sm: 13px;
-  --dc-font-body: 14px;
+  --dc-font-body: 15px;
   --dc-font-lg: 16px;
-  --dc-font-title: 20px;
+  --dc-font-title: 22px;
   --dc-font-display: 30px;
   --dc-space-unit: 4px;
   --dc-topbar: 64px;

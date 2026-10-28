@@ -3,9 +3,16 @@
     <div class="dc-container">
       <section class="atlas-hero">
         <div class="hero-lead">
-          <span class="dc-eyebrow">DATA INTELLIGENCE WORKSPACE</span>
-          <h1>找到数据，理解口径，开始分析。</h1>
-          <p>从一个入口发现数据集、字段、指标与标准，让每次查询都有清晰的依据。</p>
+          <span class="dc-eyebrow">✦ DATA INTELLIGENCE WORKSPACE</span>
+          <h1>数据触手可及，<em>分析从此开始。</em></h1>
+          <p>统一连接数仓资产、业务指标与统计标准。快速找数，理解口径，让 DataAgent 帮你生成可信 SQL。</p>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="orbital-ring orbital-ring-a"></div><div class="orbital-ring orbital-ring-b"></div>
+          <div class="data-node data-node-main"><Database :size="30"/><b>DATA</b></div>
+          <div class="data-node data-node-up"><ChartNoAxesCombined :size="20"/><span>METRIC</span></div>
+          <div class="data-node data-node-down"><Sparkles :size="21"/><span>AI AGENT</span></div>
+          <span class="signal signal-a"></span><span class="signal signal-b"></span>
         </div>
         <div class="hero-content">
           <div class="hero-search">
@@ -42,6 +49,24 @@
           </section>
           <div class="hot"><span>试试搜索</span><button v-for="x in hot" :key="x" @click="quick(x)">{{x}}</button></div>
         </div>
+      </section>
+      <section class="quick-capabilities" aria-label="核心功能">
+        <RouterLink to="/catalog" class="capability">
+          <span class="cap-icon cap-blue"><Database :size="27"/></span>
+          <span><b>资产目录</b><small>按业务层级逐层浏览数据资产</small></span><ArrowUpRight :size="19"/>
+        </RouterLink>
+        <RouterLink to="/metrics" class="capability">
+          <span class="cap-icon cap-purple"><ChartNoAxesCombined :size="27"/></span>
+          <span><b>业务指标</b><small>指标字典、来源与统计口径</small></span><ArrowUpRight :size="19"/>
+        </RouterLink>
+        <RouterLink to="/code-tables" class="capability">
+          <span class="cap-icon cap-cyan"><BookOpenCheck :size="27"/></span>
+          <span><b>标准规范</b><small>码表、标准与字段词根</small></span><ArrowUpRight :size="19"/>
+        </RouterLink>
+        <RouterLink to="/agent" class="capability cap-agent">
+          <span class="cap-icon cap-violet"><Sparkles :size="27"/></span>
+          <span><b>DataAgent</b><small>问数、生成 SQL 和开发草案</small></span><ArrowUpRight :size="19"/>
+        </RouterLink>
       </section>
       <div class="workspace-heading">
         <div><span class="dc-eyebrow">YOUR WORKSPACE</span><h2>继续你的工作</h2></div>
@@ -85,7 +110,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { ArrowRight, ArrowUpRight, Search, Sparkles } from 'lucide-vue-next'
+import { ArrowRight, ArrowUpRight, BookOpenCheck, ChartNoAxesCombined, Database, Search, Sparkles } from 'lucide-vue-next'
 import { activityApi, assetApi, agentApi, type SearchItem, type SearchSuggestion, type ServerAgentConversation } from '@/api/client'
 import AssetIcon from '@/components/AssetIcon.vue'
 
@@ -219,4 +244,69 @@ onMounted(async()=>{
 @media(max-width:1180px){.workspace-grid{grid-template-columns:1fr}.mini-stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:720px){.atlas-home{padding-top:18px}.atlas-hero{padding:25px 19px 21px}.hero-lead h1{font-size:25px}.hero-search{flex-wrap:wrap}.search-primary{flex:0 0 auto}.mini-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.hero-search input{flex-basis:calc(100% - 40px)}.search-primary{width:100%;justify-content:center}.search-mode>span{display:none}.recent-item>.dc-chip{display:none}.recent-panel,.chat-panel,.overview-panel{padding:16px}}
+
+/* Atlas 2.0 home: atmospheric hero plus structurally useful capability tiles */
+.atlas-home{padding-top:26px}
+.atlas-hero{position:relative;overflow:visible;isolation:isolate;padding:39px 45px 28px;border-radius:22px;background:linear-gradient(119deg,#14376d 0%,#1e50a7 54%,#3278e2 100%);border:1px solid #2464bc;box-shadow:0 22px 50px rgba(27,78,156,.2)}
+.atlas-hero:before{content:'';position:absolute;inset:0;z-index:-1;opacity:.32;border-radius:22px;background-image:linear-gradient(rgba(255,255,255,.09) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.09) 1px,transparent 1px);background-size:29px 29px;mask-image:linear-gradient(to left,#000,transparent 72%)}
+.atlas-hero:after{content:'';position:absolute;right:-35px;top:-100px;width:480px;height:380px;z-index:-1;background:radial-gradient(circle,rgba(126,195,255,.3),transparent 68%);pointer-events:none}
+.hero-lead{position:relative;z-index:2;max-width:860px}
+.hero-lead .dc-eyebrow{color:#b5d9ff;font-size:13px;letter-spacing:.14em}
+.hero-lead h1{font-size:39px;line-height:1.32;color:#fff;margin:11px 0 11px;letter-spacing:-.035em;text-shadow:0 2px 12px rgba(0,0,0,.06)}
+.hero-lead h1 em{font-style:normal;color:#bce7ff}
+.hero-lead p{font-size:15px;color:#d4e7ff;line-height:1.85;max-width:660px}
+.hero-content{max-width:880px;position:relative;z-index:2;margin-top:28px}
+.hero-search{min-height:65px;padding:8px 9px 8px 17px;background:#fff;border-radius:13px;border:2px solid rgba(255,255,255,.85);box-shadow:0 14px 30px rgba(7,34,86,.21)}
+.hero-search input{font-size:16px;color:#1c3559}
+.search-primary{height:45px;font-size:14px;padding:0 21px;border-radius:9px;background:linear-gradient(110deg,#2866eb,#4e8ef6)}
+.search-mode{margin:13px 0 0}
+.search-mode button{color:#e1edff;font-size:13px;padding:7px 12px}
+.search-mode .mode-active{background:rgba(255,255,255,.22);color:#fff}
+.search-mode button:hover{background:rgba(255,255,255,.14);color:white}
+.search-mode>span{color:#c4ddfa}
+.hot{margin-top:17px}
+.hot span{color:#c2d8f5;font-size:13px}
+.hot button{background:rgba(255,255,255,.13);color:#e8f3ff;border:1px solid rgba(255,255,255,.23);font-size:13px;padding:6px 12px}
+.hot button:hover{background:rgba(255,255,255,.24);color:#fff}
+.hero-art{position:absolute;right:30px;top:12px;width:255px;height:255px;pointer-events:none;opacity:.9}
+.orbital-ring{position:absolute;border:1px dashed rgba(197,227,255,.37);border-radius:50%;inset:18px}
+.orbital-ring-b{inset:52px;border-style:solid;border-color:rgba(174,218,255,.23)}
+.data-node{position:absolute;display:flex;gap:4px;align-items:center;justify-content:center;flex-direction:column;color:#fff;border:1px solid rgba(230,247,255,.32);background:rgba(255,255,255,.12);backdrop-filter:blur(12px);box-shadow:0 10px 22px rgba(1,27,90,.22)}
+.data-node-main{top:87px;left:88px;width:82px;height:82px;border-radius:23px;background:rgba(112,197,255,.22)}
+.data-node-main b{font-size:12px;letter-spacing:.1em}
+.data-node-up,.data-node-down{width:76px;height:68px;border-radius:16px}
+.data-node-up{top:24px;right:11px}.data-node-down{bottom:22px;left:0}
+.data-node span{font-size:10px;letter-spacing:.08em;font-weight:760}
+.signal{position:absolute;width:8px;height:8px;border-radius:50%;background:#7bdcff;box-shadow:0 0 0 8px rgba(123,220,255,.11)}
+.signal-a{top:50px;left:40px}.signal-b{bottom:35px;right:38px}
+.quick-capabilities{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px;margin-top:19px}
+.capability{display:flex;align-items:center;gap:13px;min-width:0;min-height:117px;padding:18px 15px;background:linear-gradient(150deg,#fff,#f8fbff);border:1px solid #cfe0f6;border-radius:16px;box-shadow:0 8px 21px rgba(38,82,154,.09);transition:transform .18s,border-color .18s,box-shadow .18s}
+.capability:hover{transform:translateY(-3px);border-color:#95b9f6;box-shadow:0 14px 33px rgba(32,84,166,.16)}
+.capability>span:nth-child(2){display:grid;gap:5px;flex:1;min-width:0}
+.capability b{font-size:17px;color:#1b365d;font-weight:770}
+.capability small{font-size:13px;color:#627895;line-height:1.55}
+.capability>svg{color:#9badc4;flex:none}
+.cap-icon{width:53px;height:53px;min-width:53px;display:grid;place-items:center;border-radius:15px;border:1px solid rgba(35,98,185,.10);box-shadow:inset 0 1px white,0 8px 19px rgba(48,100,179,.1)}
+.cap-blue{background:linear-gradient(145deg,#deebff,#edf5ff);color:#2866ed}
+.cap-purple{background:linear-gradient(145deg,#eee7ff,#f6f0ff);color:#7955da}
+.cap-cyan{background:linear-gradient(145deg,#d9f6ff,#eafcff);color:#1689b5}
+.cap-violet{background:linear-gradient(145deg,#e5e9ff,#f2edff);color:#7255db}
+.cap-agent{background:linear-gradient(125deg,#eef2ff,#fff)}
+.workspace-heading{margin-top:33px}
+.workspace-heading h2{font-size:22px}
+.recent-panel,.chat-panel,.overview-panel{padding:24px}
+.panel-head h3{font-size:17px}
+.panel-head p,.panel-head a{font-size:13px}
+.recent-item{min-height:78px}
+.recent-item b{font-size:15px}
+.recent-item code,.recent-chat{font-size:13px}
+.mini-stats strong{font-size:27px;color:#1f58ad}
+.mini-stats span{font-size:13px}
+.search-suggestions,.home-search-results{position:relative;z-index:10;border-color:#bfd5ef;box-shadow:0 16px 35px rgba(8,37,86,.15)}
+.result-heading b{font-size:15px}
+.suggest-item b,.result-card b{font-size:14px}
+@media(max-width:1340px){.quick-capabilities{grid-template-columns:repeat(2,minmax(0,1fr))}.hero-art{opacity:.45}}
+@media(max-width:900px){.hero-art{display:none}.atlas-hero{padding:30px}.hero-lead h1{font-size:34px}}
+@media(max-width:620px){.atlas-hero{padding:25px 19px 22px;border-radius:16px}.hero-lead h1{font-size:27px}.hero-lead p{font-size:14px}.quick-capabilities{grid-template-columns:1fr 1fr;gap:9px}.capability{min-height:107px;align-items:flex-start;flex-direction:column;padding:14px;gap:9px}.cap-icon{width:45px;height:45px;min-width:45px}.capability b{font-size:15px}.capability small{font-size:12px}.capability>svg{display:none}}
+
 </style>

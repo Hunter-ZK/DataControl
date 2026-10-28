@@ -12,8 +12,8 @@
           <div class="nav-section">{{ group.title }}</div>
           <RouterLink v-for="item in group.items" :key="item.to" :to="item.to"
             class="nav-item" :title="item.label">
-            <AssetIcon v-if="'assetType' in item && item.assetType" :type="item.assetType" :size="18" mode="inline"/>
-            <component :is="item.icon" v-else :size="18" :stroke-width="1.9"/>
+            <AssetIcon v-if="'assetType' in item && item.assetType" :type="item.assetType" :size="21" mode="inline"/>
+            <component :is="item.icon" v-else :size="21" :stroke-width="1.9"/>
             <span>{{ item.label }}</span>
           </RouterLink>
         </div>
@@ -211,4 +211,24 @@ onBeforeUnmount(() => window.removeEventListener('keydown', shortcut))
 .shell.is-collapsed .nav-item{justify-content:center}
 @media(max-width:1080px){.nav-section{display:none}.nav-group{margin-bottom:13px}}
 @media(max-width:820px){.top-left{min-width:0}}
+
+/* Visual hierarchy: active navigation is a vivid anchored rail, not a pale text row. */
+.shell{background:transparent}
+.sidebar{background:linear-gradient(180deg,#fdfefe 0%,#f7fbff 100%);border-right:1px solid #d6e5f6;box-shadow:4px 0 26px rgba(38,83,153,.035)}
+.brand{height:67px}
+.brand-mark{width:46px;height:46px;border-radius:14px;background:linear-gradient(145deg,#2767eb,#4aa1fa);box-shadow:0 9px 24px rgba(37,99,235,.23)}
+.brand-copy b{font-size:19px;color:#14294d}
+.brand-copy small{font-size:12px;color:#8496ae}
+.nav-section{font-size:12px;font-weight:790;color:#92a0b5;padding:15px 14px 7px}
+.nav-item{min-height:49px;padding:12px 14px;font-size:14px;font-weight:590;border-radius:11px;gap:13px}
+.nav-item:hover{background:#eaf3ff}
+.nav-item.router-link-exact-active{background:linear-gradient(95deg,#e7f1ff,#f1f7ff);color:#195bd0;box-shadow:inset 4px 0 #3274ed,0 4px 13px rgba(42,93,172,.08)}
+.topbar{background:rgba(255,255,255,.96);border-bottom:1px solid #d4e2f4;box-shadow:0 3px 15px rgba(30,75,153,.045)}
+.command{border:1px solid #d4e1f4;background:#f1f6fe;height:42px;border-radius:11px}
+.command:hover{background:white;border-color:#a7c5f5}
+.soft-action{background:linear-gradient(105deg,#2767ec,#4485f2);color:white!important;border:0;border-radius:9px;padding:11px 15px;font-size:13px;box-shadow:0 6px 17px rgba(37,99,235,.17)}
+.soft-action:hover{filter:brightness(1.045)}
+.crumb{font-size:14px;font-weight:680}
+.sidebar-foot{background:rgba(240,246,255,.67);border-radius:10px}
+
 </style>
