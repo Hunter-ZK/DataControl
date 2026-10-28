@@ -1,79 +1,83 @@
 <template>
-  <div class="dc-page">
+  <div class="dc-page atlas-home">
     <div class="dc-container">
-      <section class="hero">
-        <div class="hero-copy">
-          <span class="dc-eyebrow">DATA ASSET DISCOVERY</span>
-          <h1>从一个问题开始，找到可信数据</h1>
-          <p>查找数据集、字段、指标和标准，或向 DataAgent 提问并生成经过静态校验的 SQL。</p>
+      <section class="atlas-hero">
+        <div class="hero-lead">
+          <span class="dc-eyebrow">DATA INTELLIGENCE WORKSPACE</span>
+          <h1>找到数据，理解口径，开始分析。</h1>
+          <p>从一个入口发现数据集、字段、指标与标准，让每次查询都有清晰的依据。</p>
+        </div>
+        <div class="hero-content">
           <div class="hero-search">
-            <Search :size="20" />
+            <Search :size="20"/>
             <input v-model="keyword" @input="updateSuggestions" @keydown.enter.prevent="submitSearch"
-              placeholder="输入数据集、字段、指标或业务问题，例如：贷款余额" aria-label="数据资产检索与 DataAgent 统一入口"/>
-            <button class="search-primary" @click="submitSearch">检索资产</button>
-            <button class="ask-action" @click="askAgent"><Sparkles :size="16"/>问 DataAgent</button>
+              placeholder="搜索数据集、字段、指标，或描述你的问题…"
+              aria-label="数据资产检索与 DataAgent 统一入口"/>
+            <button class="search-primary" @click="submitSearch">检索资产 <ArrowRight :size="16"/></button>
           </div>
-          <div v-if="suggestions.length && !assetResults.length" class="search-suggestions">
-            <div class="suggest-title">相关资产 · 选择后查看详情</div>
+          <div class="search-mode">
+            <button class="mode-active" @click="submitSearch"><Search :size="14"/>查找资产</button>
+            <button @click="askAgent"><Sparkles :size="14"/>向 DataAgent 提问</button>
+            <span>Enter 搜索</span>
+          </div>
+          <div v-if="suggestions.length && !assetResults.length" class="search-suggestions" aria-label="资产联想">
+            <div class="suggest-title">相关资产 · 点击直接查看</div>
             <RouterLink v-for="item in suggestions" :key="item.assetType+item.assetId"
               :to="assetRoute(item)" class="suggest-item">
-              <AssetIcon :type="item.assetType" :size="17" mode="inline"/><span>{{ item.title }}</span><code>{{ item.technicalName }}</code>
-              <small>{{ item.assetType }}</small>
+              <AssetIcon :type="item.assetType" :size="18"/><span><b>{{item.title}}</b><code>{{item.technicalName}}</code></span><ArrowUpRight :size="15"/>
             </RouterLink>
           </div>
           <section v-if="resultsVisible" class="home-search-results" aria-live="polite">
-            <div class="result-heading"><b>检索结果</b><span>{{ resultKeyword }} · {{ resultTotal }} 项</span>
-              <RouterLink :to="{name:'search',query:{q:resultKeyword}}">完整检索</RouterLink>
+            <div class="result-heading"><b>资产检索结果</b><span>{{ resultKeyword }} · {{resultTotal}} 项</span>
+              <RouterLink :to="{name:'search',query:{q:resultKeyword}}">完整检索 <ArrowUpRight :size="14"/></RouterLink>
             </div>
-            <p v-if="loadingSearch">正在检索内部资产…</p>
-            <div v-else-if="!assetResults.length" class="empty-result">未找到匹配资产，可以改用“问 DataAgent”进一步描述需求。</div>
+            <p v-if="loadingSearch" class="dc-empty">正在检索数据资产…</p>
+            <div v-else-if="!assetResults.length" class="dc-empty">未找到匹配的资产，请调整关键词或向 DataAgent 提问。</div>
             <RouterLink v-for="item in assetResults" :key="item.assetType+item.assetId"
               :to="assetRoute(item)" class="result-card">
-              <span class="result-kind"><AssetIcon :type="item.assetType" :size="18"/><small>{{ item.assetType }}</small></span>
-              <span><b>{{ item.title }}</b><code>{{ item.technicalName }}</code><small>{{ item.snippet }}</small></span>
-              <ArrowUpRight :size="17"/>
+              <AssetIcon :type="item.assetType" :size="19"/>
+              <span><b>{{item.title}}</b><code>{{item.technicalName}}</code><small>{{item.snippet}}</small></span>
+              <ArrowUpRight :size="16"/>
             </RouterLink>
           </section>
-          <div class="hot"><span>热门搜索</span><button v-for="x in hot" :key="x" @click="quick(x)">{{ x }}</button></div>
-        </div>
-        <div class="hero-orbit" aria-hidden="true"><div class="orb orb-a"/><div class="orb orb-b"/><div class="grid-dot"/></div>
-      </section>
-
-      <section class="launch-grid">
-        <RouterLink v-for="item in launchers" :key="item.to" :to="item.to" class="launch-card">
-          <span class="launch-icon"><AssetIcon :type="launcherType(item.to)" :size="21"/></span>
-          <div><b>{{ item.title }}</b><p>{{ item.desc }}</p></div>
-          <ArrowUpRight :size="17" class="launch-arrow" />
-        </RouterLink>
-      </section>
-
-      <section v-if="recentChats.length" class="recent-conversations dc-card">
-        <div class="panel-head"><div><span class="dc-eyebrow">CONTINUE</span><h2>最近问数会话</h2></div>
-          <RouterLink to="/agent">全部会话</RouterLink>
-        </div>
-        <div class="recent-chat-list">
-          <RouterLink v-for="chat in recentChats" :key="chat.id" :to="{name:'agent',query:{conversationId:chat.id}}" class="recent-chat">
-            <Sparkles :size="16"/><span>{{ chat.title }}</span><ArrowUpRight :size="14"/>
-          </RouterLink>
+          <div class="hot"><span>试试搜索</span><button v-for="x in hot" :key="x" @click="quick(x)">{{x}}</button></div>
         </div>
       </section>
-      <section class="home-row">
-        <div class="dc-card recent-panel">
-          <div class="panel-head"><div><span class="dc-eyebrow">RECENT</span><h2>最近使用</h2></div><RouterLink to="/profile">查看全部</RouterLink></div>
-          <div class="recent-grid" v-if="recent.length">
+      <div class="workspace-heading">
+        <div><span class="dc-eyebrow">YOUR WORKSPACE</span><h2>继续你的工作</h2></div>
+        <RouterLink to="/catalog">浏览资产目录 <ArrowUpRight :size="14"/></RouterLink>
+      </div>
+      <div class="workspace-grid">
+        <section class="dc-card recent-panel">
+          <div class="panel-head"><div><h3>最近访问的资产</h3><p>从上次的数据集继续查看字段和口径</p></div><RouterLink to="/search">查看全部 <ArrowUpRight :size="14"/></RouterLink></div>
+          <div v-if="recent.length" class="asset-list">
             <RouterLink v-for="item in recent" :key="item.assetId" :to="`/datasets/${item.assetId}`" class="recent-item">
-              <div><span class="dc-chip">{{ item.layerCode || 'TABLE' }}</span><b>{{ item.bizName }}</b><code>{{ item.tableName }}</code></div>
-              <ArrowRight :size="17" />
+              <AssetIcon type="TABLE" :size="19"/>
+              <span><b>{{item.bizName}}</b><code>{{item.tableName}}</code></span>
+              <span class="dc-chip">{{item.layerCode||'数据集'}}</span><ArrowRight :size="16"/>
             </RouterLink>
           </div>
-          <div v-else class="dc-empty">暂无最近浏览，先从资产目录或搜索开始。</div>
+          <div v-else class="dc-empty">暂无浏览记录。使用上方搜索发现你的第一个资产。</div>
+        </section>
+        <div class="workspace-side">
+          <section class="dc-card chat-panel">
+            <div class="panel-head"><div><h3>最近问数会话</h3><p>继续上次的数据分析</p></div><RouterLink to="/agent">全部会话</RouterLink></div>
+            <div v-if="recentChats.length" class="chat-list">
+              <RouterLink v-for="chat in recentChats" :key="chat.id" :to="{name:'agent',query:{conversationId:chat.id}}" class="recent-chat"><Sparkles :size="15"/><span>{{chat.title}}</span><ArrowUpRight :size="14"/></RouterLink>
+            </div>
+            <RouterLink v-else class="start-agent" to="/agent"><Sparkles :size="17"/>开启第一次智能问数<ArrowRight :size="15"/></RouterLink>
+          </section>
+          <section class="dc-card overview-panel">
+            <div class="panel-head"><div><h3>数据资产概览</h3><p>当前已收录的资产类型</p></div><RouterLink to="/overview">详情</RouterLink></div>
+            <div class="mini-stats">
+              <div><strong>{{format(overview.tableCount)}}</strong><span>数据集</span></div>
+              <div><strong>{{format(overview.columnCount)}}</strong><span>字段</span></div>
+              <div><strong>{{format(overview.metricCount)}}</strong><span>指标</span></div>
+              <div><strong>{{format(overview.codeTableCount)}}</strong><span>码表</span></div>
+            </div>
+          </section>
         </div>
-        <div class="dc-card overview-panel">
-          <span class="dc-eyebrow">AT A GLANCE</span><h2>资产概览</h2>
-          <div class="mini-stats"><div><strong>{{ format(overview.tableCount) }}</strong><span>数据集</span></div><div><strong>{{ format(overview.columnCount) }}</strong><span>字段</span></div><div><strong>{{ format(overview.metricCount) }}</strong><span>指标</span></div><div><strong>{{ format(overview.codeTableCount) }}</strong><span>码表</span></div></div>
-          <RouterLink class="overview-link" to="/overview">进入数据概览 <ArrowRight :size="16" /></RouterLink>
-        </div>
-      </section>
+      </div>
     </div>
   </div>
 </template>
@@ -81,7 +85,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { ArrowRight, ArrowUpRight, BookOpenCheck, Boxes, Database, Hash, Search, Sparkles } from 'lucide-vue-next'
+import { ArrowRight, ArrowUpRight, Search, Sparkles } from 'lucide-vue-next'
 import { activityApi, assetApi, agentApi, type SearchItem, type SearchSuggestion, type ServerAgentConversation } from '@/api/client'
 import AssetIcon from '@/components/AssetIcon.vue'
 
@@ -96,22 +100,6 @@ const loadingSearch = ref(false)
 const resultTotal = ref(0)
 const resultKeyword = ref('')
 let suggestionEpoch = 0
-const launchers = [
-  { to:'/catalog', title:'资产目录', desc:'按业务主题浏览数据集与字段', icon:Database },
-  { to:'/code-tables', title:'标准码值', desc:'查询标准码表、数据标准与引用', icon:Boxes },
-  { to:'/word-roots', title:'词根索引', desc:'查看字段命名词根与规范用法', icon:Hash },
-  { to:'/metrics', title:'指标与制度', desc:'查询指标口径与制度依据', icon:BookOpenCheck },
-  { to:'/search?mode=ai', title:'智能问数', desc:'自然语言提问并生成可信 SQL', icon:Sparkles },
-]
-function launcherType(path: string): string {
-  if (path.startsWith('/catalog')) return 'TABLE'
-  if (path.startsWith('/code-tables')) return 'CODE_TABLE'
-  if (path.startsWith('/standards')) return 'STANDARD'
-  if (path.startsWith('/word-roots')) return 'WORD_ROOT'
-  if (path.startsWith('/metrics')) return 'METRIC'
-  if (path.startsWith('/search')) return 'FIELD'
-  return 'METRIC'
-}
 function assetRoute(item: {assetType: string;assetId: string;technicalName: string}) {
   const code = item.technicalName || item.assetId
   switch (item.assetType) {
@@ -172,37 +160,63 @@ onMounted(async()=>{
 </script>
 
 <style scoped>
-.hero{position:relative;min-height:340px;overflow:hidden;border:1px solid #d9ebf4;border-radius:26px;background:linear-gradient(135deg,#eef9fd 0%,#fbfdff 58%,#edf8fc 100%);padding:54px 58px;box-shadow:var(--dc-shadow-md)}.hero-copy{position:relative;z-index:2;max-width:820px}.hero h1{font-size:42px;line-height:1.16;letter-spacing:-.04em;margin:12px 0 10px}.hero p{font-size:15px;color:var(--dc-text-2);margin:0}.hero-search{margin-top:30px;height:60px;display:flex;align-items:center;gap:10px;padding:6px 6px 6px 17px;background:#fff;border:1px solid #cfe4ef;border-radius:15px;box-shadow:0 18px 42px rgba(50,120,157,.12);color:#6b9db6}.hero-search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--dc-text);font-size:15px}.hero-search button{height:48px;padding:0 27px;border:0;border-radius:11px;background:linear-gradient(135deg,#51add2,#72c8db);color:#fff;font-weight:700;cursor:pointer}.hot{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:12px;font-size:12px;color:#89a0af}.hot button{border:0;background:transparent;color:#4e8eab;cursor:pointer;padding:3px 5px}.hero-orbit{position:absolute;right:0;top:0;width:36%;height:100%}.orb{position:absolute;border-radius:50%;filter:blur(2px)}.orb-a{width:220px;height:220px;right:40px;top:34px;background:radial-gradient(circle at 35% 35%,rgba(123,207,226,.38),rgba(109,171,213,.04) 68%)}.orb-b{width:120px;height:120px;right:160px;bottom:22px;background:radial-gradient(circle,rgba(80,167,209,.22),transparent 70%)}.grid-dot{position:absolute;inset:0;background-image:radial-gradient(rgba(69,143,180,.15) 1px,transparent 1px);background-size:18px 18px;mask-image:linear-gradient(to left,#000,transparent)}.launch-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:13px;margin-top:20px}.launch-card{position:relative;min-height:116px;padding:18px 17px;display:flex;align-items:flex-start;gap:12px;border:1px solid var(--dc-border);border-radius:15px;background:#fff;box-shadow:0 8px 24px rgba(44,109,142,.04);transition:.18s}.launch-card:hover{transform:translateY(-2px);border-color:#bfdde9;box-shadow:0 14px 32px rgba(44,109,142,.08)}.launch-icon{flex:0 0 42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--dc-primary-soft);color:var(--dc-primary-strong)}.launch-card b{font-size:14px}.launch-card p{margin:7px 0 0;font-size:11px;line-height:1.55;color:var(--dc-text-2)}.launch-arrow{position:absolute;right:13px;top:13px;color:#9aafbc}.home-row{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(300px,.8fr);gap:18px;margin-top:22px}.recent-panel,.overview-panel{padding:22px}.panel-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px}.panel-head h2,.overview-panel h2{font-size:18px;margin:5px 0 0}.panel-head a{font-size:12px;color:var(--dc-primary-strong)}.recent-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.recent-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px;border:1px solid #e7eff4;border-radius:11px}.recent-item div{min-width:0;display:grid;gap:5px}.recent-item b{font-size:13px}.recent-item code{font-size:10px;color:#718b9a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}.mini-stats div{padding:13px;border-radius:11px;background:#f7fbfd;border:1px solid #e5f0f5}.mini-stats strong{display:block;font-size:22px;color:#276b8e}.mini-stats span{font-size:11px;color:#8297a5}.overview-link{margin-top:14px;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dc-primary-strong)}@media(max-width:1200px){.launch-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.home-row{grid-template-columns:1fr}}@media(max-width:760px){.hero{padding:34px 24px;min-height:auto}.hero h1{font-size:32px}.hero-orbit{opacity:.45;width:45%}.launch-grid{grid-template-columns:1fr 1fr}.recent-grid{grid-template-columns:1fr}}@media(max-width:520px){.hero-search{height:54px}.hero-search button{height:42px;padding:0 16px}.launch-grid{grid-template-columns:1fr}}
- .hero-search { flex-wrap:wrap;height:auto;min-height:60px; }
- .hero-search input { min-width: min(100%,210px); flex: 1 1 280px; }
- .hero-search .ask-action { display:inline-flex;align-items:center;gap:5px;background:var(--dc-agent);color:white; }
- .search-suggestions,.home-search-results { margin-top:12px;max-width:820px;padding:12px;border:1px solid var(--dc-border);border-radius:13px;background:white;box-shadow:var(--dc-shadow-sm); }
- .suggest-title {font-size:12px;color:var(--dc-text-2);margin-bottom:7px;}
- .suggest-item {display:flex;gap:12px;align-items:center;padding:9px 10px;border-radius:8px;color:var(--dc-text);text-decoration:none;}
- .suggest-item:hover,.result-card:hover{background:var(--dc-primary-soft);}
- .suggest-item code,.result-card code{font-size:12px;color:var(--dc-text-2);}
- .suggest-item small {margin-left:auto;font-size:12px;color:var(--dc-text-3);}
- .result-heading {display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px;}
- .result-heading span{color:var(--dc-text-2);}
- .result-heading a{margin-left:auto;color:var(--dc-primary);}
- .result-card{display:flex;align-items:center;gap:12px;padding:12px 8px;text-decoration:none;color:var(--dc-text);border-top:1px solid var(--dc-border);}
- .result-card>span:nth-child(2){display:grid;gap:4px;flex:1;min-width:0;}
- .result-card small{color:var(--dc-text-2);font-size:12px;}
- .result-kind{font-size:12px;color:var(--dc-primary);width:80px;}
- .recent-conversations {margin:16px 0;padding:18px;}
- .recent-chat-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;}
- .recent-chat{display:flex;gap:9px;align-items:center;padding:11px;border:1px solid var(--dc-border);border-radius:9px;color:var(--dc-text);font-size:13px;}
- .recent-chat span{flex:1;}
- @media(max-width:650px){.hero-search{align-items:stretch;}.hero-search .ask-action,.hero-search .search-primary{min-height:40px;}.result-card small{display:none}}
- .hero{background:linear-gradient(135deg,#f8fbff,#eff6ff);border-color:var(--dc-border)}
- .hero-orbit{opacity:.55}
- .hero-search{background:#fff;border-color:#dbeafe}
- .launch-card,.recent-conversations{border-color:var(--dc-border);box-shadow:var(--dc-shadow-sm)}
- .launch-icon{background:transparent;border:0;box-shadow:none}
- .suggest-item{display:flex;align-items:center;gap:10px}
- .suggest-item>span:nth-child(2){flex:1}
- .result-kind{display:flex;align-items:center;gap:7px;width:auto;min-width:100px}
- .result-kind small{font-size:11px;color:var(--dc-text-3)}
- .result-card{gap:14px}
- @media(max-width:650px){.result-kind small{display:none}.result-kind{min-width:36px}}
+.atlas-home{min-height:100%;padding-top:36px}
+.atlas-hero{padding:36px 42px 27px;background:linear-gradient(128deg,#fff 16%,#f4f8ff 100%);border:1px solid #dfebfa;border-radius:16px;box-shadow:0 12px 36px rgba(26,76,142,.035)}
+.hero-lead h1{margin:8px 0 6px;font-size:31px;line-height:1.35;letter-spacing:-.025em;font-weight:770;color:#172c4d}
+.hero-lead p{margin:0;color:var(--dc-text-2);font-size:14px}
+.hero-content{max-width:890px;margin-top:24px}
+.hero-search{display:flex;align-items:center;gap:13px;padding:7px 8px 7px 16px;min-height:58px;border:1px solid #bfcff0;border-radius:11px;background:#fff;box-shadow:0 7px 22px rgba(40,92,164,.075);color:var(--dc-primary)}
+.hero-search:focus-within{border-color:#6297f1;box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+.hero-search input{flex:1;min-width:0;border:0;background:transparent;outline:0;color:var(--dc-text);font-size:14px}
+.hero-search input::placeholder{color:#91a0b5}
+.search-primary{display:inline-flex;align-items:center;gap:9px;border:0;border-radius:8px;background:var(--dc-primary);height:42px;padding:0 20px;color:#fff;font-weight:700;cursor:pointer}
+.search-primary:hover{background:var(--dc-primary-strong)}
+.search-mode{display:flex;align-items:center;gap:5px;margin:10px 0 0}
+.search-mode button{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border:0;border-radius:7px;background:transparent;color:#7386a1;font-size:12px;cursor:pointer}
+.search-mode .mode-active{color:var(--dc-primary);background:#e8f0ff;font-weight:700}
+.search-mode>span{margin-left:auto;color:#a4afbf;font-size:12px}
+.hot{display:flex;align-items:center;gap:7px;margin-top:15px;flex-wrap:wrap}
+.hot span{font-size:12px;color:#8898ad;margin-right:3px}
+.hot button{border:1px solid #e0e8f5;border-radius:7px;background:#fff;padding:5px 11px;font-size:12px;color:#627892;cursor:pointer}
+.hot button:hover{color:var(--dc-primary);border-color:#aac8f8}
+.search-suggestions,.home-search-results{background:#fff;border:1px solid var(--dc-border);border-radius:10px;padding:13px 15px;margin-top:9px;box-shadow:var(--dc-shadow-sm)}
+.suggest-title{color:#7e91ac;font-size:12px;padding-bottom:7px}
+.suggest-item,.result-card{display:flex;align-items:center;gap:13px;min-height:58px;padding:8px 5px;border-top:1px solid #f0f3f9}
+.suggest-item:first-of-type{border-top:0}
+.suggest-item:hover,.result-card:hover{background:#f7faff}
+.suggest-item span,.result-card span{display:grid;gap:3px;flex:1;min-width:0}
+.suggest-item b,.result-card b{font-size:13px;font-weight:680}
+.suggest-item code,.result-card code{font:12px var(--dc-mono);color:#788ba3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.result-card small{font-size:12px;color:var(--dc-text-2)}
+.result-heading{display:flex;align-items:center;gap:10px;padding-bottom:7px}
+.result-heading span{font-size:12px;color:var(--dc-text-3)}
+.result-heading a{margin-left:auto;color:var(--dc-primary);display:flex;align-items:center;gap:4px;font-size:12px}
+.workspace-heading{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:30px 0 13px}
+.workspace-heading h2{font-size:19px;margin:4px 0 0;font-weight:740}
+.workspace-heading>a{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--dc-primary);font-weight:630}
+.workspace-grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);align-items:start;gap:16px}
+.workspace-side{display:grid;gap:16px;min-width:0}
+.recent-panel,.chat-panel,.overview-panel{padding:20px 22px;min-width:0}
+.panel-head{display:flex;align-items:start;justify-content:space-between;gap:10px;margin-bottom:14px}
+.panel-head h3{font-size:15px;margin:0 0 2px;font-weight:730}
+.panel-head p{margin:0;color:var(--dc-text-3);font-size:12px}
+.panel-head a{font-size:12px;color:var(--dc-primary);display:flex;align-items:center;gap:4px;white-space:nowrap}
+.recent-item{display:flex;align-items:center;gap:13px;min-height:69px;padding:11px 0;border-top:1px solid #f0f3f8}
+.recent-item:hover{background:#fafcff}
+.recent-item>span:nth-child(2){display:grid;gap:3px;flex:1;min-width:0}
+.recent-item b{font-size:13px;font-weight:680;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent-item code{font:12px var(--dc-mono);color:#8192a8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent-item>.dc-chip{flex:none}
+.chat-list{display:grid;gap:3px}
+.recent-chat{display:flex;align-items:center;gap:10px;padding:10px 3px;border-top:1px solid #f0f3f8;color:#58708c;font-size:13px}
+.recent-chat span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent-chat:hover{color:var(--dc-primary)}
+.start-agent{display:flex;align-items:center;gap:9px;color:var(--dc-primary);font-size:13px;padding:10px 0}
+.mini-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.mini-stats div{display:grid;justify-items:start;gap:2px;padding:10px 0}
+.mini-stats strong{font-size:21px;font-weight:760;color:var(--dc-text);font-variant-numeric:tabular-nums}
+.mini-stats span{font-size:12px;color:var(--dc-text-3)}
+@media(max-width:1180px){.workspace-grid{grid-template-columns:1fr}.mini-stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:720px){.atlas-home{padding-top:18px}.atlas-hero{padding:25px 19px 21px}.hero-lead h1{font-size:25px}.hero-search{flex-wrap:wrap}.search-primary{flex:0 0 auto}.mini-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.hero-search input{flex-basis:calc(100% - 40px)}.search-primary{width:100%;justify-content:center}.search-mode>span{display:none}.recent-item>.dc-chip{display:none}.recent-panel,.chat-panel,.overview-panel{padding:16px}}
 </style>

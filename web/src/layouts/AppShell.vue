@@ -2,24 +2,21 @@
   <div class="shell" :class="{ 'is-collapsed': navCollapsed }">
     <aside class="sidebar">
       <RouterLink class="brand" to="/">
-        <span class="brand-mark">D</span>
-        <span class="brand-copy"><b>DataControl</b><small>DATA ASSET PORTAL</small></span>
+        <span class="brand-mark"><Layers3 :size="21" :stroke-width="2.2"/></span>
+        <span class="brand-copy"><b>DataControl</b><small>数据资产与智能工作台</small></span>
       </RouterLink>
 
       <button class="collapse-nav" :aria-label="navCollapsed ? '展开侧边栏' : '折叠侧边栏'" :title="navCollapsed ? '展开导航' : '收起导航'" @click="navCollapsed=!navCollapsed"><PanelLeftClose :size="16"/></button>
-      <nav class="nav">
-        <span class="nav-section">工作台</span>
-        <RouterLink v-for="item in primary" :key="item.to" :to="item.to" class="nav-item" :title="item.label">
-          <AssetIcon v-if="item.assetType" :type="item.assetType" :size="18" mode="inline"/>
-          <component :is="item.icon" v-else :size="18" stroke-width="1.8" />
-          <span>{{ item.label }}</span>
-        </RouterLink>
-        <div class="nav-divider" />
-        <span class="nav-section">个人与统计</span>
-        <RouterLink v-for="item in secondary" :key="item.to" :to="item.to" class="nav-item" :title="item.label">
-          <component :is="item.icon" :size="18" stroke-width="1.8" />
-          <span>{{ item.label }}</span>
-        </RouterLink>
+      <nav class="nav" aria-label="主导航">
+        <div v-for="group in navGroups" :key="group.title" class="nav-group">
+          <div class="nav-section">{{ group.title }}</div>
+          <RouterLink v-for="item in group.items" :key="item.to" :to="item.to"
+            class="nav-item" :title="item.label">
+            <AssetIcon v-if="'assetType' in item && item.assetType" :type="item.assetType" :size="18" mode="inline"/>
+            <component :is="item.icon" v-else :size="18" :stroke-width="1.9"/>
+            <span>{{ item.label }}</span>
+          </RouterLink>
+        </div>
       </nav>
 
       <div class="sidebar-foot">
@@ -35,7 +32,7 @@
           <button class="icon-button mobile-menu" aria-label="展开导航" @click="mobileNavOpen=true"><Menu :size="18"/></button>
           <button v-if="route.name !== 'home'" class="icon-button" @click="router.back()"><ArrowLeft :size="18" /></button>
           <AssetIcon :type="breadcrumbType" :size="17" mode="inline"/>
-          <span class="crumb">{{ route.meta.title || 'DataControl' }}</span>
+          <span class="crumb">{{ route.meta.title || '工作台' }}</span>
         </div>
         <button class="command" aria-label="打开全局资产搜索" @click="commandOpen=true">
           <Search :size="17" /><span>搜索数据集、字段、指标、标准…</span><kbd>{{ isMac ? '⌘ K' : 'Ctrl K' }}</kbd>
@@ -79,7 +76,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, BarChart3, BookOpenCheck, Boxes, CircleGauge, CircleHelp, Database, Hash, Menu, PanelLeftClose, Search, Sparkles, UserRound } from 'lucide-vue-next'
+import { ArrowLeft, BarChart3, BookOpenCheck, Boxes, CircleGauge, CircleHelp, Database, Hash, Layers3, Menu, PanelLeftClose, Search, Sparkles, UserRound } from 'lucide-vue-next'
 import { assetApi, type SearchSuggestion } from '@/api/client'
 import AssetIcon from '@/components/AssetIcon.vue'
 
@@ -134,6 +131,12 @@ const secondary = [
   { to: '/overview', label: '数据概览', icon: BarChart3 },
   { to: '/profile', label: '个人中心', icon: UserRound },
 ]
+const navGroups = [
+  { title: '工作空间', items: [primary[0], primary[6]] },
+  { title: '数据发现', items: [primary[2], primary[1]] },
+  { title: '数据理解', items: [primary[5], primary[3], primary[4]] },
+  { title: '其他', items: secondary },
+]
 
 function shortcut(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
@@ -178,4 +181,34 @@ onBeforeUnmount(() => window.removeEventListener('keydown', shortcut))
  .brand-mark{background:linear-gradient(140deg,#2563eb,#60a5fa);box-shadow:0 2px 9px rgba(37,99,235,.12)}
  .topbar{background:rgba(255,255,255,.96);backdrop-filter:blur(12px)}
  @media(max-width:820px){.collapse-nav{display:none}.shell.is-collapsed{display:block}}
+ 
+/* Atlas shell refinements: quiet canvas, clear focus, consistent icon rhythm. */
+.shell{background:var(--dc-bg)}
+.sidebar{background:#fff;border-right:1px solid var(--dc-border);padding:20px 12px 16px}
+.brand{gap:11px;padding:0 12px;height:54px}
+.brand-mark{width:37px;height:37px;border-radius:11px;background:#2563eb;box-shadow:0 5px 12px rgba(37,99,235,.14)}
+.brand-copy b{color:#1b3353;font-size:16px;letter-spacing:-.025em}
+.brand-copy small{font-size:12px;letter-spacing:0;margin-top:4px;color:#8b9db3}
+.nav{display:block;margin-top:18px}
+.nav-group{margin-bottom:12px}
+.nav-section{font-size:12px;color:#94a3b7;padding:9px 13px 6px;letter-spacing:.035em;font-weight:680}
+.nav-item{min-height:41px;border-radius:9px;margin:2px 0;gap:12px;color:#5a708e;padding:9px 12px;font-size:13px;font-weight:560}
+.nav-item:hover{background:#f5f8fe;color:#245cce}
+.nav-item.router-link-exact-active{background:#edf4ff;color:#1f59d6;box-shadow:inset 3px 0 #2563eb;font-weight:710}
+.nav-item.router-link-exact-active:before{display:none}
+.collapse-nav{margin:8px 0 1px;align-self:flex-end;border:0;background:transparent;color:#8ca0b9}
+.collapse-nav:hover{background:#f0f5fd;color:#2563eb}
+.sidebar-foot{border-top:1px solid var(--dc-border);margin:0 6px;padding:16px 6px}
+.topbar{background:rgba(255,255,255,.97);height:64px;padding:0 26px;border-bottom:1px solid var(--dc-border)}
+.top-left{min-width:188px;gap:10px}
+.crumb{font-size:13px;color:#233954}
+.command{height:38px;border-radius:9px;background:#f7f9fd;border-color:var(--dc-border);color:#7f90a9}
+.command:hover{border-color:#c0d3f4;background:#fff}
+.soft-action{font-size:12px;font-weight:700;border-radius:8px;padding:9px 12px}
+.avatar{background:#e7f0ff;color:#235ac7}
+.shell.is-collapsed .nav-section{display:none}
+.shell.is-collapsed .nav-group{margin-bottom:12px}
+.shell.is-collapsed .nav-item{justify-content:center}
+@media(max-width:1080px){.nav-section{display:none}.nav-group{margin-bottom:13px}}
+@media(max-width:820px){.top-left{min-width:0}}
 </style>
