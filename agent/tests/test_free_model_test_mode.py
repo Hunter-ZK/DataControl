@@ -48,7 +48,8 @@ def test_free_test_is_separate_profile_and_requires_explicit_consent(monkeypatch
     async def reachable():
         return True
     monkeypatch.setattr(runner, "_mcp_reachable", reachable)
-    runner.dsh_bin = tmp_path / "dsh"\n    runner.dsh_bin.touch()
+    runner.dsh_bin = tmp_path / "dsh"
+    runner.dsh_bin.touch()
     blocked = asyncio.run(runner.health())
     assert blocked["profileReady"] and not blocked["ready"]
     assert blocked["modelMode"] == "free-test"
