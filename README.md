@@ -68,6 +68,32 @@ The current validator improves CTE/alias handling but is not yet a complete MaxC
 - dsh telemetry, session upload and web tools remain disabled in the current DataAgent profile;
 - the Guard plugin is defense in depth, not the sole security boundary.
 
+## Windows one-command launcher and npm repair
+
+Use `start.bat` from the DataControl repository root. It checks installed
+Portal, frontend, and Agent dependencies and only runs missing setup; daily
+starts skip reinstallation. It also recognizes:
+
+```bat
+start.bat           REM automatically set up if needed, then start
+start.bat setup     REM setup only (do not start services)
+start.bat repair    REM repair Agent npm dependencies and start
+start.bat stop      REM stop stale DataControl services
+```
+
+Store `DEEPSEEK_API_KEY=your_key_here` in the git-ignored local `.env`
+file (or provide the key via environment variables) for real-model queries.
+Never commit your key. Keep `.env` private.
+
+Windows `TAR_ENTRY_ERROR`, `ENOENT`, and `.DELETE.*` during dsh npm
+installation indicate a failed/locked dependency tree. Stop overlapping npm
+processes and run `start.bat repair`. Repair only removes
+`agent/dsh/node_modules`, not your Python environment, sample database,
+old dsh sessions, or tracked source code. Installation logs are kept at
+`.local/npm-dsh.stderr.log` and `.local/npm-dsh.stdout.log`.
+The setup lock prevents parallel installer runs, and npm has an explicit
+timeout rather than silently blocking forever.
+
 ## Development quick start
 The normal setup uses one Python environment for Portal and Agent. Use Python 3.13 or 3.14.
 
