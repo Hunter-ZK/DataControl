@@ -140,4 +140,18 @@ const hasSupportingDetails = computed(() => {
 .details-summary{font-size:13px}
 @media(max-width:760px){.assistant-answer{padding:15px;border-radius:12px}.user-bubble{max-width:96%;font-size:14px}.answer-content{padding:13px 0}}
 
+
+/* Atlas 2.1 — premium AI workspace without fabricated progress */
+
+.assistant-answer{position:relative;overflow:hidden;border-color:#c8daf4;box-shadow:0 10px 28px #24599b13}
+.assistant-answer:before{content:'';position:absolute;left:0;top:0;width:4px;height:100%;background:linear-gradient(180deg,#3777ea 0,#8fbcff 55%,#eaf3ff)}
+.answer-toolbar{background:linear-gradient(100deg,#f1f7ff,#fff);margin:-21px -23px 0;padding:14px 20px 14px 25px;border-color:#d9e6f7}
+.assistant-identity b{font-size:15px;color:#2459a6}
+.answer-content{padding:21px 2px 8px}
+.sql-result{padding:14px 1px 2px;border-top:1px solid #e3ecf9}
+.answer-progress{background:#f3f8ff;border-color:#d6e4f7}
+.supporting-details{background:#f6faff;border-color:#d4e3f7}
+.supporting-details:hover{border-color:#a8c9f7}
+@media(max-width:760px){.answer-toolbar{margin:-15px -15px 0;padding:12px 13px 12px 17px}.answer-content{padding:13px 0}}
+
 </style>

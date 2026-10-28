@@ -7,7 +7,9 @@
           <h1>DataAgent <span>智能工作台</span></h1>
           <p>让数仓知识参与每一次问答：检索数据资产、解释指标口径、生成 SQL 与开发草案。</p>
         </div>
-        <span class="service-status" :class="{ ready: status?.ready }"><i></i>{{ status?.ready ? '服务正常' : '服务未就绪' }}</span>
+        <div class="agent-head-status"><span class="agent-version">INTELLIGENCE WORKSPACE</span>
+          <span class="service-status" :class="{ ready: status?.ready }"><i></i>{{ status?.ready ? '服务正常' : '服务未就绪' }}</span>
+        </div>
       </header>
 
       <section class="agent-workspace dc-card" :class="{ 'mobile-history-open': mobileHistoryOpen, 'inspector-visible': inspectorOpen }">
@@ -29,7 +31,7 @@
             <History :size="16"/> {{ mobileHistoryOpen ? '关闭历史' : '查看历史会话' }}
           </button>
           <div class="chat-model-bar">
-            <div class="model-bar-brand"><Sparkles :size="21"/><span>DataAgent</span></div>
+            <div class="model-bar-brand"><span class="model-mark"><Sparkles :size="21"/></span><span>DataAgent</span></div>
             <span class="chat-model-label">模型</span>
             <div class="model-options" role="group" aria-label="选择当前对话模型">
               <button type="button" :class="{selected:modelMode==='deepseek'}" :disabled="loading" @click="chooseModel('deepseek')">DeepSeek 官方</button>
@@ -45,6 +47,12 @@
               <PanelRight :size="18"/>{{ inspectorOpen ? '收起工作面板' : '展开工作面板' }}
             </button>
           </div>
+          <div class="agent-mode-strip">
+            <span class="mode-indicator"><span class="mode-pulse" :class="{idle:!status?.ready||!loading}"></span>{{loading?'正在处理任务':status?.ready?'已就绪':'服务未就绪'}}</span>
+            <span><Cpu :size="15"/>{{modelMode==='free-test'?'免费模型测试': 'DeepSeek 官方'}}</span>
+            <span><Workflow :size="15"/>{{taskTier==='multi'?'多步任务':'标准问数'}}</span>
+            <span class="mode-safe"><ShieldCheck :size="15"/>仅生成和校验 · 不执行 SQL</span>
+          </div>
           <div v-if="modelMode==='free-test'" class="runtime-warning"><TriangleAlert :size="18"/><span>免费模型使用第三方公共网关，可能记录问题及工具信息。仅测试模拟数据；不得输入真实业务、内部 SQL、账号或个人信息。</span></div>
           <div v-if="contextAsset" class="context-strip">
             <Database :size="17" />
@@ -55,11 +63,22 @@
 
           <div ref="messageBox" class="messages">
             <div v-if="messages.length === 0" class="welcome">
+              <div class="welcome-constellation" aria-hidden="true">
+                <span class="constellation-orbit orbit-first"></span><span class="constellation-orbit orbit-second"></span>
+                <span class="constellation-dot dot-a"></span><span class="constellation-dot dot-b"></span>
+                <span class="constellation-dot dot-c"></span>
+              </div>
               <div class="welcome-icon"><Sparkles :size="36" /></div>
               <span class="welcome-label">YOUR DATA COPILOT</span>
               <h2>今天，想探索什么数据？</h2>
               <p>从一个问题开始，DataAgent 将结合现有元数据与业务口径，为你提供有依据的回答和经过静态校验的 SQL。</p>
-              <div class="prompt-heading"><span>你可以尝试</span><small>点击填入提问框</small></div>
+              <div class="welcome-capabilities" aria-label="DataAgent 支持的工作">
+                <span><Database :size="16"/>发现可信资产</span>
+                <span><ChartNoAxesCombined :size="16"/>理解业务口径</span>
+                <span><Code2 :size="16"/>生成 SQL 草案</span>
+                <span><ShieldCheck :size="16"/>静态校验</span>
+              </div>
+              <div class="prompt-heading"><span>从这些任务开始</span><small>选择后可修改问题</small></div>
               <div class="prompt-grid">
                 <button v-for="(item,index) in quickPrompts" :key="item" @click="usePrompt(item)">
                   <span class="prompt-icon"><component :is="[Database, ChartNoAxesCombined, Code2, ShieldCheck][index%4]" :size="24"/></span>
@@ -76,6 +95,12 @@
               :tier="taskTier"
               @clarify="submitClarification(index, $event)"
             />
+            <div v-if="latestAnswer && !loading && (latestAnswer.sql || latestAnswer.evidence || latestAnswer.events?.length)" class="result-shortcuts">
+              <span><PanelsTopLeft :size="17"/> 结果工作区</span>
+              <button v-if="latestAnswer.sql" @click="openInspector('sql')"><Code2 :size="16"/>查看生成的 SQL <ArrowUpRight :size="14"/></button>
+              <button v-if="latestAnswer.evidence" @click="openInspector('evidence')"><Database :size="16"/>查看数据依据 <ArrowUpRight :size="14"/></button>
+              <button v-if="latestAnswer.events?.length" @click="openInspector('steps')"><Workflow :size="16"/>查看任务步骤 <ArrowUpRight :size="14"/></button>
+            </div>
             <div v-if="latestAnswer && !loading" class="answer-quick-actions">
               <button @click="copyLatestAnswer"><Copy :size="14"/>复制回答</button>
               <button @click="regenerateLatest"><RotateCcw :size="14"/>重新生成</button>
@@ -152,7 +177,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUp, ArrowUpRight, ChartNoAxesCombined, Code2, Copy, Database, FlaskConical, History, LoaderCircle, PanelRight, RotateCcw, ShieldCheck, Sparkles, Square, ThumbsDown, ThumbsUp, TriangleAlert, X } from 'lucide-vue-next'
+import { ArrowUp, ArrowUpRight, ChartNoAxesCombined, Code2, Copy, Cpu, Database, FlaskConical, History, LoaderCircle, PanelRight, PanelsTopLeft, RotateCcw, ShieldCheck, Sparkles, Square, ThumbsDown, ThumbsUp, TriangleAlert, Workflow, X } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { agentApi, assetApi, type AgentActivity, type AgentModelMode, type AgentResult, type AgentStatus, type AgentStreamEvent, AgentTurnCancelledError } from '@/api/client'
 import AgentConversationSidebar from '@/components/agent/AgentConversationSidebar.vue'
@@ -212,6 +237,10 @@ const agentUnavailableReason = computed(() => {
 const mobileHistoryOpen = ref(false)
 const inspectorOpen = ref(false)
 const inspectorTab = ref<'evidence' | 'sql' | 'steps'>('evidence')
+function openInspector(tab: 'evidence' | 'sql' | 'steps') {
+  inspectorTab.value = tab
+  inspectorOpen.value = true
+}
 const question = ref('')
 const loading = ref(false)
 const liveEvents = ref<AgentActivity[]>([])
@@ -812,5 +841,58 @@ onMounted(async () => {
 .answer-quick-actions button,.followup-prompts button{font-size:13px;padding:9px 12px}
 @media(max-width:1250px){.agent-workspace{grid-template-columns:220px minmax(0,1fr)!important}.agent-workspace.inspector-visible{grid-template-columns:220px minmax(0,1fr)!important}.agent-inspector{display:flex!important;position:absolute;right:0;top:0;bottom:0;width:min(355px,90vw);z-index:25;box-shadow:-12px 0 32px rgba(15,53,113,.19)}.agent-workspace{position:relative}}
 @media(max-width:760px){.agent-screen{padding:8px 0 10px;min-height:600px}.agent-page{width:calc(100% - 16px)}.agent-head{padding:0 5px 10px}.agent-head h1{font-size:21px}.agent-head p{display:none}.agent-workspace{grid-template-columns:1fr!important}.agent-workspace.inspector-visible{grid-template-columns:1fr!important}.chat-model-bar{padding:9px;gap:7px}.model-bar-brand{font-size:14px}.model-bar-brand svg{width:17px}.model-options button,.tier-options button{padding:7px 9px;font-size:12px}.chat-model-label{display:none}.inspector-toggle{margin-left:0}.welcome{margin:3vh auto 0}.welcome h2{font-size:24px}.welcome>p{font-size:13px}.welcome-icon{width:60px;height:60px}.prompt-grid{grid-template-columns:1fr 1fr;gap:8px}.prompt-grid button{min-height:88px;padding:12px;flex-direction:column;align-items:flex-start;font-size:12px;gap:7px}.prompt-icon{width:35px;height:35px}.composer-wrap{padding:9px}.composer textarea{font-size:14px}.messages{padding:18px 13px}}
+
+
+/* Atlas 2.1 — premium AI workspace without fabricated progress */
+
+.agent-screen{background:radial-gradient(ellipse 820px 550px at 89% -10%,rgba(109,169,255,.20),transparent 76%),linear-gradient(165deg,#edf4ff,#f2f6ff 60%,#edf5ff)}
+.agent-head{position:relative}
+.agent-head .dc-eyebrow{color:#4b7fd2}
+.agent-head h1{font-size:30px}
+.agent-head-status{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.agent-version{font-size:11px;letter-spacing:.1em;color:#7694c4;font-weight:790;border:1px solid #c8dcfa;background:#f7faff;padding:8px 11px;border-radius:9px}
+.agent-workspace{border:1px solid #aecaef;box-shadow:0 19px 55px rgba(27,71,143,.18),0 2px 12px rgba(30,96,198,.07)}
+.chat-model-bar{background:linear-gradient(110deg,#f0f6ff,#fff);border-bottom:1px solid #cfe0f5}
+.model-mark{display:grid;place-items:center;width:35px;height:35px;border-radius:11px;background:linear-gradient(135deg,#2e6ce4,#7ca9ff);color:white;box-shadow:0 5px 16px #2659d62c}
+.model-bar-brand svg{color:#fff}
+.agent-mode-strip{display:flex;align-items:center;gap:17px;flex-wrap:wrap;padding:9px 22px;background:linear-gradient(93deg,#f8fbff,#eef5ff);border-bottom:1px solid #e1eaf7;min-height:39px}
+.agent-mode-strip>span{display:inline-flex;align-items:center;gap:6px;color:#738aab;font-size:12px;font-weight:650}
+.agent-mode-strip .mode-indicator{color:#376ec1;font-weight:760}
+.mode-pulse{width:8px;height:8px;display:inline-block;border-radius:50%;background:#347ee5;box-shadow:0 0 0 4px #dae9ff;animation:mode-breathe 1.6s ease-in-out infinite}
+.mode-pulse.idle{animation:none;background:#2eaa87;box-shadow:0 0 0 3px #e2f4ed}
+.agent-mode-strip .mode-safe{margin-left:auto;color:#37836f}
+@keyframes mode-breathe{0%,100%{opacity:1;box-shadow:0 0 0 3px #d9e8ff}50%{opacity:.6;box-shadow:0 0 0 6px #e4efff}}
+.welcome{position:relative;isolation:isolate;max-width:820px;margin:clamp(10px,3vh,34px) auto 0;padding:12px 0 18px}
+.welcome:before{content:'';position:absolute;z-index:-1;left:10%;right:10%;top:-18px;height:220px;background:radial-gradient(ellipse at 50% 48%,rgba(74,134,230,.17),transparent 75%);pointer-events:none}
+.welcome-constellation{position:absolute;z-index:-1;pointer-events:none;width:300px;height:180px;top:-10px;left:calc(50% - 150px)}
+.constellation-orbit{position:absolute;border:1px dashed rgba(56,123,227,.18);border-radius:50%;inset:3px 12px}
+.orbit-second{inset:18px 51px;border-style:solid;border-color:rgba(75,142,232,.15)}
+.constellation-dot{position:absolute;width:9px;height:9px;border:2px solid #f6faff;border-radius:50%;background:#68a7ed;box-shadow:0 0 0 5px #dceaff}
+.dot-a{left:14px;top:74px}.dot-b{right:25px;top:31px}.dot-c{right:58px;bottom:12px;background:#8c83e9}
+.welcome-icon{position:relative;z-index:1;width:85px;height:85px;border-radius:27px;background:linear-gradient(135deg,#205bd7 0%,#4a85f4 57%,#80c7fd 100%);box-shadow:0 16px 40px #2d6bd54a,inset 0 1px 3px #ffffff91;transform:rotate(-3deg)}
+.welcome-icon svg{transform:rotate(3deg)}
+.welcome-label{color:#477bd2}
+.welcome h2{color:#183967;font-size:33px}
+.welcome-capabilities{display:flex;align-items:center;justify-content:center;gap:9px;flex-wrap:wrap;margin:0 auto 25px}
+.welcome-capabilities span{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:690;color:#3568ae;border:1px solid #c8dcf8;background:linear-gradient(115deg,#fff,#f0f6ff);padding:9px 12px;border-radius:999px;box-shadow:0 4px 12px #3168aa0e}
+.welcome-capabilities svg{color:#3a7ce2}
+.prompt-heading{padding-top:9px;border-top:1px solid #deebfa}
+.prompt-grid button{border:1px solid #c7daf5;box-shadow:0 7px 23px rgba(33,93,180,.095);position:relative;overflow:hidden}
+.prompt-grid button:before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#4a85ea,#9fcaff);opacity:.7}
+.prompt-grid button:nth-child(2):before{background:linear-gradient(90deg,#8162dc,#c3a8ff)}
+.prompt-grid button:nth-child(3):before{background:linear-gradient(90deg,#25abc8,#a2e7f6)}
+.prompt-grid button:nth-child(4):before{background:linear-gradient(90deg,#35a792,#a4efd4)}
+.result-shortcuts{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:14px 0 13px;padding:12px 13px;border:1px solid #cbdff8;border-radius:12px;background:linear-gradient(95deg,#f0f6ff,#fff);box-shadow:0 5px 15px #3465b513}
+.result-shortcuts>span{display:flex;align-items:center;gap:7px;color:#335d9c;font-size:13px;font-weight:790;margin-right:auto}
+.result-shortcuts button{display:flex;align-items:center;gap:6px;border:1px solid #ccdef6;border-radius:8px;background:#fff;color:#2e6cce;padding:9px 10px;font-size:12px;font-weight:700;cursor:pointer}
+.result-shortcuts button:hover{background:#e7f1ff;border-color:#8cb7f2}
+.agent-inspector{background:linear-gradient(150deg,#f8fbff,#eef5ff)}
+.agent-inspector header{background:#edf5ff}
+.agent-inspector .inspector-content{padding:16px}
+.composer-wrap{background:linear-gradient(180deg,#fff,#f9fbff)}
+.composer{border-color:#9cbef0;box-shadow:0 7px 25px #2b6bd31b}
+@media(max-width:900px){.agent-head-status{display:none}.agent-mode-strip{gap:10px;padding:8px 12px}.agent-mode-strip .mode-safe{margin-left:0}}
+@media(max-width:760px){.agent-head h1{font-size:22px}.agent-mode-strip{gap:8px}.agent-mode-strip>span{font-size:11px}.agent-mode-strip .mode-safe{width:100%}.welcome-capabilities{gap:5px;margin-bottom:14px}.welcome-capabilities span{font-size:11px;padding:7px 9px}.welcome-constellation{transform:scale(.7)}.welcome h2{font-size:24px}.result-shortcuts{padding:9px}.result-shortcuts>span{width:100%}.result-shortcuts button{font-size:11px}}
+@media(prefers-reduced-motion:reduce){.mode-pulse{animation:none}.prompt-grid button{transition:none}}
 
 </style>

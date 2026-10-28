@@ -95,4 +95,22 @@ li.error .stage-status{color:#cb3845}
 .spin{animation:turn 1s linear infinite}
 @keyframes turn{to{transform:rotate(360deg)}}
 @media(max-width:600px){.task-journey{padding:11px}.journey-title p{font-size:12px}.stage-main small{font-size:12px}}
+
+/* Atlas 2.1 — premium AI workspace without fabricated progress */
+
+.task-journey{border-color:#c8ddf7;background:linear-gradient(135deg,#f2f7ff,#fff);box-shadow:0 5px 16px #2867ab0c}
+.journey-icon{width:39px;height:39px;border-radius:11px;background:#dcecff;color:#276de4}
+.journey-title b{font-size:14px;color:#25456e}
+.journey-count{background:#e5efff;border-radius:8px;padding:6px 10px;color:#2867ce;font-size:13px}
+.journey-stages{gap:5px}
+.journey-stages li{padding:11px 12px;border:1px solid #e2eafa;background:#fff;border-radius:9px}
+.journey-stages li:nth-child(even){background:#f7faff}
+.journey-stages li.done{background:#f0faf6;border-color:#ccece0}
+.journey-stages li.running{background:#edf4ff;border-color:#b5d4fa;box-shadow:inset 3px 0 #3478ea}
+.journey-stages li.error{background:#fff4f4;border-color:#f0cece}
+.journey-stages li+li:before{display:none}
+.stage-number{width:27px;height:27px}
+.stage-main b{font-size:13px}
+.stage-main small{font-size:12px}
+
 </style>
