@@ -33,6 +33,7 @@ class AgentConversation(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("sys_user.id"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     model_mode: Mapped[str] = mapped_column(String(16), nullable=False)
+    task_tier: Mapped[str] = mapped_column(String(16), default="standard", nullable=False)
     pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     session_id: Mapped[str | None] = mapped_column(String(200))
     legacy_messages_json: Mapped[str | None] = mapped_column(Text)

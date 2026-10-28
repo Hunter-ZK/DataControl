@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api/v1/agent/conversations", tags=["agent-history"])
 class ConversationNew(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     modelMode: Literal["deepseek"] = "deepseek"
+    taskTier: Literal["standard", "multi"] = "standard"
     contextAsset: dict[str, Any] | None = None
 
 
@@ -32,6 +33,7 @@ class LegacyConversation(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     modelMode: Literal["deepseek", "free-test"] = "deepseek"
     pinned: bool = False
+    taskTier: Literal["standard", "multi"] = "standard"
     sessionId: str | None = Field(default=None, max_length=200)
     messages: list[dict[str, Any]] = Field(default_factory=list, max_length=80)
     contextAsset: dict[str, Any] | None = None
@@ -54,7 +56,7 @@ def new_conversation(body: ConversationNew, user: User = Depends(get_current_use
     with SessionLocal() as db:
         return {"code": "OK", "data": history.serialize(db, history.create(
             db, user.id, body.title.strip(), body.modelMode,
-            context_asset=body.contextAsset,
+            context_asset=body.contextAsset, task_tier=body.taskTier,
         ))}
 
 
@@ -80,6 +82,7 @@ def import_legacy(body: ImportRequest, user: User = Depends(get_current_user)):
             conv = history.create(
                 db, user.id, item.title, mode, legacy_messages=rows,
                 session_id=None, pinned=item.pinned, context_asset=item.contextAsset,
+                task_tier=item.taskTier if mode == "deepseek" else "standard",
             )
             imported.append(history.serialize(db, conv))
     return {"code": "OK", "data": imported}

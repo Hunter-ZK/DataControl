@@ -48,10 +48,11 @@ def owned(db: Session, user_id: int, conversation_id: str) -> AgentConversation:
 
 
 def create(db: Session, user_id: int, title: str, mode: str, *,
-           legacy_messages=None, session_id=None, pinned=False, context_asset=None) -> AgentConversation:
+           legacy_messages=None, session_id=None, pinned=False, context_asset=None,
+           task_tier="standard") -> AgentConversation:
     conv = AgentConversation(
         id=str(uuid4()), user_id=user_id, title=title[:200] or "新会话",
-        model_mode=mode, pinned=pinned, session_id=session_id,
+        model_mode=mode, task_tier=task_tier, pinned=pinned, session_id=session_id,
         legacy_messages_json=_json(legacy_messages[:80]) if legacy_messages is not None else None,
         context_asset_json=_json(context_asset) if context_asset else None,
         created_at=datetime.utcnow(), updated_at=datetime.utcnow(),
@@ -105,7 +106,8 @@ def serialize(db: Session, conv: AgentConversation) -> dict:
             })
     return {
         "id": conv.id, "serverId": conv.id, "title": conv.title,
-        "modelMode": conv.model_mode, "sessionId": conv.session_id,
+        "modelMode": conv.model_mode, "taskTier": conv.task_tier,
+        "sessionId": conv.session_id,
         "pinned": conv.pinned, "messages": messages[-80:],
         "contextAsset": _decode(conv.context_asset_json, {}) if conv.context_asset_json else None,
         "createdAt": int(conv.created_at.timestamp() * 1000),
