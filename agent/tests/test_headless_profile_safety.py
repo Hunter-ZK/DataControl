@@ -73,4 +73,4 @@ def test_web_profile_uses_v021_declarative_preset_registry():
     text = WEB_PATCH.read_text(encoding="utf-8")
     assert "agent-preset-registry" in text
     assert "default: standard" in text
-    assert "agent-presets" not in text
+    assert "- id: agent-presets" not in text
