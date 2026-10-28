@@ -18,7 +18,7 @@ $headless = Join-Path $local "dsh-home-v0.2.1-rc.3\profiles\dataagent-headless\p
 
 function Test-PortalReady {
   if (-not ((Test-Path $python) -and (Test-Path $vite))) { return $false }
-  & $python -c "import backend.app.main, alembic, httpx" 2>$null
+  & $python -c "import importlib.util as u; raise SystemExit(0 if all(u.find_spec(n) for n in ('backend.app.main','alembic','httpx')) else 1)"
   if ($LASTEXITCODE -ne 0) { return $false }
   if (Test-Path $portalMarker) { return $true }
 
@@ -40,7 +40,7 @@ function Test-AgentReady {
   if (-not ((Test-Path $agentMarker) -and (Test-Path $dsh) -and (Test-Path $headless))) {
     return $false
   }
-  & $python -c "import agent3, dataagent_gateway" 2>$null
+  & $python -c "import importlib.util as u; raise SystemExit(0 if all(u.find_spec(n) for n in ('agent3','dataagent_gateway')) else 1)"
   return ($LASTEXITCODE -eq 0)
 }
 
