@@ -53,6 +53,11 @@ jobs:
       - run: python -c "import agent3, dataagent_gateway, cryptography; major=int(cryptography.__version__.split('.')[0]); assert major == 48, cryptography.__version__; print('Agent runtime OK; cryptography=' + cryptography.__version__)"
       - run: python agent/scripts/check_architecture.py
       - run: python -m pytest -q agent/tests
+      - name: Exercise npm 12 install-script approvals on Windows
+        if: runner.os == 'Windows'
+        run: |
+          npm install -g npm@12.2.1 --no-audit --no-fund
+          npm --version
       - name: Install pinned dsh
         working-directory: agent/dsh
         run: npm install --no-audit --no-fund
