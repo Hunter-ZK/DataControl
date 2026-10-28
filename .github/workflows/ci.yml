@@ -33,6 +33,25 @@ jobs:
       - run: python -m pytest -q
       - run: python scripts/search_benchmark.py
 
+  browser-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '24'}
+      - working-directory: web
+        run: npm install --no-audit --no-fund
+      - working-directory: web
+        run: npx playwright install --with-deps chromium
+      - working-directory: web
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: datacontrol-browser-screenshots
+          path: web/test-results/
+          retention-days: 7
+
   agent-cross-platform:
     strategy:
       fail-fast: false
