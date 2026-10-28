@@ -35,6 +35,7 @@ export type AgentConversation = {
   title: string
   sessionId: string | null
   modelMode: AgentModelMode
+  taskTier?: 'standard' | 'multi'
   createdAt: number
   updatedAt: number
   pinned: boolean

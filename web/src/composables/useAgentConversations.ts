@@ -30,6 +30,7 @@ function normalizeConversation(value: unknown): AgentConversation | null {
       row.modelMode !== 'deepseek' && typeof row.sessionId === 'string'
       && row.sessionId.startsWith('free-test:')
     ) ? 'free-test' : 'deepseek',
+    taskTier: row.taskTier === 'multi' ? 'multi' : 'standard',
     createdAt: typeof row.createdAt === 'number' ? row.createdAt : now,
     updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : now,
     pinned: row.pinned === true,
@@ -112,6 +113,7 @@ export function useAgentConversations() {
   function create(
     firstQuestion: string, contextAsset?: ContextAsset | null,
     modelMode: AgentModelMode = 'deepseek',
+    taskTier: 'standard' | 'multi' = 'standard',
   ): AgentConversation {
     const now = Date.now()
     const conversation: AgentConversation = {
@@ -120,6 +122,7 @@ export function useAgentConversations() {
       title: defaultTitle(firstQuestion),
       sessionId: null,
       modelMode,
+      taskTier,
       createdAt: now,
       updatedAt: now,
       pinned: false,

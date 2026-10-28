@@ -178,6 +178,7 @@ export interface ServerAgentConversation {
   title: string
   sessionId: string | null
   modelMode: AgentModelMode
+  taskTier?: 'standard' | 'multi'
   pinned: boolean
   createdAt: number
   updatedAt: number
@@ -229,6 +230,7 @@ export async function streamAgentTurn(
   modelMode: AgentModelMode = 'deepseek',
   conversationId: string | null = null,
   displayQuestion: string | null = null,
+  taskTier: 'standard' | 'multi' = 'standard',
 ): Promise<AgentResult> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   const token = localStorage.getItem('datacontrol_token')
@@ -239,7 +241,7 @@ export async function streamAgentTurn(
     body: JSON.stringify({
       question, runId, modelMode,
       conversationId: conversationId || undefined,
-      displayQuestion: displayQuestion || undefined,
+      displayQuestion: displayQuestion || undefined, taskTier,
       publicGatewayConsent: false,
     }),
     signal,
@@ -412,8 +414,9 @@ export const relationApi = {
 
 export const agentApi = {
   conversations: () => get<ServerAgentConversation[]>('/agent/conversations'),
-  createConversation: (title: string, modelMode: AgentModelMode, contextAsset?: Record<string, unknown> | null) =>
-    post<ServerAgentConversation>('/agent/conversations', { title, modelMode, contextAsset }),
+  createConversation: (title: string, modelMode: AgentModelMode,
+    contextAsset?: Record<string, unknown> | null, taskTier: 'standard' | 'multi' = 'standard') =>
+    post<ServerAgentConversation>('/agent/conversations', { title, modelMode, contextAsset, taskTier }),
   importConversations: (conversations: Array<Record<string, unknown>>) =>
     post<ServerAgentConversation[]>('/agent/conversations/import', { conversations }),
   editConversation: (id: string, data: { title?: string; pinned?: boolean }) =>
