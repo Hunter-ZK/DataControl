@@ -170,7 +170,10 @@ export interface SemanticMetric {
   researchPolicy: 'internal_only'
 }
 
+export type AgentModelMode = 'deepseek' | 'free-test'
+
 export interface AgentStatus {
+  modelMode?: AgentModelMode
   ready: boolean
   mode: string
   source: string
@@ -209,6 +212,7 @@ export async function streamAgentTurn(
   runId: string,
   onEvent: (event: AgentStreamEvent) => void,
   signal: AbortSignal,
+  modelMode: AgentModelMode = 'deepseek',
 ): Promise<AgentResult> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   const token = localStorage.getItem('datacontrol_token')
@@ -216,7 +220,10 @@ export async function streamAgentTurn(
   const response = await fetch('/api/v1/agent/query/stream', {
     method: 'POST',
     headers,
-    body: JSON.stringify({ question, sessionId: sessionId || undefined, runId }),
+    body: JSON.stringify({
+      question, sessionId: sessionId || undefined, runId, modelMode,
+      publicGatewayConsent: modelMode === 'free-test',
+    }),
     signal,
   })
   if (!response.ok) throw new Error(`Agent streaming request failed (HTTP ${response.status})`)
@@ -383,9 +390,13 @@ export const relationApi = {
 }
 
 export const agentApi = {
-  status: () => get<AgentStatus>('/agent/status'),
-  query: (question: string, sessionId?: string | null) =>
-    post<AgentResult>('/agent/query', { question, sessionId: sessionId || undefined }),
+  status: (modelMode: AgentModelMode = 'deepseek') =>
+    get<AgentStatus>('/agent/status', { params: { modelMode } }),
+  query: (question: string, sessionId?: string | null, modelMode: AgentModelMode = 'deepseek') =>
+    post<AgentResult>('/agent/query', {
+      question, sessionId: sessionId || undefined, modelMode,
+      publicGatewayConsent: modelMode === 'free-test',
+    }),
   stream: streamAgentTurn,
   cancel: (runId: string) => post<{ cancelled: boolean }>(`/agent/query/${runId}/cancel`),
 }

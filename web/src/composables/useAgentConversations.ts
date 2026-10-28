@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import type { AgentConversation, AgentMessage, ContextAsset, ConversationGroup } from '@/components/agent/types'
+import type { AgentModelMode } from '@/api/client'
 
 const STORAGE_KEY = 'datacontrol_agent_conversations_v1'
 const ACTIVE_KEY = 'datacontrol_agent_active_conversation_v1'
@@ -24,6 +25,10 @@ function normalizeConversation(value: unknown): AgentConversation | null {
     id: row.id,
     title: typeof row.title === 'string' && row.title.trim() ? row.title.trim() : '历史会话',
     sessionId: typeof row.sessionId === 'string' ? row.sessionId : null,
+    modelMode: row.modelMode === 'free-test' || (
+      row.modelMode !== 'deepseek' && typeof row.sessionId === 'string'
+      && row.sessionId.startsWith('free-test:')
+    ) ? 'free-test' : 'deepseek',
     createdAt: typeof row.createdAt === 'number' ? row.createdAt : now,
     updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : now,
     pinned: row.pinned === true,
@@ -103,12 +108,16 @@ export function useAgentConversations() {
     return conversation
   }
 
-  function create(firstQuestion: string, contextAsset?: ContextAsset | null): AgentConversation {
+  function create(
+    firstQuestion: string, contextAsset?: ContextAsset | null,
+    modelMode: AgentModelMode = 'deepseek',
+  ): AgentConversation {
     const now = Date.now()
     const conversation: AgentConversation = {
       id: newConversationId(),
       title: defaultTitle(firstQuestion),
       sessionId: null,
+      modelMode,
       createdAt: now,
       updatedAt: now,
       pinned: false,
@@ -137,10 +146,12 @@ export function useAgentConversations() {
     messages: AgentMessage[],
     sessionId: string | null,
     contextAsset?: ContextAsset | null,
+    modelMode?: AgentModelMode,
   ) {
     const conversation = activeConversation.value
     if (!conversation) return
     conversation.sessionId = sessionId
+    if (modelMode) conversation.modelMode = modelMode
     conversation.updatedAt = Date.now()
     conversation.messages = [...messages]
     conversation.contextAsset = contextAsset ? { ...contextAsset } : null

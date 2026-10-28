@@ -1,5 +1,6 @@
 import type {
   AgentActivity,
+  AgentModelMode,
   AgentClarification,
   AgentEvidence,
   AgentValidation,
@@ -30,6 +31,7 @@ export type AgentConversation = {
   id: string
   title: string
   sessionId: string | null
+  modelMode: AgentModelMode
   createdAt: number
   updatedAt: number
   pinned: boolean
