@@ -210,6 +210,18 @@ function assistantMessage(result: AgentResult): AgentMessage {
   }
 }
 
+function reportAgentDevtools(result: AgentResult) {
+  if (!import.meta.env.DEV) return
+  const steps = (result.events || []).filter((item) => item.type === 'tool_call' || item.type === 'tool_result')
+  console.groupCollapsed(`[DataAgent] 本轮完成 · ${steps.filter((item) => item.type === 'tool_call').length} 次 Agent3 工具调用`)
+  for (const item of steps) {
+    // Show only trusted tool identifiers and status; never print question, SQL or tool input.
+    console.info(item.type === 'tool_call' ? 'TOOL_START' : 'TOOL_END', item.tool, item.type === 'tool_result' ? item.status : '')
+  }
+  console.info('SQL:', result.sql ? 'generated' : 'none', 'Validation:', result.validationState || 'n/a')
+  console.groupEnd()
+}
+
 async function runAgentTurn(displayText: string, prompt: string, createTitle?: string) {
   if (!status.value?.ready || loading.value) return
   if (!activeConversationId.value) createConversation(createTitle || displayText, contextAsset.value)
@@ -219,6 +231,7 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
   await scrollBottom()
   try {
     const result = await agentApi.query(prompt, sessionId.value)
+    reportAgentDevtools(result)
     if (result.sessionId) sessionId.value = result.sessionId
     messages.value.push(assistantMessage(result))
     syncActive(messages.value, sessionId.value, contextAsset.value)

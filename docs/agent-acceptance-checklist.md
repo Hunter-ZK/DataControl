@@ -60,7 +60,7 @@ Get-Content .\.local\agent-gateway.err.log -Tail 40 -Wait
 
 保持这个窗口打开，再在网页中提问。日志按请求 ID 展示 START / TOOL_START / TOOL_END / DONE 或 ERROR，不展示问题全文、工具参数、SQL 正文、模型思维内容和密钥。
 
-如要看 MCP 服务的底层日志：`Get-Content .\.local\agent-mcp.err.log -Tail 40 -Wait`。浏览器 F12 Console 是网页侧诊断，不是 Gateway 原生工具流记录。
+如要看 MCP 服务的底层日志：`Get-Content .\.local\agent-mcp.err.log -Tail 40 -Wait`。浏览器按 **F12 → Console** 也能查看本轮工具调用摘要（回答完成后一次显示）；实时逐步日志以 Gateway 终端为准。两种方式均不输出问题全文、SQL 或工具参数。
 
 ## 4. 验收完成后的反馈
 
