@@ -7,7 +7,7 @@
           <h1>智能问数</h1>
           <p>面向数据查询与开发场景检索内部可信指标、资产和口径；存在业务分歧时先让你选择，再生成经过静态校验的 MaxCompute SQL。系统不执行生产 SQL，也不访问外部网络补全口径。</p>
         </div>
-        <span class="service-status" :class="{ ready: status?.ready }"><i></i>{{ status?.ready ? (status?.provider === 'our-free-model' ? '免费测试模式' : '服务正常') : '服务未就绪' }}</span>
+        <span class="service-status" :class="{ ready: status?.ready }"><i></i>{{ status?.ready ? '服务正常' : '服务未就绪' }}</span>
       </header>
 
       <section class="agent-workspace dc-card">
@@ -25,13 +25,21 @@
         />
 
         <section class="chat-shell">
+          <div class="chat-model-bar">
+            <span class="chat-model-label">对话模型</span>
+            <div class="model-options" role="group" aria-label="选择当前对话模型">
+              <button type="button" :class="{ selected: modelMode === 'deepseek' }" :disabled="loading || modelSwitching" :aria-pressed="modelMode === 'deepseek'" @click="switchModel('deepseek')">DeepSeek 官方</button>
+              <button type="button" :class="{ selected: modelMode === 'free-test' }" :disabled="loading || modelSwitching" :aria-pressed="modelMode === 'free-test'" @click="switchModel('free-test')"><FlaskConical :size="14" />免费模型测试</button>
+            </div>
+            <span class="model-context">{{ modelMode === 'free-test' ? '第三方公开网关 · 仅模拟数据' : '官方模型 · 可信 SQL 校验' }}</span>
+          </div>
           <div v-if="contextAsset" class="context-strip">
             <Database :size="17" />
             <div><span>当前数据资产</span><b>{{ contextAsset.bizName || contextAsset.tableName }}</b><code>{{ contextAsset.tableName }}</code></div>
             <button @click="clearContext"><X :size="15" />清除</button>
           </div>
           <div v-if="!status?.ready" class="runtime-warning"><TriangleAlert :size="18" /><span>{{ agentUnavailableReason }}</span></div>
-          <div v-if="status?.provider === 'our-free-model'" class="runtime-warning"><TriangleAlert :size="18" /><span>公开免费模型测试模式：提问及工具返回的信息会发送至第三方模型服务。请勿输入真实业务数据、内部 SQL 或个人信息。</span></div>
+          <div v-if="modelMode === 'free-test'" class="runtime-warning"><TriangleAlert :size="18" /><span>公开免费模型测试模式：提问及工具返回的信息会发送至第三方模型服务。请勿输入真实业务数据、内部 SQL 或个人信息。</span></div>
 
           <div ref="messageBox" class="messages">
             <div v-if="messages.length === 0" class="welcome">
@@ -85,9 +93,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpRight, Database, LoaderCircle, Send, ShieldCheck, Sparkles, Square, TriangleAlert, X } from 'lucide-vue-next'
+import { ArrowUpRight, Database, FlaskConical, LoaderCircle, Send, ShieldCheck, Sparkles, Square, TriangleAlert, X } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { agentApi, assetApi, type AgentActivity, type AgentResult, type AgentStatus, type AgentStreamEvent, AgentTurnCancelledError } from '@/api/client'
+import { agentApi, assetApi, type AgentActivity, type AgentModelMode, type AgentResult, type AgentStatus, type AgentStreamEvent, AgentTurnCancelledError } from '@/api/client'
 import AgentConversationSidebar from '@/components/agent/AgentConversationSidebar.vue'
 import AgentMessageView from '@/components/agent/AgentMessage.vue'
 import AgentTrace from '@/components/agent/AgentTrace.vue'
@@ -97,6 +105,10 @@ import { useAgentConversations } from '@/composables/useAgentConversations'
 const route = useRoute()
 const router = useRouter()
 const status = ref<AgentStatus | null>(null)
+const modelMode = ref<AgentModelMode>('deepseek')
+const modelSwitching = ref(false)
+const publicGatewayAcknowledged = ref(false)
+let statusRequestSerial = 0
 const agentUnavailableReason = computed(() => {
   if (!status.value) return '无法获取 Agent 状态：请确认 DataControl 后端已在 8000 端口启动。'
   return status.value.reason
@@ -141,10 +153,49 @@ const quickPrompts = [
 ]
 
 async function refreshStatus() {
-  try { status.value = await agentApi.status() } catch { status.value = null }
+  const serial = ++statusRequestSerial
+  const chosen = modelMode.value
+  try {
+    const state = await agentApi.status(chosen)
+    if (serial === statusRequestSerial && chosen === modelMode.value) status.value = state
+  } catch {
+    if (serial === statusRequestSerial) status.value = null
+  }
+}
+
+async function confirmPublicGateway(): Promise<boolean> {
+  if (publicGatewayAcknowledged.value) return true
+  try {
+    await ElMessageBox.confirm(
+      '免费模型由第三方公共服务提供。提问及 Agent 检索到的元数据可能发送给该服务。仅可使用模拟数据，禁止提交真实业务元数据、内部 SQL、客户资料或密钥。是否继续？',
+      '启用免费模型测试',
+      { confirmButtonText: '仅用于模拟数据，继续', cancelButtonText: '取消', type: 'warning' },
+    )
+    publicGatewayAcknowledged.value = true
+    return true
+  } catch { return false }
+}
+
+async function switchModel(nextMode: AgentModelMode) {
+  if (loading.value || modelSwitching.value || nextMode === modelMode.value) return
+  modelSwitching.value = true
+  try {
+    if (nextMode === 'free-test' && !(await confirmPublicGateway())) return
+    // Change model by opening a fresh conversation. Do not send the previous
+    // model's prompt history, session ID or selected business asset downstream.
+    if (route.query.asset || route.query.q) await router.replace({ name: 'agent' })
+    clearActive()
+    resetConversationState()
+    modelMode.value = nextMode
+    status.value = null
+    await refreshStatus()
+  } finally {
+    modelSwitching.value = false
+  }
 }
 
 async function loadContext() {
+  if (modelMode.value === 'free-test') { contextAsset.value = null; return }
   const asset = typeof route.query.asset === 'string' ? route.query.asset : ''
   if (!asset) { contextAsset.value = null; return }
   try {
@@ -154,9 +205,11 @@ async function loadContext() {
 }
 
 function restoreConversation(conversation: AgentConversation) {
+  modelMode.value = conversation.modelMode
   sessionId.value = conversation.sessionId || null
   messages.value = [...conversation.messages]
-  contextAsset.value = conversation.contextAsset ? { ...conversation.contextAsset } : null
+  contextAsset.value = modelMode.value === 'free-test' ? null
+    : (conversation.contextAsset ? { ...conversation.contextAsset } : null)
   nextTick(() => { resizeComposer(); scrollBottom() })
 }
 
@@ -164,7 +217,10 @@ async function selectConversation(conversation: AgentConversation) {
   if (loading.value) return
   if (route.query.asset || route.query.q) await router.replace({ name: 'agent' })
   const selected = activateConversation(conversation.id)
-  if (selected) restoreConversation(selected)
+  if (selected) {
+    restoreConversation(selected)
+    await refreshStatus()
+  }
 }
 
 async function renameConversation(conversation: AgentConversation) {
@@ -190,7 +246,7 @@ async function newSession() {
 
 async function clearContext() {
   contextAsset.value = null
-  syncActive(messages.value, sessionId.value, null)
+  syncActive(messages.value, sessionId.value, null, modelMode.value)
   await router.replace({ name: 'agent' })
 }
 
@@ -262,10 +318,13 @@ async function stopAgentTurn() {
 }
 
 async function runAgentTurn(displayText: string, prompt: string, createTitle?: string) {
-  if (!status.value?.ready || loading.value) return
-  if (!activeConversationId.value) createConversation(createTitle || displayText, contextAsset.value)
+  if (!status.value?.ready || loading.value || modelSwitching.value) return
+  const selectedMode = modelMode.value
+  if (selectedMode === 'free-test' && !(await confirmPublicGateway())) return
+  if (selectedMode !== modelMode.value || loading.value) return
+  if (!activeConversationId.value) createConversation(createTitle || displayText, contextAsset.value, selectedMode)
   messages.value.push({ role: 'user', text: displayText })
-  syncActive(messages.value, sessionId.value, contextAsset.value)
+  syncActive(messages.value, sessionId.value, contextAsset.value, selectedMode)
   loading.value = true
   stopRequested.value = false
   liveEvents.value = []
@@ -273,24 +332,24 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
   activeController = new AbortController()
   await scrollBottom()
   try {
-    const result = await agentApi.stream(prompt, sessionId.value, activeRunId, onAgentStreamEvent, activeController.signal)
+    const result = await agentApi.stream(prompt, sessionId.value, activeRunId, onAgentStreamEvent, activeController.signal, selectedMode)
     if (stopRequested.value) throw new AgentTurnCancelledError()
     reportAgentDevtools(result)
     if (result.sessionId) sessionId.value = result.sessionId
     messages.value.push(assistantMessage(result))
-    syncActive(messages.value, sessionId.value, contextAsset.value)
+    syncActive(messages.value, sessionId.value, contextAsset.value, modelMode.value)
     await scrollBottom()
   } catch (error) {
     if (stopRequested.value || error instanceof AgentTurnCancelledError) {
       // A partially written dsh session must not be silently resumed.
       sessionId.value = null
       messages.value.push({ role: 'assistant', text: '本轮任务已停止，未生成可采信的最终结果。Agent 会话上下文已重置，请重新发起需要的查询。' })
-      syncActive(messages.value, sessionId.value, contextAsset.value)
+      syncActive(messages.value, sessionId.value, contextAsset.value, modelMode.value)
     } else {
       console.error('DataAgent query failed', error)
       ElMessage.error('智能问数本次未完成，请检查 Agent 服务与运行日志。')
       await refreshStatus()
-      syncActive(messages.value, sessionId.value, contextAsset.value)
+      syncActive(messages.value, sessionId.value, contextAsset.value, modelMode.value)
     }
   } finally {
     loading.value = false
@@ -323,7 +382,7 @@ async function submitClarification(
 
   message.clarificationResolved = true
   message.clarificationSelection = [...payload.values]
-  syncActive(messages.value, sessionId.value, contextAsset.value)
+  syncActive(messages.value, sessionId.value, contextAsset.value, modelMode.value)
 
   const displayText = payload.custom
     ? `补充口径：${payload.custom}`
@@ -336,17 +395,18 @@ async function submitClarification(
 
 onMounted(async () => {
   loadConversations()
-  await refreshStatus()
   const initialQuestion = typeof route.query.q === 'string' ? route.query.q.trim() : ''
   const hasRouteAsset = typeof route.query.asset === 'string' && !!route.query.asset
   if (hasRouteAsset || initialQuestion) {
     clearActive(); resetConversationState()
+    modelMode.value = 'deepseek'
     if (hasRouteAsset) await loadContext()
     if (initialQuestion) question.value = initialQuestion
   } else {
     const restored = restoreLast()
     if (restored) restoreConversation(restored)
   }
+  await refreshStatus()
   resizeComposer()
 })
 </script>
@@ -363,6 +423,14 @@ onMounted(async () => {
 .service-status.ready i { background: #1c805a; }
 .agent-workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: 268px minmax(0,1fr); overflow: hidden; border-color: #a9c9d8; box-shadow: 0 20px 52px rgba(27,78,106,.15); background: #fff; }
 .chat-shell { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: rgba(255,255,255,.99); }
+.chat-model-bar { flex: none; display: flex; align-items: center; gap: 12px; padding: 11px 20px; background: #f7fbfd; border-bottom: 1px solid #d8e7ef; }
+.chat-model-label { color: #547184; font-weight: 700; font-size: 12px; white-space: nowrap; }
+.model-options { display: inline-flex; align-items: center; gap: 3px; border: 1px solid #d0e1eb; background: #eaf3f8; border-radius: 10px; padding: 3px; }
+.model-options button { display: inline-flex; gap: 6px; align-items: center; padding: 8px 12px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #567587; font-size: 12px; font-weight: 650; white-space: nowrap; cursor: pointer; }
+.model-options button.selected { background: #fff; border-color: #c3dce9; color: #12618b; box-shadow: 0 1px 6px rgba(30,90,120,.09); }
+.model-options button:hover:not(:disabled):not(.selected) { color: #17688f; background: #dcecf4; }
+.model-options button:disabled { opacity: .55; cursor: not-allowed; }
+.model-context { margin-left: auto; color: #738d9e; font-size: 12px; text-align: right; }
 .context-strip { flex: none; display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 12px; align-items: center; padding: 12px 20px; background: #d9edf6; border-bottom: 1px solid #aacddb; color: #245b75; }
 .context-strip > div { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
 .context-strip span { font-size: 13px; color: #4f788d; }
@@ -396,7 +464,7 @@ onMounted(async () => {
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media(max-width:980px){.agent-workspace{grid-template-columns:220px minmax(0,1fr)}}
-@media(max-width:760px){.agent-screen{min-height:640px;padding:12px 0}.agent-head{align-items:flex-start;flex-direction:column;gap:10px;padding-bottom:12px}.agent-head h1{font-size:31px}.agent-workspace{grid-template-columns:1fr}.agent-workspace :deep(.history-pane){display:none}.messages{padding:21px 15px}.prompt-grid{grid-template-columns:1fr}.composer-wrap{padding:10px 12px 11px}.composer-hint span:first-child{display:none}.composer-hint{justify-content:flex-end}}
+@media(max-width:760px){.chat-model-bar{padding:9px 12px;gap:7px;flex-wrap:wrap}.model-context{display:none}.model-options button{padding:7px 9px}.agent-screen{min-height:640px;padding:12px 0}.agent-head{align-items:flex-start;flex-direction:column;gap:10px;padding-bottom:12px}.agent-head h1{font-size:31px}.agent-workspace{grid-template-columns:1fr}.agent-workspace :deep(.history-pane){display:none}.messages{padding:21px 15px}.prompt-grid{grid-template-columns:1fr}.composer-wrap{padding:10px 12px 11px}.composer-hint span:first-child{display:none}.composer-hint{justify-content:flex-end}}
 </style>
 
 <style scoped>
