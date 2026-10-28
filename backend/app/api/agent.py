@@ -14,9 +14,8 @@ from backend.app.agent.runtime import AgentRuntimeError, EmbeddedAgentGateway
 from backend.app.agent import history
 from backend.app.api.auth import get_optional_user
 from backend.app.db.models import User
-from backend.app.db.application_models import AgentTurn, AgentConversation
+from backend.app.db.application_models import AgentTurn
 from backend.app.db.session import SessionLocal
-from sqlalchemy import select
 
 router = APIRouter(prefix="/api/v1/agent", tags=["agent"])
 
