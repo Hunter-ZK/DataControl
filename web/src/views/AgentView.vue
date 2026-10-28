@@ -141,6 +141,8 @@ const {
   rename,
   remove,
   togglePin,
+  attachServerId,
+  mergeServer,
 } = useAgentConversations()
 
 const quickPrompts = [
@@ -226,16 +228,26 @@ async function selectConversation(conversation: AgentConversation) {
 async function renameConversation(conversation: AgentConversation) {
   try {
     const result = await ElMessageBox.prompt('输入新的会话名称', '重命名会话', { inputValue: conversation.title, inputPlaceholder: '会话名称', confirmButtonText: '保存', cancelButtonText: '取消', inputValidator: (value) => !!String(value || '').trim() || '请输入会话名称' })
-    rename(conversation.id, String(result.value || ''))
-  } catch { /* user cancelled */ }
+    const title = String(result.value || '')
+    if (conversation.serverId) await agentApi.editConversation(conversation.serverId, { title })
+    rename(conversation.id, title)
+  } catch { /* cancelled or update failed, local state unchanged */ }
 }
 
 async function deleteConversation(conversation: AgentConversation) {
   try { await ElMessageBox.confirm(`删除“${conversation.title}”？删除后仅移除当前浏览器中的历史记录。`, '删除会话', { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }) } catch { return }
-  if (remove(conversation.id)) resetConversationState()
+  try {
+    if (conversation.serverId) await agentApi.deleteConversation(conversation.serverId)
+    if (remove(conversation.id)) resetConversationState()
+  } catch { ElMessage.error('服务端删除未成功，原会话已保留。') }
 }
 
-function toggleConversationPin(conversation: AgentConversation) { togglePin(conversation.id) }
+async function toggleConversationPin(conversation: AgentConversation) {
+  try {
+    if (conversation.serverId) await agentApi.editConversation(conversation.serverId, { pinned: !conversation.pinned })
+    togglePin(conversation.id)
+  } catch { ElMessage.error('置顶操作未保存，原状态已保留。') }
+}
 function resetConversationState() { sessionId.value = null; messages.value = []; contextAsset.value = null; question.value = ''; nextTick(resizeComposer) }
 
 async function newSession() {
@@ -315,7 +327,7 @@ async function stopAgentTurn() {
       ElMessage.warning('服务端未确认取消，正在等待任务最终状态；请勿将其视为已停止。')
       return
     }
-    activeController?.abort()
+    // Do not abort the stream here: only a terminal 'cancelled' event confirms stop.
   } catch {
     stopRequested.value = false
     ElMessage.warning('停止请求失败，仍在等待服务端结果；请检查 Agent 日志。')
@@ -331,21 +343,32 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
   messages.value.push({ role: 'user', text: displayText })
   syncActive(messages.value, sessionId.value, contextAsset.value, selectedMode)
   loading.value = true
+  if (localStorage.getItem('datacontrol_token') && activeConversationId.value) {
+    const active = conversations.value.find((c) => c.id === activeConversationId.value)
+    if (active && !active.serverId) {
+      try {
+        const saved = await agentApi.createConversation(active.title, selectedMode)
+        attachServerId(active.id, saved.id)
+      } catch {
+        ElMessage.warning('服务端会话不可用，本轮仍保存在当前浏览器。')
+      }
+    }
+  }
   stopRequested.value = false
   liveEvents.value = []
   activeRunId = crypto.randomUUID()
   activeController = new AbortController()
   await scrollBottom()
   try {
-    const result = await agentApi.stream(prompt, sessionId.value, activeRunId, onAgentStreamEvent, activeController.signal, selectedMode)
-    if (stopRequested.value) throw new AgentTurnCancelledError()
+    const serverId = conversations.value.find((c) => c.id === activeConversationId.value)?.serverId || null
+    const result = await agentApi.stream(prompt, sessionId.value, activeRunId, onAgentStreamEvent, activeController.signal, selectedMode, serverId)
     reportAgentDevtools(result)
     if (result.sessionId) sessionId.value = result.sessionId
     messages.value.push(assistantMessage(result))
     syncActive(messages.value, sessionId.value, contextAsset.value, modelMode.value)
     await scrollBottom()
   } catch (error) {
-    if (stopRequested.value || error instanceof AgentTurnCancelledError) {
+    if (error instanceof AgentTurnCancelledError) {
       // A partially written dsh session must not be silently resumed.
       sessionId.value = null
       messages.value.push({ role: 'assistant', text: '本轮任务已停止，未生成可采信的最终结果。Agent 会话上下文已重置，请重新发起需要的查询。' })
@@ -402,6 +425,32 @@ async function submitClarification(
   await runAgentTurn(displayText, technicalChoice)
 }
 
+async function refreshServerHistory() {
+  if (!localStorage.getItem('datacontrol_token')) return
+  try {
+    const remote = await agentApi.conversations()
+    mergeServer(remote as unknown as AgentConversation[])
+    const unlinked = conversations.value.filter((c) => !c.serverId && c.messages.length > 0)
+    if (unlinked.length) {
+      try {
+        await ElMessageBox.confirm(
+          `发现 ${unlinked.length} 条仅保存在本浏览器的历史会话。是否导入当前登录账号？不导入也不会删除。`,
+          '导入本地会话',
+          { confirmButtonText: '确认导入', cancelButtonText: '保留本地', type: 'info' },
+        )
+        const imported = await agentApi.importConversations(unlinked.map((c) => ({
+          title: c.title, modelMode: c.modelMode, pinned: c.pinned,
+          sessionId: c.sessionId, messages: c.messages, contextAsset: c.contextAsset,
+        })))
+        for (let i = 0; i < imported.length; i++) attachServerId(unlinked[i].id, imported[i].id)
+        mergeServer(imported as unknown as AgentConversation[])
+      } catch { /* User declined, or import failed: keep all local history. */ }
+    }
+    const active = conversations.value.find((c) => c.id === activeConversationId.value)
+    if (active) restoreConversation(active)
+  } catch { ElMessage.warning('暂时无法同步服务端历史，本地会话仍可使用。') }
+}
+
 onMounted(async () => {
   loadConversations()
   const initialQuestion = typeof route.query.q === 'string' ? route.query.q.trim() : ''
@@ -416,6 +465,7 @@ onMounted(async () => {
     if (restored) restoreConversation(restored)
   }
   await refreshStatus()
+  await refreshServerHistory()
   resizeComposer()
 })
 </script>
