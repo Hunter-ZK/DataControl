@@ -1,45 +1,128 @@
-$ErrorActionPreference="Stop"
-$root=(Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-Push-Location $root
-try {
-  if(-not(Get-Command npm -ErrorAction SilentlyContinue)){throw "Node.js/npm is required for the embedded DataAgent."}
+[CmdletBinding()]
+param([switch]$Repair)
 
-  $python=Join-Path $root ".venv\Scripts\python.exe"
-  if(-not(Test-Path $python)){
-    $created=$false
-    if(Get-Command python -ErrorAction SilentlyContinue){
-      & python -c "import sys; raise SystemExit(0 if (3,13) <= sys.version_info[:2] < (3,15) else 1)" 2>$null
-      if($LASTEXITCODE -eq 0){ & python -m venv .venv; $created=$LASTEXITCODE -eq 0 }
-    }
-    if(-not $created -and (Get-Command py -ErrorAction SilentlyContinue)){
-      foreach($version in @("-3.13","-3.14")){
-        & py $version -c "import sys; raise SystemExit(0 if (3,13) <= sys.version_info[:2] < (3,15) else 1)" 2>$null
-        if($LASTEXITCODE -eq 0){ & py $version -m venv .venv; if($LASTEXITCODE -eq 0){$created=$true;break} }
-      }
-    }
-    if(-not $created){throw "DataControl requires Python 3.13 or 3.14. Install a compatible Python or create .venv first."}
-    & $python -m pip install -U pip
-    & $python -m pip install -e ".[dev]"
+$ErrorActionPreference = "Stop"
+$root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$local = Join-Path $root ".local"
+$marker = Join-Path $local "agent-setup-v0.2.1-rc.3.ready"
+$dshRoot = Join-Path $root "agent\dsh"
+$dshModules = Join-Path $dshRoot "node_modules"
+$dshBin = Join-Path $dshModules ".bin\dsh.cmd"
+$guardRoot = Join-Path $root "agent\guard-plugin"
+$python = Join-Path $root ".venv\Scripts\python.exe"
+$npmTimeoutMs = 600000
+
+New-Item -ItemType Directory -Force -Path $local | Out-Null
+$setupLock = $null
+try {
+  $lockPath = Join-Path $local "agent-setup.lock"
+  try {
+    $setupLock = [System.IO.File]::Open(
+      $lockPath, [System.IO.FileMode]::OpenOrCreate,
+      [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None
+    )
+  } catch [System.IO.IOException] {
+    throw "Another DataControl Agent setup is running. Close the other setup window before retrying."
   }
 
-  & $python -c "import sys; raise SystemExit(0 if (3,13) <= sys.version_info[:2] < (3,15) else 1)"
-  if($LASTEXITCODE -ne 0){throw "Existing .venv must use Python 3.13 or 3.14."}
-  Write-Host ("Embedded DataAgent Python: " + (& $python --version))
+  function Assert-Exit([string]$Step) {
+    if ($LASTEXITCODE -ne 0) {
+      throw "$Step failed (exit code $LASTEXITCODE)."
+    }
+  }
 
-  Write-Host "Installing wheel-compatible cryptography runtime..."
-  & $python -m pip install --only-binary=:all: "cryptography>=48.0.1,<49"
-  if($LASTEXITCODE -ne 0){throw "Compatible cryptography wheel installation failed"}
+  function Invoke-NpmInstall([string]$Name, [string]$Directory) {
+    $stdout = Join-Path $local "npm-$Name.stdout.log"
+    $stderr = Join-Path $local "npm-$Name.stderr.log"
+    Remove-Item $stdout, $stderr -Force -ErrorAction SilentlyContinue
+    $command = "npm install --no-audit --no-fund --no-progress --install-strategy=shallow --maxsockets=5"
+    Write-Host "[DataControl] Installing $Name npm packages. Detailed output: $stderr"
+    $params = @{
+      FilePath = $env:ComSpec
+      ArgumentList = @("/d", "/c", $command)
+      WorkingDirectory = $Directory
+      RedirectStandardOutput = $stdout
+      RedirectStandardError = $stderr
+      NoNewWindow = $true
+      PassThru = $true
+    }
+    $process = Start-Process @params
+    try {
+      if (-not $process.WaitForExit($npmTimeoutMs)) {
+        & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null
+        throw "$Name npm installation timed out and was stopped. Check $stderr."
+      }
+      if ($process.ExitCode -ne 0) {
+        $tail = if (Test-Path $stderr) { (Get-Content $stderr -Tail 16) -join [Environment]::NewLine } else { "No npm error log." }
+        throw "$Name npm installation failed with exit code $($process.ExitCode). $tail"
+      }
+    } finally {
+      $process.Dispose()
+    }
+    Write-Host "[DataControl] $Name npm packages installed."
+  }
 
-  & $python -m pip install -e ".\agent[all]"
-  if($LASTEXITCODE -ne 0){throw "Agent Python package installation failed"}
+  if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
+    throw "Node.js 24/npm is not available on PATH."
+  }
+  Push-Location $root
+  try {
+    if (-not (Test-Path $python)) {
+      throw "Missing Python environment. Run .\start.bat setup first."
+    }
+    & $python -c "import sys; raise SystemExit(0 if (3,13) <= sys.version_info[:2] < (3,15) else 1)"
+    Assert-Exit "Python version validation"
 
-  Push-Location agent\dsh
-  try{npm install --no-audit --no-fund;if($LASTEXITCODE -ne 0){throw "dsh npm install failed"}}finally{Pop-Location}
-  Push-Location agent\guard-plugin
-  try{npm install --no-audit --no-fund;npm run build;npm test;if($LASTEXITCODE -ne 0){throw "guard plugin verification failed"}}finally{Pop-Location}
+    if ($Repair -or -not (Test-Path $marker)) {
+      Remove-Item $marker -Force -ErrorAction SilentlyContinue
+      if (Test-Path $dshModules) {
+        Write-Host "[DataControl] Clearing only incomplete agent\dsh\node_modules..."
+        try {
+          Remove-Item -LiteralPath $dshModules -Recurse -Force -ErrorAction Stop
+        } catch {
+          throw "Cannot remove locked npm files. Close npm/Node.js processes using this folder, and retry .\start.bat repair. Details: $($_.Exception.Message)"
+        }
+      }
+    }
 
-  & .\agent\scripts\setup_dataagent.ps1 -DshHome (Join-Path $root ".local\dsh-home-v0.2.1-rc.3")
-  & $python -c "import agent3, dataagent_gateway, cryptography; print('Agent Python imports OK; cryptography=' + cryptography.__version__)"
-  if($LASTEXITCODE -ne 0){throw "Agent imports failed after setup"}
-  Write-Host "Embedded DataAgent setup complete (shared .venv + local dsh profile)."
-} finally { Pop-Location }
+    & $python -m pip install --only-binary=:all: "cryptography>=48.0.1,<49"
+    Assert-Exit "cryptography setup"
+    & $python -m pip install -e ".\agent[all]"
+    Assert-Exit "Agent Python setup"
+
+    if (-not (Test-Path $dshBin)) {
+      Invoke-NpmInstall "dsh" $dshRoot
+    } else {
+      Write-Host "[DataControl] Existing dsh installation found."
+    }
+    if (-not (Test-Path $dshBin)) {
+      throw "dsh.cmd is missing after npm installation."
+    }
+
+    if ($Repair -or -not (Test-Path (Join-Path $guardRoot "node_modules\.bin\tsc.cmd"))) {
+      Invoke-NpmInstall "guard" $guardRoot
+    }
+    Push-Location $guardRoot
+    try {
+      & npm.cmd run build
+      Assert-Exit "Guard plugin build"
+      & npm.cmd test
+      Assert-Exit "Guard plugin test"
+    } finally { Pop-Location }
+
+    & (Join-Path $root "agent\scripts\setup_dataagent.ps1") -DshHome (Join-Path $local "dsh-home-v0.2.1-rc.3")
+    & $python -c "import agent3, dataagent_gateway, cryptography"
+    Assert-Exit "Agent Python imports"
+
+    # Create the marker only after all dependencies and both dsh profiles succeed.
+    Set-Content -LiteralPath $marker -Value "dsh=0.2.1-rc.3; profile=dataagent-headless" -Encoding UTF8
+    Write-Host "[DataControl] Agent setup complete. Subsequent starts reuse installed dependencies."
+  } finally {
+    Pop-Location
+  }
+} catch {
+  Remove-Item $marker -Force -ErrorAction SilentlyContinue
+  throw
+} finally {
+  if ($setupLock) { $setupLock.Dispose() }
+}
