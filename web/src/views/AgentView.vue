@@ -30,7 +30,7 @@
             <div><span>当前数据资产</span><b>{{ contextAsset.bizName || contextAsset.tableName }}</b><code>{{ contextAsset.tableName }}</code></div>
             <button @click="clearContext"><X :size="15" />清除</button>
           </div>
-          <div v-if="!status?.ready" class="runtime-warning"><TriangleAlert :size="18" /><span>智能问数服务暂未就绪，请确认本地 Agent 服务已启动后重试。</span></div>
+          <div v-if="!status?.ready" class="runtime-warning"><TriangleAlert :size="18" /><span>{{ agentUnavailableReason }}</span></div>
 
           <div ref="messageBox" class="messages">
             <div v-if="messages.length === 0" class="welcome">
@@ -77,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowUpRight, Database, LoaderCircle, Send, ShieldCheck, Sparkles, TriangleAlert, X } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -90,6 +90,12 @@ import { useAgentConversations } from '@/composables/useAgentConversations'
 const route = useRoute()
 const router = useRouter()
 const status = ref<AgentStatus | null>(null)
+const agentUnavailableReason = computed(() => {
+  if (!status.value) return '无法获取 Agent 状态：请确认 DataControl 后端已在 8000 端口启动。'
+  return status.value.reason
+    ? `Agent 暂不可用：${status.value.reason}`
+    : 'Agent 暂不可用：请查看启动终端的 Gateway/MCP 状态和日志。'
+})
 const question = ref('')
 const loading = ref(false)
 const messages = ref<AgentMessage[]>([])

@@ -19,7 +19,7 @@ git pull --ff-only
 
 如果切换分支或拉取被本地改动阻止，请先妥善保存这些改动，**不要**使用 `git reset --hard` 或删除整个 `.local`。
 
-修复后运行 `.\start.bat`，再进入 `http://127.0.0.1:5173`。
+`.\start.bat repair` 会先修复，再**直接启动**服务；无需在同一个服务运行期间再次执行 `.\start.bat`。启动完成后打开 `http://127.0.0.1:5173`。
 
 启动器现会对比仓库原始 Profile 与本地生成的 Profile；不匹配时自动更新配置。遇到不可解析的旧插件条目时，旧 Profile 会备份到 `.local/dsh-home-v0.2.1-rc.3/profile-backups/`，再生成新 Profile。正常修复不重装 npm 依赖。
 

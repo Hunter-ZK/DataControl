@@ -16,10 +16,9 @@ function Test-DataAgentProfilesCurrent {
       return $false
     }
     try {
-      if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ne
-          (Get-FileHash -LiteralPath $profile -Algorithm SHA256).Hash) {
-        return $false
-      }
+      $sourceHash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
+      $profileHash = (Get-FileHash -LiteralPath $profile -Algorithm SHA256).Hash
+      if ($sourceHash -ne $profileHash) { return $false }
     } catch {
       return $false
     }
