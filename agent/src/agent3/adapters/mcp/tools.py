@@ -17,6 +17,21 @@ class MCPToolAdapter:
     def search_tables(self, query: str, limit: int = 8) -> dict[str, Any]:
         return self._core.search_tables(self._authz(), query, limit=limit)
 
+    def search_assets(self, query: str, limit: int = 12) -> dict[str, Any]:
+        return self._core.search_assets(self._authz(), query, limit=limit)
+
+    def get_asset(self, asset_type: str, asset_id: str) -> dict[str, Any]:
+        return self._core.get_asset(self._authz(), asset_type, asset_id)
+
+    def find_references(self, asset_type: str, asset_id: str) -> dict[str, Any]:
+        return self._core.find_references(self._authz(), asset_type, asset_id)
+
+    def get_lineage_summary(self, asset_type: str, asset_id: str, depth: int = 1) -> dict[str, Any]:
+        return self._core.get_lineage_summary(self._authz(), asset_type, asset_id, depth=depth)
+
+    def revise_query(self, semantic_plan: dict[str, Any], changes: dict[str, Any]) -> dict[str, Any]:
+        return self._core.revise_query(self._authz(), semantic_plan, changes)
+
     def get_schema(self, table_name: str) -> dict[str, Any]:
         return self._core.get_schema(self._authz(), table_name)
 

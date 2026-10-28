@@ -33,6 +33,11 @@ def build_poc_server():
     mcp = FastMCP("agent3", host="127.0.0.1", port=8900)
     for tool in (
         adapter.search_tables,
+        adapter.search_assets,
+        adapter.get_asset,
+        adapter.find_references,
+        adapter.get_lineage_summary,
+        adapter.revise_query,
         adapter.get_schema,
         adapter.resolve_code_value,
         adapter.get_semantic_model,

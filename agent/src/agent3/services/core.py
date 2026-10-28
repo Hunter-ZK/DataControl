@@ -17,6 +17,7 @@ from agent3.semantic.models import (
     SelectionMode,
 )
 from agent3.semantic.registry import SemanticRegistry
+from agent3.semantic.revision import revise_plan
 from agent3.semantic.validator import SemanticPlanValidator
 from agent3.sql.analysis.analyzer import SQLAnalysisError, SQLAnalyzer
 from agent3.sql.validation.validator import SQLValidator
@@ -54,6 +55,38 @@ class Agent3Core:
                 for table in tables
             ]
         }
+
+    def search_assets(self, authz: AuthzContext, query: str, *, limit: int = 12) -> dict[str, Any]:
+        discovery = getattr(self.metadata, "search_assets", None)
+        if discovery is not None:
+            return discovery(authz, query, limit=limit)
+        return {"assets": [], "total": 0, "researchPolicy": "internal_only",
+                "status": "asset_discovery_unavailable"}
+
+    def get_asset(self, authz: AuthzContext, asset_type: str, asset_id: str) -> dict[str, Any]:
+        lookup = getattr(self.metadata, "get_asset", None)
+        if lookup is None:
+            return {"found": False, "status": "asset_detail_unavailable"}
+        return lookup(authz, asset_type, asset_id)
+
+    def find_references(self, authz: AuthzContext, asset_type: str, asset_id: str) -> dict[str, Any]:
+        lookup = getattr(self.metadata, "find_references", None)
+        if lookup is None:
+            return {"assetId": asset_id, "references": [], "status": "unavailable"}
+        return lookup(authz, asset_type, asset_id)
+
+    def get_lineage_summary(self, authz: AuthzContext, asset_type: str, asset_id: str,
+                            *, depth: int = 1) -> dict[str, Any]:
+        lookup = getattr(self.metadata, "get_lineage_summary", None)
+        if lookup is None:
+            return {"assetId": asset_id, "status": "unavailable"}
+        return lookup(authz, asset_type, asset_id, depth=depth)
+
+    def revise_query(self, authz: AuthzContext, semantic_plan: dict[str, Any],
+                     changes: dict[str, Any]) -> dict[str, Any]:
+        ir = revise_plan(semantic_plan, changes)
+        result = self.compile_query(authz, ir)
+        return {**result, "revised": True, "changedKeys": sorted(changes)}
 
     def get_schema(self, authz: AuthzContext, table_name: str) -> dict[str, Any]:
         table = self.metadata.get_table(authz, table_name)

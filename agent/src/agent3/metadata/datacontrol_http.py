@@ -85,6 +85,40 @@ class PortalMetadataProvider:
             aliases=tuple(value for value in (row.get("bizName"),) if value),
         )
 
+    def search_assets(self, authz: AuthzContext, query: str, *, limit: int = 12) -> dict[str, Any]:
+        _ = authz
+        data = self._get("/search", params={"q": _search_phrase(query), "limit": max(1, min(limit, 40))})
+        items = data.get("items", []) if isinstance(data, dict) else []
+        return {"assets": [
+            {key: row.get(key) for key in ("assetId", "assetType", "title",
+             "technicalName", "snippet", "parentAssetId", "score")}
+            for row in items if isinstance(row, dict) and row.get("assetId") and row.get("assetType")
+        ], "total": data.get("total", 0) if isinstance(data, dict) else 0,
+            "researchPolicy": "internal_only"}
+
+    def get_asset(self, authz: AuthzContext, asset_type: str, asset_id: str) -> dict[str, Any]:
+        _ = authz
+        if asset_type not in {"TABLE", "COLUMN", "METRIC", "CODE_TABLE", "STANDARD", "WORD_ROOT", "STAT_SYSTEM"}:
+            raise ValueError("Unsupported asset type")
+        if not re.fullmatch(r"[A-Za-z0-9_-]{2,40}", asset_id):
+            raise ValueError("Invalid asset ID")
+        return self._get(f"/agent-assets/{asset_type}/{asset_id}")
+
+    def find_references(self, authz: AuthzContext, asset_type: str, asset_id: str) -> dict[str, Any]:
+        _ = authz
+        if not re.fullmatch(r"[A-Za-z0-9_-]{2,40}", asset_id):
+            raise ValueError("Invalid asset ID")
+        return self._get("/agent-assets/references", params={"asset_type": asset_type,
+                                                              "asset_id": asset_id})
+
+    def get_lineage_summary(self, authz: AuthzContext, asset_type: str, asset_id: str,
+                            *, depth: int = 1) -> dict[str, Any]:
+        _ = authz
+        if asset_type not in ("TABLE", "COLUMN") or not re.fullmatch(r"[A-Za-z0-9_-]{2,40}", asset_id):
+            raise ValueError("Invalid lineage asset")
+        return self._get(f"/agent-assets/lineage/{asset_type}/{asset_id}",
+                         params={"depth": max(1, min(depth, 3))})
+
     def all_tables(self, authz: AuthzContext) -> tuple[TableMetadata, ...]:
         _ = authz
         rows = self._get("/tables", params={"limit": 200})
