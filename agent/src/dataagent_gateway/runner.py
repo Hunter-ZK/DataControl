@@ -682,4 +682,8 @@ class HeadlessHarnessRunner:
         )
         if self.free_test and result.get("sessionId"):
             result["sessionId"] = "free-test:" + result["sessionId"]
+        result["durationMs"] = int((time.monotonic() - started) * 1000)
+        result["toolCallCount"] = sum(
+            1 for event in result["events"] if event["type"] == "tool_call"
+        )
         return result

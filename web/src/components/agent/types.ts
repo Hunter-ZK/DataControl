@@ -11,6 +11,8 @@ export type AgentMessage = {
   role: 'user' | 'assistant'
   text: string
   summary?: string | null
+  durationMs?: number
+  toolCallCount?: number
   sql?: string | null
   validation?: AgentValidation | null
   validationState?: AgentValidationState

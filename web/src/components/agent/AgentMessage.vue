@@ -7,6 +7,9 @@
           <span class="agent-avatar"><Sparkles :size="16" /></span>
           <b>DataAgent</b>
           <span class="assistant-caption">回答</span>
+          <span v-if="typeof message.durationMs === 'number'" class="assistant-caption">
+            {{ (message.durationMs / 1000).toFixed(1) }} 秒 · {{ message.toolCallCount ?? 0 }} 次工具调用
+          </span>
         </div>
         <span v-if="message.sql" class="answer-status" :class="validationTone(message)">
           <CheckCircle2 v-if="validationState(message) === 'passed'" :size="14" />

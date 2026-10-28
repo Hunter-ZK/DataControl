@@ -10,7 +10,7 @@
         <span class="service-status" :class="{ ready: status?.ready }"><i></i>{{ status?.ready ? '服务正常' : '服务未就绪' }}</span>
       </header>
 
-      <section class="agent-workspace dc-card">
+      <section class="agent-workspace dc-card" :class="{ 'mobile-history-open': mobileHistoryOpen }">
         <AgentConversationSidebar
           :groups="conversationGroups"
           :count="conversations.length"
@@ -25,6 +25,9 @@
         />
 
         <section class="chat-shell">
+          <button class="mobile-history-trigger" @click="mobileHistoryOpen=!mobileHistoryOpen">
+            <History :size="16"/> {{ mobileHistoryOpen ? '关闭历史' : '查看历史会话' }}
+          </button>
           <div class="chat-model-bar">
             <button class="inspector-toggle" @click="inspectorOpen=!inspectorOpen">
               <PanelRight :size="15"/>{{ inspectorOpen ? '隐藏检查器' : '查看检查器' }}
@@ -132,7 +135,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpRight, Copy, Database, LoaderCircle, PanelRight, RotateCcw, Send, ShieldCheck, Sparkles, Square, ThumbsDown, ThumbsUp, TriangleAlert, X } from 'lucide-vue-next'
+import { ArrowUpRight, Copy, Database, History, LoaderCircle, PanelRight, RotateCcw, Send, ShieldCheck, Sparkles, Square, ThumbsDown, ThumbsUp, TriangleAlert, X } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { agentApi, assetApi, type AgentActivity, type AgentModelMode, type AgentResult, type AgentStatus, type AgentStreamEvent, AgentTurnCancelledError } from '@/api/client'
 import AgentConversationSidebar from '@/components/agent/AgentConversationSidebar.vue'
@@ -155,6 +158,7 @@ const agentUnavailableReason = computed(() => {
     ? `Agent 暂不可用：${status.value.reason}`
     : 'Agent 暂不可用：请查看启动终端的 Gateway/MCP 状态和日志。'
 })
+const mobileHistoryOpen = ref(false)
 const inspectorOpen = ref(true)
 const inspectorTab = ref<'evidence' | 'sql' | 'steps'>('evidence')
 const question = ref('')
@@ -237,6 +241,7 @@ function restoreConversation(conversation: AgentConversation) {
 
 async function selectConversation(conversation: AgentConversation) {
   if (loading.value) return
+  mobileHistoryOpen.value = false
   if (route.query.asset || route.query.q) await router.replace({ name: 'agent' })
   const selected = activateConversation(conversation.id)
   if (selected) {
@@ -272,6 +277,7 @@ function resetConversationState() { sessionId.value = null; messages.value = [];
 
 async function newSession() {
   if (loading.value) return
+  mobileHistoryOpen.value = false
   clearActive(); resetConversationState()
   if (route.query.asset || route.query.q) await router.replace({ name: 'agent' })
 }
@@ -304,6 +310,8 @@ function assistantMessage(result: AgentResult): AgentMessage {
     role: 'assistant',
     text: result.answer || '分析完成。',
     summary: result.summary,
+    durationMs: result.durationMs,
+    toolCallCount: result.toolCallCount,
     sql: result.sql,
     validation: result.validation,
     validationState: result.validationState,
@@ -579,6 +587,12 @@ onMounted(async () => {
 </style>
 
 <style scoped>
+ .mobile-history-trigger {display:none;border:0;border-bottom:1px solid var(--dc-border);padding:10px 14px;background:var(--dc-primary-soft);color:var(--dc-primary);font-size:13px;align-items:center;gap:7px;cursor:pointer;}
+ @media(max-width:760px) {
+  .mobile-history-trigger{display:flex;}
+  .agent-workspace{position:relative;}
+  .agent-workspace.mobile-history-open :deep(.history-pane){display:flex;position:absolute;top:0;bottom:0;left:0;width:min(320px,88vw);z-index:20;background:#fff;box-shadow:0 10px 32px rgba(28,60,85,.22);}
+ }
  .fixed-model {display:inline-flex;align-items:center;padding:8px 12px;background:#fff;border:1px solid var(--dc-border);border-radius:8px;color:var(--dc-primary);font-size:12px;font-weight:700;}
  .inspector-toggle {border:0;background:transparent;color:var(--dc-primary);font-size:12px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;}
  .agent-inspector {min-height:0;display:flex;flex-direction:column;overflow:hidden;border-left:1px solid var(--dc-border);background:#fbfdfe;}

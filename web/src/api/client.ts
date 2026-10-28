@@ -353,6 +353,8 @@ export interface AgentValidation {
 }
 
 export interface AgentResult {
+  durationMs?: number
+  toolCallCount?: number
   sessionId?: string | null
   answer: string
   summary?: string | null

@@ -68,6 +68,7 @@ def _safe_answer(result: dict) -> dict:
         "validationState", "sqlSourceCallId", "validationCallId",
         "clarification", "researchPolicy", "semanticPlan",
         "semanticValidation", "evidence", "sqlExecuted", "hiddenReasoningExposed",
+        "durationMs", "toolCallCount",
     )
     clean = {key: result[key] for key in permitted if key in result}
     clean["sqlExecuted"] = False
@@ -95,7 +96,7 @@ def serialize(db: Session, conv: AgentConversation) -> dict:
             messages.append({
                 "role": "assistant", "text": result.get("answer") or "分析完成。",
                 **{k: result[k] for k in ("summary", "sql", "validation", "validationState",
-                    "evidence", "events", "clarification") if k in result},
+                    "evidence", "events", "clarification", "durationMs", "toolCallCount") if k in result},
             })
         elif turn.status in TERMINAL:
             messages.append({
