@@ -35,7 +35,7 @@ for (const width of [1440, 1024, 390]) {
     await page.goto('/')
     await expect(page.getByRole('heading', { name: /数据触手可及/ })).toBeVisible()
     await expect(page.getByRole('button', { name: '检索资产' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '问 DataAgent' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '向 DataAgent 提问' })).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath(`homepage-${width}.png`), fullPage: true })
   })
 }
@@ -45,4 +45,37 @@ test('mobile navigation exposes asset discovery and protected Agent', async ({ p
   await page.goto('/')
   await page.getByRole('button', { name: '展开导航' }).click()
   await expect(page.getByRole('link', { name: '智能问数' }).first()).toBeVisible()
+})
+
+test('asset search separates result records and switches detail density', async ({ page }) => {
+  await page.route('**/api/v1/catalogs', async route => {
+    await route.fulfill({ json: { code:'OK',data:[] } })
+  })
+  await page.route('**/api/v1/search**', async route => {
+    await route.fulfill({ json: route.request().url().includes('/suggest')
+      ? {code:'OK',data:[]} : queryData })
+  })
+  await page.goto('/search?q=贷款余额')
+  await expect(page.getByRole('heading', { name: '贷款余额汇总' })).toBeVisible()
+  await expect(page.locator('.result-group')).toHaveCount(1)
+  await expect(page.locator('.asset-definition')).toHaveCount(1)
+  await page.getByRole('button', { name: '精简' }).click()
+  await expect(page.locator('.asset-definition')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: '贷款余额汇总' })).toBeVisible()
+  await page.getByRole('button', { name: '详细' }).click()
+  await expect(page.locator('.asset-definition')).toHaveCount(1)
+})
+
+test('word-root dictionary retains searchable rows without card layout', async ({ page }) => {
+  await page.route('**/api/v1/word-roots**', async route => {
+    await route.fulfill({ json: {code:'OK',data:[
+      {assetId:'W-1',root:'BAL',cnName:'余额',enFull:'Balance',synonyms:'存量余额',status:'ONLINE'},
+      {assetId:'W-2',root:'AMT',cnName:'金额',enFull:'Amount',synonyms:'',status:'ONLINE'}
+    ]} })
+  })
+  await page.goto('/word-roots')
+  await expect(page.locator('.dictionary-table tbody tr')).toHaveCount(2)
+  await page.getByRole('button', { name: 'B', exact:true }).click()
+  await expect(page.locator('.dictionary-table tbody tr')).toHaveCount(1)
+  await expect(page.getByRole('link', { name: 'BAL' })).toBeVisible()
 })
