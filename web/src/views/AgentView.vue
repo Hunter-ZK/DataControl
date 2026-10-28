@@ -36,7 +36,13 @@
             <div class="model-options" role="group" aria-label="选择当前对话模型">
               <span class="fixed-model">DeepSeek 官方</span>
             </div>
-            <span class="model-context">官方 DeepSeek · 可信 SQL 校验 · 不执行 SQL</span>
+            <div class="tier-options" role="group" aria-label="选择任务类型">
+              <button type="button" :class="{active:taskTier==='standard'}" :disabled="loading"
+                @click="chooseTier('standard')">标准问数</button>
+              <button type="button" :class="{active:taskTier==='multi'}" :disabled="loading"
+                @click="chooseTier('multi')">多步任务</button>
+            </div>
+            <span class="model-context">官方 DeepSeek · {{taskTier==='multi'?'多步规划':'标准 SQL 问数'}} · 不执行 SQL</span>
           </div>
           <div v-if="contextAsset" class="context-strip">
             <Database :size="17" />
@@ -151,6 +157,15 @@ const route = useRoute()
 const router = useRouter()
 const status = ref<AgentStatus | null>(null)
 const modelMode = ref<AgentModelMode>('deepseek')
+const taskTier = ref<'standard' | 'multi'>('standard')
+function chooseTier(value: 'standard' | 'multi') {
+  if (loading.value) return
+  if (messages.value.length && taskTier.value !== value) {
+    ElMessage.warning('当前对话的任务类型已固定，请先新建会话后切换。')
+    return
+  }
+  taskTier.value = value
+}
 let statusRequestSerial = 0
 const agentUnavailableReason = computed(() => {
   if (!status.value) return '无法获取 Agent 状态：请确认 DataControl 后端已在 8000 端口启动。'
@@ -232,6 +247,7 @@ async function loadContext() {
 }
 
 function restoreConversation(conversation: AgentConversation) {
+  taskTier.value = conversation.taskTier === 'multi' ? 'multi' : 'standard'
   modelMode.value = 'deepseek'
   sessionId.value = conversation.modelMode === 'deepseek' ? conversation.sessionId || null : null
   messages.value = [...conversation.messages]
@@ -391,7 +407,9 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
     return
   }
   const selectedMode: AgentModelMode = 'deepseek'
-  if (!activeConversationId.value) createConversation(createTitle || displayText, contextAsset.value, selectedMode)
+  if (!activeConversationId.value) {
+    createConversation(createTitle || displayText, contextAsset.value, selectedMode, taskTier.value)
+  }
   messages.value.push({ role: 'user', text: displayText })
   syncActive(messages.value, sessionId.value, contextAsset.value, selectedMode)
   loading.value = true
@@ -399,7 +417,8 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
     const active = conversations.value.find((c) => c.id === activeConversationId.value)
     if (active && !active.serverId) {
       try {
-        const saved = await agentApi.createConversation(active.title, selectedMode, active.contextAsset || null)
+        const saved = await agentApi.createConversation(active.title, selectedMode,
+          active.contextAsset || null, active.taskTier || 'standard')
         attachServerId(active.id, saved.id)
       } catch {
         loading.value = false
@@ -417,7 +436,9 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
   await scrollBottom()
   try {
     const serverId = conversations.value.find((c) => c.id === activeConversationId.value)?.serverId || null
-    const result = await agentApi.stream(prompt, sessionId.value, activeRunId, onAgentStreamEvent, activeController.signal, selectedMode, serverId, displayText)
+    const result = await agentApi.stream(prompt, sessionId.value, activeRunId,
+      onAgentStreamEvent, activeController.signal, selectedMode, serverId, displayText,
+      taskTier.value)
     reportAgentDevtools(result)
     if (result.sessionId) sessionId.value = result.sessionId
     messages.value.push(assistantMessage(result))
@@ -496,6 +517,7 @@ async function refreshServerHistory() {
         )
         const imported = await agentApi.importConversations(unlinked.map((c) => ({
           title: c.title, modelMode: c.modelMode, pinned: c.pinned,
+          taskTier: c.taskTier || 'standard',
           sessionId: null, messages: c.messages, contextAsset: c.contextAsset,
         })))
         for (let i = 0; i < imported.length; i++) attachServerId(unlinked[i].id, imported[i].id)
@@ -601,6 +623,10 @@ onMounted(async () => {
   .agent-workspace{position:relative;}
   .agent-workspace.mobile-history-open :deep(.history-pane){display:flex;position:absolute;top:0;bottom:0;left:0;width:min(320px,88vw);z-index:20;background:#fff;box-shadow:0 10px 32px rgba(28,60,85,.22);}
  }
+ .tier-options{display:inline-flex;gap:3px;padding:3px;border:1px solid var(--dc-border);border-radius:9px;background:var(--dc-surface-soft);}
+ .tier-options button{border:0;border-radius:6px;padding:7px 10px;color:var(--dc-text-2);background:transparent;font-size:12px;cursor:pointer;}
+ .tier-options button.active{background:#fff;color:var(--dc-agent);font-weight:750;box-shadow:0 1px 5px rgba(18,90,112,.1);}
+ .tier-options button:disabled{opacity:.5;cursor:not-allowed;}
  .fixed-model {display:inline-flex;align-items:center;padding:8px 12px;background:#fff;border:1px solid var(--dc-border);border-radius:8px;color:var(--dc-primary);font-size:12px;font-weight:700;}
  .inspector-toggle {border:0;background:transparent;color:var(--dc-primary);font-size:12px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;}
  .agent-inspector {min-height:0;display:flex;flex-direction:column;overflow:hidden;border-left:1px solid var(--dc-border);background:#fbfdfe;}
