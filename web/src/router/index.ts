@@ -19,7 +19,7 @@ import AgentView from '@/views/AgentView.vue'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/login', component: LoginView },
+    { path: '/login', name: 'login', component: LoginView },
     {
       path: '/', component: AppShell, children: [
         { path: '', name: 'home', component: HomeView, meta: { title: '首页' } },
