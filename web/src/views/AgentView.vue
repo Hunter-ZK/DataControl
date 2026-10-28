@@ -48,7 +48,7 @@
             </button>
           </div>
           <div class="agent-mode-strip">
-            <span class="mode-indicator"><span class="mode-pulse" :class="{idle:!status?.ready||!loading}"></span>{{loading?'正在处理任务':status?.ready?'已就绪':'服务未就绪'}}</span>
+            <span class="mode-indicator"><span class="mode-pulse" :class="{idle:status?.ready&&!loading,offline:!status?.ready}"></span>{{loading?'正在处理任务':status?.ready?'已就绪':'服务未就绪'}}</span>
             <span><Cpu :size="15"/>{{modelMode==='free-test'?'免费模型测试': 'DeepSeek 官方'}}</span>
             <span><Workflow :size="15"/>{{taskTier==='multi'?'多步任务':'标准问数'}}</span>
             <span class="mode-safe"><ShieldCheck :size="15"/>仅生成和校验 · 不执行 SQL</span>
@@ -702,6 +702,7 @@ onMounted(async () => {
 @keyframes spin { to { transform: rotate(360deg); } }
 @media(max-width:1180px){.agent-workspace{grid-template-columns:220px minmax(0,1fr)}.agent-inspector{display:none}}
 @media(max-width:760px){.chat-model-bar{padding:9px 12px;gap:7px;flex-wrap:wrap}.model-context{display:none}.model-options button{padding:7px 9px}.agent-screen{min-height:640px;padding:12px 0}.agent-head{align-items:flex-start;flex-direction:column;gap:10px;padding-bottom:12px}.agent-head h1{font-size:31px}.agent-workspace{grid-template-columns:1fr}.agent-workspace :deep(.history-pane){display:none}.messages{padding:21px 15px}.prompt-grid{grid-template-columns:1fr}.composer-wrap{padding:10px 12px 11px}.composer-hint span:first-child{display:none}.composer-hint{justify-content:flex-end}}
+.mode-pulse.offline{animation:none;background:#c48f49;box-shadow:0 0 0 3px #fbf0dd}
 </style>
 
 <style scoped>
