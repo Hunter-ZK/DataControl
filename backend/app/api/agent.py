@@ -78,7 +78,7 @@ async def agent_query(body: AgentQuery, user: User = Depends(get_current_user)):
         )
     except AgentRuntimeError as exc:
         raise HTTPException(502, detail=str(exc)) from exc
-    return {"code": "OK", "data": data}
+    return {"code": "OK", "data": history.public_answer(data)}
 
 LOG = logging.getLogger("uvicorn.error")
 
@@ -117,8 +117,10 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
         async def cached():
             yield (json.dumps({"type": "started", "runId": run_id}, ensure_ascii=False) + "\n").encode("utf-8")
             if previous.status == "completed" and previous.result_json:
-                yield (json.dumps({"type": "result", "result": json.loads(previous.result_json)},
-                                  ensure_ascii=False) + "\n").encode("utf-8")
+                yield (json.dumps({
+                    "type": "result",
+                    "result": history.public_answer(json.loads(previous.result_json)),
+                }, ensure_ascii=False) + "\n").encode("utf-8")
             elif previous.status == "cancelled":
                 yield b'{"type":"cancelled"}\n'
             else:
@@ -167,7 +169,7 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
                     clean = history._safe_answer(result)
                     if persisted:
                         history.transition(run_id, "completed", result=clean)
-                    event = {"type": "result", "result": clean}
+                    event = {"type": "result", "result": history.public_answer(clean)}
                     terminal = True
                 elif event_type == "cancelled":
                     if persisted:

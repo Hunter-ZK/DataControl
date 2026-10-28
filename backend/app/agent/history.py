@@ -84,6 +84,11 @@ def _safe_answer(result: dict) -> dict:
     return clean
 
 
+def public_answer(result: dict) -> dict:
+    """Remove internal dsh session handles from all browser-visible responses."""
+    return {key: value for key, value in result.items() if key != "sessionId"}
+
+
 def serialize(db: Session, conv: AgentConversation) -> dict:
     messages = _decode(conv.legacy_messages_json, [])[:80]
     turns = db.execute(
@@ -107,7 +112,8 @@ def serialize(db: Session, conv: AgentConversation) -> dict:
     return {
         "id": conv.id, "serverId": conv.id, "title": conv.title,
         "modelMode": conv.model_mode, "taskTier": conv.task_tier,
-        "sessionId": conv.session_id,
+        # The user has a conversation ID; model session handles stay server-side.
+        "sessionId": None,
         "pinned": conv.pinned, "messages": messages[-80:],
         "contextAsset": _decode(conv.context_asset_json, {}) if conv.context_asset_json else None,
         "createdAt": int(conv.created_at.timestamp() * 1000),
