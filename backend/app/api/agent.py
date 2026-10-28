@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import asdict
 import json
 import logging
-import os
 from uuid import UUID
 from typing import Literal
 
@@ -35,21 +34,13 @@ class AgentQuery(BaseModel):
 def check_public_test(mode: str, consent: bool = False) -> None:
     if mode != "free-test":
         return
-    if os.getenv("DATACONTROL_ENABLE_FREE_TEST") != "1":
-        raise HTTPException(403, "Public model tests must be explicitly enabled on this local installation")
     if not consent:
-        raise HTTPException(403, "Public model test requires explicit consent for each turn")
+        raise HTTPException(403, "Public model request requires the client's explicit consent")
 
 
 @router.get("/status")
 async def agent_status(modelMode: Literal["deepseek", "free-test"] = "deepseek",
                        taskTier: Literal["standard", "multi"] = "standard"):
-    if modelMode == "free-test" and os.getenv("DATACONTROL_ENABLE_FREE_TEST") != "1":
-        return {"code": "OK", "data": {
-            "ready": False, "reason": "公开免费模型测试默认关闭；仅在本机用 DATACONTROL_ENABLE_FREE_TEST=1 启用",
-            "modelMode": "free-test", "sqlExecutionEnabled": False,
-            "hiddenReasoningExposed": False,
-        }}
     status = await EmbeddedAgentGateway().status(modelMode, taskTier)
     return {
         "code": "OK",

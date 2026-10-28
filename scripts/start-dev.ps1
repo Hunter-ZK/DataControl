@@ -79,6 +79,14 @@ if(-not $SkipAgent){
   }
   & $python -c "import agent3, dataagent_gateway"
   if($LASTEXITCODE -ne 0){throw "Embedded DataAgent package is unavailable after setup."}
+  if(-not(Test-Path (Join-Path $localDir "free-model-test-v2.7.2.ready"))){
+    try {
+      & (Join-Path $root "scripts\setup-free-model-test.ps1")
+      if($LASTEXITCODE -ne 0){Write-Warning "Optional free model installer exited with code $LASTEXITCODE"}
+    } catch {
+      Write-Warning "Optional free model could not be installed: $($_.Exception.Message). Official Agent is unaffected."
+    }
+  }
 }
 
 Assert-PortFree 8000 "DataControl API"
@@ -117,7 +125,7 @@ try {
       Write-Host "DataAgent Gateway: READY http://127.0.0.1:8910 (queries enabled)"
     }else{
       Write-Warning ("DataAgent Gateway PROCESS STARTED on 8910, but Agent queries are UNAVAILABLE: "+[string]$gatewayHealth.reason)
-      Write-Host "Agent setup: .\start.bat repair (official); .\scripts\setup-free-model-test.ps1 (optional free test)."
+      Write-Host "Agent setup: .\start.bat repair (includes the optional free model)."
     }
     Write-Host "Agent 运行记录:     在另一 PowerShell 窗口执行："
     Write-Host "  Get-Content .\.local\agent-gateway.err.log -Tail 40 -Wait"

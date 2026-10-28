@@ -99,6 +99,12 @@ try {
 
     # Create the marker only after all dependencies and both dsh profiles succeed.
     Set-Content -LiteralPath $marker -Value "dsh=0.2.1-rc.3; profile=dataagent-headless" -Encoding UTF8
+    try {
+      & (Join-Path $root "scripts\setup-free-model-test.ps1")
+      if ($LASTEXITCODE -ne 0) { Write-Warning "Optional free model setup returned exit code $LASTEXITCODE" }
+    } catch {
+      Write-Warning "Optional public model could not be installed: $($_.Exception.Message). Official DeepSeek remains available."
+    }
     Write-Host "[DataControl] Agent setup complete. Subsequent starts reuse installed dependencies."
   } finally {
     Pop-Location

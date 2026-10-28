@@ -88,6 +88,13 @@ if [ "$SKIP_AGENT" -eq 0 ]; then
     fi
   fi
   "$PYTHON" -c 'import agent3, dataagent_gateway' >/dev/null 2>&1 || { echo "Embedded DataAgent Python package is unavailable after setup." >&2; exit 1; }
+  # Existing installations upgraded from earlier branches should also acquire
+  # the optional model without a separate setup command or env flag.
+  if [ ! -f "$ROOT/.local/free-model-test-v2.7.2.ready" ]; then
+    if ! bash "$ROOT/scripts/setup-free-model-test.sh"; then
+      echo "[DataControl] Public model unavailable (upstream/compatibility); official agent continues." >&2
+    fi
+  fi
 fi
 
 assert_port_free() {

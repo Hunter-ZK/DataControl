@@ -169,6 +169,15 @@ async function chooseModel(value: AgentModelMode) {
     ElMessage.warning('已绑定资产的会话不能切换到公共网关测试模式。请使用纯模拟问题。')
     return
   }
+  if (value === 'free-test') {
+    try {
+      await ElMessageBox.confirm(
+        '免费模型通过外部公共网关处理请求，可能记录提示词和工具结果。请仅使用公开模拟数据，不要输入内部元数据、业务 SQL 或个人信息。开启此会话的免费测试模式？',
+        '使用免费模型',
+        { confirmButtonText: '使用免费模型', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch { return }
+  }
   modelMode.value = value
   taskTier.value = 'standard'
   await refreshStatus()
@@ -431,18 +440,9 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
     ElMessage.warning('会话模型不一致，请新建会话。')
     return
   }
-  if (selectedMode === 'free-test') {
-    if (contextAsset.value) {
-      ElMessage.error('公共测试模式不允许绑定业务资产。')
-      return
-    }
-    try {
-      await ElMessageBox.confirm(
-        '这次提问及模型请求中的工具资料会传输到第三方公共模型网关，并可能被记录。仅限本地模拟数据，不得传输内部资料。确认继续本轮测试？',
-        '第三方模型：每轮确认',
-        { confirmButtonText:'确认发送模拟数据', cancelButtonText:'取消', type:'warning' },
-      )
-    } catch { return }
+  if (selectedMode === 'free-test' && contextAsset.value) {
+    ElMessage.error('公共测试模式不允许绑定业务资产。')
+    return
   }
   if (!activeConversationId.value) {
     createConversation(createTitle || displayText, contextAsset.value, selectedMode, taskTier.value)

@@ -63,4 +63,11 @@ for profile in dataagent dataagent-headless dataagent-headless-multi; do
   }
 done
 
+# The third-party provider is preinstalled for developer convenience, but
+# failure never prevents the official model or the metadata portal from starting.
+# All public-provider requests still require choosing "免费模型测试" in the UI.
+if ! bash "$ROOT/scripts/setup-free-model-test.sh"; then
+  echo "[DataControl] Optional free model install unavailable; official DeepSeek remains usable." >&2
+fi
+
 echo "Embedded DataAgent setup complete (shared .venv + local dsh profile)."
