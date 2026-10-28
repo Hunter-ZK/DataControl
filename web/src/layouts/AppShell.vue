@@ -76,7 +76,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, BarChart3, BookOpenCheck, Boxes, CircleGauge, CircleHelp, Database, Hash, Layers3, Menu, PanelLeftClose, Search, Sparkles, UserRound } from 'lucide-vue-next'
+import { ArrowLeft, BarChart3, BookOpenCheck, Boxes, CircleGauge, CircleHelp, Database, FileText, Hash, Layers3, Menu, PanelLeftClose, Search, Sparkles, UserRound } from 'lucide-vue-next'
 import { assetApi, type SearchSuggestion } from '@/api/client'
 import AssetIcon from '@/components/AssetIcon.vue'
 
@@ -122,10 +122,12 @@ const primary = [
   { to: '/', label: '首页', icon: CircleGauge },
   { to: '/catalog', label: '资产目录', icon: Database, assetType: 'TABLE' },
   { to: '/search', label: '资产检索', icon: Search },
-  { to: '/code-tables', label: '标准码值', icon: Boxes, assetType: 'CODE_TABLE' },
+  { to: '/code-tables', label: '标准码表', icon: Boxes, assetType: 'CODE_TABLE' },
   { to: '/word-roots', label: '词根索引', icon: Hash, assetType: 'WORD_ROOT' },
-  { to: '/metrics', label: '指标与制度', icon: BookOpenCheck, assetType: 'METRIC' },
+  { to: '/metrics', label: '业务指标', icon: BookOpenCheck, assetType: 'METRIC' },
   { to: '/agent', label: '智能问数', icon: Sparkles },
+  { to: '/standards', label: '数据标准', icon: BookOpenCheck, assetType: 'STANDARD' },
+  { to: '/stat-systems', label: '统计制度', icon: FileText, assetType: 'STAT_SYSTEM' },
 ]
 const secondary = [
   { to: '/overview', label: '数据概览', icon: BarChart3 },
@@ -134,7 +136,7 @@ const secondary = [
 const navGroups = [
   { title: '工作空间', items: [primary[0], primary[6]] },
   { title: '数据发现', items: [primary[2], primary[1]] },
-  { title: '数据理解', items: [primary[5], primary[3], primary[4]] },
+  { title: '数据理解', items: [primary[5], primary[8], primary[3], primary[7], primary[4]] },
   { title: '其他', items: secondary },
 ]
 
@@ -231,4 +233,5 @@ onBeforeUnmount(() => window.removeEventListener('keydown', shortcut))
 .crumb{font-size:14px;font-weight:680}
 .sidebar-foot{background:rgba(240,246,255,.67);border-radius:10px}
 
+.nav{overflow-y:auto;scrollbar-width:thin;scrollbar-color:#d0dff4 transparent;min-height:0}.sidebar{min-height:0}.mobile-links a{font-size:14px}.command-results button{font-size:14px}.command-results code{font-size:12px}
 </style>
