@@ -71,7 +71,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $scripts = @('scripts/dev.ps1', 'scripts/setup-agent.ps1', 'scripts/setup-dev.ps1', 'scripts/run-npm-install.ps1', 'agent/scripts/setup_dataagent.ps1')
+          $scripts = @('scripts/dev.ps1', 'scripts/agent-profile-state.ps1', 'scripts/start-dev.ps1', 'scripts/setup-agent.ps1', 'scripts/setup-dev.ps1', 'scripts/run-npm-install.ps1', 'agent/scripts/setup_dataagent.ps1')
           foreach ($script in $scripts) {
             $tokens = $null
             $errors = $null
@@ -90,6 +90,35 @@ jobs:
           if (-not $failedAsExpected) { throw "Windows npm wrapper did not propagate the nonzero exit code." }
           cmd.exe /d /c start.bat stop
           if ($LASTEXITCODE -ne 0) { throw "Windows launcher's stop command failed" }
+      - name: Exercise actual Agent profile readiness guard in Windows PowerShell 5.1
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          . ./scripts/agent-profile-state.ps1
+          $fixtureRoot = Join-Path $env:RUNNER_TEMP '学习 Agent readiness'
+          $headlessSource = Join-Path $fixtureRoot 'agent/dsh/profile/headless.patch.yml'
+          $webSource = Join-Path $fixtureRoot 'agent/dsh/profile/cordis.patch.yml'
+          $headlessProfile = Join-Path $fixtureRoot '.local/dsh-home-v0.2.1-rc.3/profiles/dataagent-headless'
+          $webProfile = Join-Path $fixtureRoot '.local/dsh-home-v0.2.1-rc.3/profiles/dataagent'
+          foreach ($path in @((Split-Path $headlessSource), (Split-Path $webSource), $headlessProfile, $webProfile)) {
+            New-Item -ItemType Directory -Force -Path $path | Out-Null
+          }
+          Copy-Item -LiteralPath 'agent/dsh/profile/headless.patch.yml' -Destination $headlessSource
+          Copy-Item -LiteralPath 'agent/dsh/profile/cordis.patch.yml' -Destination $webSource
+          Copy-Item -LiteralPath $headlessSource -Destination (Join-Path $headlessProfile 'cordis.patch.yml')
+          Copy-Item -LiteralPath $webSource -Destination (Join-Path $webProfile 'cordis.patch.yml')
+          '{}' | Set-Content -LiteralPath (Join-Path $headlessProfile 'package.json') -Encoding UTF8
+          '{}' | Set-Content -LiteralPath (Join-Path $webProfile 'package.json') -Encoding UTF8
+          $originalHome = $HOME
+          if (-not (Test-DataAgentProfilesCurrent -RepoRoot $fixtureRoot)) { throw 'Current profiles were not recognized' }
+          if ($HOME -ne $originalHome) { throw 'PowerShell HOME was modified' }
+          'obsolete plugin' | Add-Content -LiteralPath (Join-Path $headlessProfile 'cordis.patch.yml') -Encoding UTF8
+          if (Test-DataAgentProfilesCurrent -RepoRoot $fixtureRoot) { throw 'Stale profile was not rejected' }
+          Copy-Item -LiteralPath $headlessSource -Destination (Join-Path $headlessProfile 'cordis.patch.yml') -Force
+          Remove-Item -LiteralPath (Join-Path $webProfile 'package.json')
+          if (Test-DataAgentProfilesCurrent -RepoRoot $fixtureRoot) { throw 'Incomplete profile was not rejected' }
+          Write-Host 'Agent profile readiness guard passed (valid/stale/incomplete, Unicode path, Windows PowerShell 5.1).'
       - name: Bootstrap DataAgent profiles from a Unicode Windows path (PowerShell 5.1)
         if: runner.os == 'Windows'
         shell: powershell

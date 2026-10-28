@@ -4,6 +4,8 @@
 
 旧 `setup_dataagent.ps1` 通过 `dsh.cmd` 直接执行 `--dump-config`，在 PowerShell 5.1 的中文路径下可能产生乱码。报错 `patch: entry "tool-ralph" not found` 则表示正在应用的旧 Profile 包含新版 Harness 已移除的插件 ID。当前源码 `agent/dsh/profile/headless.patch.yml` 不再包含 `tool-ralph`；如果本地仍出现报错，首先检查 Git 分支和未同步的本地文件。
 
+在此前修复后的启动守卫中，曾误用 `$home` 作为普通变量名。但 PowerShell 不区分变量名大小写，`$home` 会覆盖只读的自动变量 `$HOME`，导致 `Test-DataAgentProfilesCurrent` 在服务启动前抛错。现已改用 `$profilesRoot`，并一并将 Profile 相关脚本中的 `$profile` 改名为 `$profileDir`，避免与自动变量 `$PROFILE` 混淆。
+
 ## 操作步骤（不删除 .local 或用户会话）
 
 在 DataControl 仓库根目录打开 PowerShell：

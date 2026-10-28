@@ -45,22 +45,34 @@ function Invoke-DshProfile([string[]]$CliArguments) {
   return ""
 }
 
+
+function Backup-StaleProfile([string]$ProfilePath, [string]$Name) {
+  $backupRoot=Join-Path $env:DSH_HOME "profile-backups"
+  New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
+  $backupName="$Name-$([DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))"
+  $backup=Join-Path $backupRoot $backupName
+  Move-Item -LiteralPath $ProfilePath -Destination $backup -ErrorAction Stop
+  Write-Warning "Preserved stale dsh profile '$Name' at $backup"
+  return $backup
+}
+
 Push-Location $repoRoot
 try {
   foreach($entry in $profiles) {
     $name=$entry.Name
     $base=$entry.Base
     $patch=$entry.Patch
-    $profile=Join-Path $env:DSH_HOME ("profiles\"+$name)
-    if ((Test-Path $profile) -and -not (Test-Path (Join-Path $profile "package.json"))) {
-      Remove-Item -Recurse -Force $profile
+    $profileDir=Join-Path $env:DSH_HOME ("profiles\"+$name)
+    if ((Test-Path -LiteralPath $profileDir) -and -not (Test-Path (Join-Path $profileDir "package.json"))) {
+      # An incomplete profile may still contain sessions. Preserve it rather than delete.
+      $null=Backup-StaleProfile -ProfilePath $profileDir -Name $name
     }
-    if (-not (Test-Path (Join-Path $profile "package.json"))) {
+    if (-not (Test-Path (Join-Path $profileDir "package.json"))) {
       $null=Invoke-DshProfile -CliArguments @("--profile",$name,"--from-default-profile",$base,"--dump-config")
     }
     # Always replace a previously generated overlay; old patches can mention
     # plugin IDs removed by newer dsh releases (for example tool-ralph).
-    Copy-Item -LiteralPath $patch -Destination (Join-Path $profile "cordis.patch.yml") -Force
+    Copy-Item -LiteralPath $patch -Destination (Join-Path $profileDir "cordis.patch.yml") -Force
     try {
       $config=Invoke-DshProfile -CliArguments @("--profile",$name,"--dump-config")
     } catch {
@@ -68,15 +80,10 @@ try {
       if ($detail -notmatch 'patch: entry .+ not found') { throw }
       # The old profile base itself is incompatible. Keep every file in a backup
       # before recreating; never silently delete sessions or locally saved data.
-      $backupRoot=Join-Path $env:DSH_HOME "profile-backups"
-      New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
-      $backupName="$name-$([DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))"
-      $backup=Join-Path $backupRoot $backupName
-      Write-Warning "Stale dsh profile '$name' references a removed plugin; backing it up to $backup"
-      Move-Item -LiteralPath $profile -Destination $backup
+      $backup=Backup-StaleProfile -ProfilePath $profileDir -Name $name
       try {
         $null=Invoke-DshProfile -CliArguments @("--profile",$name,"--from-default-profile",$base,"--dump-config")
-        Copy-Item -LiteralPath $patch -Destination (Join-Path $profile "cordis.patch.yml") -Force
+        Copy-Item -LiteralPath $patch -Destination (Join-Path $profileDir "cordis.patch.yml") -Force
         $config=Invoke-DshProfile -CliArguments @("--profile",$name,"--dump-config")
       } catch {
         throw "Could not recreate dsh profile '$name'. Previous profile is preserved at $backup. $($_.Exception.Message)"
