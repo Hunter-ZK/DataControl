@@ -57,3 +57,11 @@ A successful local acceptance writes `.local/p3-agent-acceptance.json`; Portal s
   locally with a running 8000/8900/8910 stack.
 - Rollback: select the previous branch and rerun setup; the old pinned package
   and old DSH home remain separate. Never run a test on irreplaceable sessions.
+
+
+## Optional public-model test lane
+
+Windows users may opt in to `Ebony-Vinyl/dsh-our-free-model@v2.7.2` via
+`scripts/setup-free-model-test.ps1` and `scripts/start-free-test.ps1`.
+It runs in an independent read-only profile, not the official default.
+See `docs/free-model-local-test.md`; never send non-synthetic metadata to public providers.

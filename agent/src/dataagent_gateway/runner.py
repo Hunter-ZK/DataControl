@@ -440,7 +440,11 @@ class HeadlessHarnessRunner:
         self.dsh_js_entry = (
             self.agent_root / "dsh" / "node_modules" / "@deepseek-ai" / "dsh" / "lib" / "bin.js"
         )
-        self.profile = os.getenv("DATACONTROL_DSH_PROFILE", "dataagent-headless")
+        self.free_test = os.getenv("DATACONTROL_AGENT_MODEL_MODE") == "free-test"
+        self.profile = (
+            "dataagent-headless-free" if self.free_test
+            else os.getenv("DATACONTROL_DSH_PROFILE", "dataagent-headless")
+        )
 
     @property
     def profile_dir(self) -> Path:
@@ -459,39 +463,56 @@ class HeadlessHarnessRunner:
         profile_package_ready = (self.profile_dir / "package.json").exists()
         source_overlay = self.agent_root / "dsh" / "profile" / "headless.patch.yml"
         active_overlay = self.profile_dir / "cordis.patch.yml"
+        provider = "our-free-model" if self.free_test else "deepseek-official"
+        model = "kilo-auto/free" if self.free_test else "deepseek-flash"
         try:
-            profile_current = (
-                source_overlay.is_file()
-                and active_overlay.is_file()
-                and source_overlay.read_bytes() == active_overlay.read_bytes()
-            )
+            expected = source_overlay.read_bytes()
+            if self.free_test:
+                expected = expected.replace(
+                    b"provider: deepseek-official\n    model: deepseek-flash",
+                    b"provider: our-free-model\n    model: kilo-auto/free",
+                )
+            patch_ok = active_overlay.is_file() and active_overlay.read_bytes() == expected
         except OSError:
-            profile_current = False
-        profile_ready = profile_package_ready and profile_current
+            patch_ok = False
+        plugin_ok = True
+        if self.free_test:
+            try:
+                pkg = json.loads((self.profile_dir / "package.json").read_text(encoding="utf-8"))
+                plugin = json.loads((self.profile_dir / "node_modules" / "dsh-our-free-model" / "package.json").read_text(encoding="utf-8"))
+                plugin_ok = (
+                    (self.repo_root / ".local" / "free-model-test-v2.7.2.ready").is_file()
+                    and plugin.get("version") == "2.7.2"
+                    and "dsh-our-free-model" in pkg.get("dsh", {}).get("profile", {}).get("bundles", [])
+                )
+            except (OSError, ValueError, AttributeError):
+                plugin_ok = False
+        profile_ready = profile_package_ready and patch_ok and plugin_ok
         api_key_present = bool(os.getenv("DEEPSEEK_API_KEY"))
+        opt_in = not self.free_test or os.getenv("DATACONTROL_FREE_TEST_ACCEPT_PUBLIC_GATEWAY") == "1"
+        key_ready = self.free_test or api_key_present
         mcp_reachable = await self._mcp_reachable()
-        ready = dsh_installed and profile_ready and api_key_present and mcp_reachable
+        ready = dsh_installed and profile_ready and key_ready and opt_in and mcp_reachable
         blockers: list[str] = []
         if not dsh_installed:
             blockers.append("DeepSeek Harness is not installed")
-        if not profile_package_ready:
-            blockers.append(f"dsh profile '{self.profile}' is not initialized (run .\\start.bat repair)")
-        elif not profile_current:
+        if not profile_ready:
             blockers.append(
-                f"dsh profile '{self.profile}' is outdated or incomplete "
-                "(run .\\start.bat repair to reload the current source overlay)"
+                "Free model test profile needs setup: .\\\\scripts\\\\setup-free-model-test.ps1"
+                if self.free_test else "DataAgent profile is missing/outdated: .\\\\start.bat repair"
             )
-        if not api_key_present:
+        if not opt_in:
+            blockers.append("Start free model only via start-free-test.ps1")
+        if not key_ready:
             blockers.append("DEEPSEEK_API_KEY is not set")
         if not mcp_reachable:
             blockers.append("Agent3 MCP is not reachable on 127.0.0.1:8900")
         return {
-            "ready": ready,
-            "dshInstalled": dsh_installed,
-            "profileReady": profile_ready,
-            "apiKeyPresent": api_key_present,
-            "mcpReachable": mcp_reachable,
-            "profile": self.profile,
+            "ready": ready, "dshInstalled": dsh_installed,
+            "profileReady": profile_ready, "apiKeyPresent": api_key_present,
+            "apiKeyRequired": not self.free_test, "mcpReachable": mcp_reachable,
+            "profile": self.profile, "modelMode": "free-test" if self.free_test else "deepseek",
+            "provider": provider, "model": model,
             "reason": "; ".join(blockers) if blockers else None,
         }
 

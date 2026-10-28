@@ -115,11 +115,11 @@ try {
       Write-Host "DataAgent Gateway: READY http://127.0.0.1:8910 (queries enabled)"
     }else{
       Write-Warning ("DataAgent Gateway PROCESS STARTED on 8910, but Agent queries are UNAVAILABLE: "+[string]$gatewayHealth.reason)
-      Write-Host "Repair profile: .\start.bat repair; for missing API key set DEEPSEEK_API_KEY and restart."
+      Write-Host "Agent setup: .\start.bat repair (official); .\scripts\setup-free-model-test.ps1 (optional free test)."
     }
     Write-Host "Agent 运行记录:     在另一 PowerShell 窗口执行："
     Write-Host "  Get-Content .\.local\agent-gateway.err.log -Tail 40 -Wait"
-    if([string]::IsNullOrWhiteSpace($env:DEEPSEEK_API_KEY)){Write-Warning "DEEPSEEK_API_KEY is not set; Agent Gateway will be degraded until DataControl is restarted with the key present."}
+    if($env:DATACONTROL_AGENT_MODEL_MODE -ne "free-test" -and [string]::IsNullOrWhiteSpace($env:DEEPSEEK_API_KEY)){Write-Warning "DEEPSEEK_API_KEY is not set; Agent Gateway will be degraded until DataControl is restarted with the key present."}
   }
 
   Write-Host ("Python runtime:      "+(& $python --version))
