@@ -7,7 +7,7 @@
           <h1>智能问数</h1>
           <p>面向数据查询与开发场景检索内部可信指标、资产和口径；存在业务分歧时先让你选择，再生成经过静态校验的 MaxCompute SQL。系统不执行生产 SQL，也不访问外部网络补全口径。</p>
         </div>
-        <span class="service-status" :class="{ ready: status?.ready }"><i></i>{{ status?.ready ? '服务正常' : '服务未就绪' }}</span>
+        <span class="service-status" :class="{ ready: status?.ready }"><i></i>{{ status?.ready ? (status?.provider === 'our-free-model' ? '免费测试模式' : '服务正常') : '服务未就绪' }}</span>
       </header>
 
       <section class="agent-workspace dc-card">
@@ -31,6 +31,7 @@
             <button @click="clearContext"><X :size="15" />清除</button>
           </div>
           <div v-if="!status?.ready" class="runtime-warning"><TriangleAlert :size="18" /><span>{{ agentUnavailableReason }}</span></div>
+          <div v-if="status?.provider === 'our-free-model'" class="runtime-warning"><TriangleAlert :size="18" /><span>公开免费模型测试模式：提问及工具返回的信息会发送至第三方模型服务。请勿输入真实业务数据、内部 SQL 或个人信息。</span></div>
 
           <div ref="messageBox" class="messages">
             <div v-if="messages.length === 0" class="welcome">
