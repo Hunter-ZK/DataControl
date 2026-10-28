@@ -11,7 +11,7 @@
 
 ### F1 身份、Skill、质量基础
 - 正式 Agent API 要求登录；Portal 的续接会话由服务端持有，浏览器不得传入任意 provider sessionId；取消请求按登录用户检查 run 所属会话。
-- Portal 与 Gateway 阻止公开免费模型通道（HTTP 410），旧测试历史仍允许只读导入，不会自动重用第三方 Session。
+- 2026-10-28 最新变更：可选公共免费模型已恢复，开发启动时自动尝试安装到独立的 `dataagent-headless-free` Profile，无需另设环境开关。仅在用户显式选择免费模式并确认后使用；官方 DeepSeek 仍为默认模型。第三方兼容性尚待 Mac/Windows 实机验收，不允许使用内部数据。
 - MCP 清单改为 `agent/tool-catalog.json`，由 MCP Server、Gateway、Portal 共享，避免三处白名单漂移。
 - 标准档与多步任务档采用分别安装的 dsh Headless Profile（`dataagent-headless` / `dataagent-headless-multi`）；每会话固定档位并保存在 SQLite，默认 120s/600s 超时。普通启动会校验 Profile 内容，缺失时触发配置重建。二者目前通过配置与提示词分离，尚非全部规划插件的严格独立装载。
 - 新增八份数据资产、SQL 改写、澄清、结果、规划、ETL 与质量检查 Skill 文档；为主要界面加入设计变量。
