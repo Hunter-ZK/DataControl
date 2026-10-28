@@ -230,9 +230,11 @@ const quickPrompts = [
 async function refreshStatus() {
   const serial = ++statusRequestSerial
   const chosen = modelMode.value
+  const selectedTier = taskTier.value
   try {
-    const state = await agentApi.status(chosen, taskTier.value)
-    if (serial === statusRequestSerial && chosen === modelMode.value) status.value = state
+    const state = await agentApi.status(chosen, selectedTier)
+    if (serial === statusRequestSerial && chosen === modelMode.value
+        && selectedTier === taskTier.value) status.value = state
   } catch {
     if (serial === statusRequestSerial) status.value = null
   }
