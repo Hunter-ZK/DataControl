@@ -6,17 +6,17 @@ $agentRoot = Join-Path $repoRoot "agent"
 $localDir = Join-Path $repoRoot ".local"
 $dshHomePath = Join-Path $localDir "dsh-home-v0.2.1-rc.3"
 $profileName = "dataagent-headless-free"
-$profileDir = Join-Path $dshHomePath ("profiles\\" + $profileName)
+$profileDir = Join-Path $dshHomePath ("profiles\" + $profileName)
 $sourceDir = Join-Path $localDir "dsh-our-free-model-v2.7.2"
 $pinnedCommit = "e1b347aec9cc956eda70a766219f028a811078e2"
 $marker = Join-Path $localDir "free-model-test-v2.7.2.ready"
-$pythonExe = Join-Path $repoRoot ".venv\\Scripts\\python.exe"
-$dshExe = Join-Path $agentRoot "dsh\\node_modules\\.bin\\dsh.cmd"
-$cliHelper = Join-Path $agentRoot "scripts\\dsh_profile_cli.py"
+$pythonExe = Join-Path $repoRoot ".venv\Scripts\python.exe"
+$dshExe = Join-Path $agentRoot "dsh\node_modules\.bin\dsh.cmd"
+$cliHelper = Join-Path $agentRoot "scripts\dsh_profile_cli.py"
 $outLog = Join-Path $localDir "free-model-setup.stdout.log"
 $errLog = Join-Path $localDir "free-model-setup.stderr.log"
 if (-not (Test-Path $pythonExe) -or -not (Test-Path $dshExe)) {
-  throw "First install the standard Agent: .\\start.bat repair"
+  throw "First install the standard Agent: .\start.bat repair"
 }
 if (-not (Get-Command git.exe -ErrorAction SilentlyContinue)) { throw "git.exe is required" }
 New-Item -ItemType Directory -Force -Path $localDir | Out-Null
@@ -48,11 +48,12 @@ if ($sourcePackage.name -ne "dsh-our-free-model" -or $sourcePackage.version -ne 
 if (-not (Test-Path (Join-Path $profileDir "package.json"))) {
   $null = Invoke-Dsh -ArgsForDsh @("--profile",$profileName,"--from-default-profile","headless","--dump-config")
 }
-$sourcePatch = Join-Path $agentRoot "dsh\\profile\\headless.patch.yml"
+$sourcePatch = Join-Path $agentRoot "dsh\profile\headless.patch.yml"
 $patch = [System.IO.File]::ReadAllText($sourcePatch,[System.Text.Encoding]::UTF8)
-$needle = "provider: deepseek-official" + "`n" + "    model: deepseek-flash"
+$newline = if ($patch.Contains("`r`n")) { "`r`n" } else { "`n" }
+$needle = "provider: deepseek-official" + $newline + "    model: deepseek-flash"
 if (-not $patch.Contains($needle)) { throw "Read-only headless model declaration changed; review before installing" }
-$patch = $patch.Replace($needle, ("provider: our-free-model" + "`n" + "    model: kilo-auto/free"))
+$patch = $patch.Replace($needle, ("provider: our-free-model" + $newline + "    model: kilo-auto/free"))
 [System.IO.File]::WriteAllText((Join-Path $profileDir "cordis.patch.yml"),$patch,[System.Text.UTF8Encoding]::new($false))
 # Upstream README: install local source; never install the unrelated npm package.
 $null = Invoke-Dsh -ArgsForDsh @("plugin","--profile",$profileName,"add",$sourceDir)
@@ -60,9 +61,9 @@ $config = Invoke-Dsh -ArgsForDsh @("--profile",$profileName,"--dump-config")
 foreach ($required in @("our-free-model","kilo-auto/free","mcp-agent3","agent3-guard")) {
   if ($config -notmatch [regex]::Escape($required)) { throw "Test profile missing: $required" }
 }
-$installed = Join-Path $profileDir "node_modules\\dsh-our-free-model\\package.json"
+$installed = Join-Path $profileDir "node_modules\dsh-our-free-model\package.json"
 if (-not (Test-Path $installed)) { throw "Free plugin not found in optional profile" }
 $installedPackage = Get-Content $installed -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($installedPackage.version -ne "2.7.2") { throw "Installed free plugin version mismatch" }
 Set-Content -LiteralPath $marker -Value "v2.7.2; commit=$pinnedCommit" -Encoding UTF8
-Write-Host "[free-test] Installed. Launch: .\\scripts\\start-free-test.ps1"
+Write-Host "[free-test] Installed. Launch: .\scripts\start-free-test.ps1"

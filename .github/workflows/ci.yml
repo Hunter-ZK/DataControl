@@ -71,7 +71,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $scripts = @('scripts/dev.ps1', 'scripts/agent-profile-state.ps1', 'scripts/start-dev.ps1', 'scripts/setup-agent.ps1', 'scripts/setup-dev.ps1', 'scripts/run-npm-install.ps1', 'agent/scripts/setup_dataagent.ps1')
+          $scripts = @('scripts/dev.ps1', 'scripts/agent-profile-state.ps1', 'scripts/start-dev.ps1', 'scripts/setup-free-model-test.ps1', 'scripts/start-free-test.ps1', 'scripts/setup-agent.ps1', 'scripts/setup-dev.ps1', 'scripts/run-npm-install.ps1', 'agent/scripts/setup_dataagent.ps1')
           foreach ($script in $scripts) {
             $tokens = $null
             $errors = $null

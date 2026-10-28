@@ -471,6 +471,9 @@ class HeadlessHarnessRunner:
                 expected = expected.replace(
                     b"provider: deepseek-official\n    model: deepseek-flash",
                     b"provider: our-free-model\n    model: kilo-auto/free",
+                ).replace(
+                    b"provider: deepseek-official\r\n    model: deepseek-flash",
+                    b"provider: our-free-model\r\n    model: kilo-auto/free",
                 )
             patch_ok = active_overlay.is_file() and active_overlay.read_bytes() == expected
         except OSError:
@@ -602,7 +605,15 @@ class HeadlessHarnessRunner:
         request_id = uuid.uuid4().hex[:8]
         started = time.monotonic()
         LOGGER.info("[Agent:%s] START session=%s", request_id, "resume" if session_id else "new")
-        process = await self._spawn(self._command(session_id), env)
+        if self.free_test:
+            if session_id and not session_id.startswith("free-test:"):
+                raise HarnessRunError("Start a new conversation for public free-test mode")
+            native_session_id = session_id[len("free-test:"):] if session_id else None
+        else:
+            if session_id and session_id.startswith("free-test:"):
+                raise HarnessRunError("Start a new conversation for the official DeepSeek model")
+            native_session_id = session_id
+        process = await self._spawn(self._command(native_session_id), env)
         try:
             assert process.stdin is not None
             assert process.stdout is not None
@@ -653,4 +664,6 @@ class HeadlessHarnessRunner:
             "yes" if result["sql"] else "no",
             result["validationState"],
         )
+        if self.free_test and result.get("sessionId"):
+            result["sessionId"] = "free-test:" + result["sessionId"]
         return result

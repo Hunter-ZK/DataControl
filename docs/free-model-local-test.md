@@ -29,3 +29,5 @@ Get-Content .\.local\agent-gateway.err.log -Tail 40
 `modelMode=free-test`、`provider=our-free-model` 表示已选测试配置；`ready=true` 只确认本地组件存在，不能证明第三方模型可用。
 
 退出当前启动进程后，用原来 `.\start.bat` 启动，即为**官方 DeepSeek 模式**。不要同时运行两套服务以免端口冲突；本选项不计入官方真实模型验收。
+
+切换模型模式后请在智能问数页面新建会话。服务端会在免费模式的 sessionId 上加 `free-test:` 前缀，并拒绝跨模式恢复历史会话，避免把官方模型的上下文意外传给第三方。
