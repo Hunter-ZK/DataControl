@@ -21,5 +21,14 @@
   --dc-shadow-md: 0 18px 48px rgba(34, 91, 123, 0.14);
   --dc-container: 1400px;
   --dc-sidebar: 228px;
+  --dc-agent: #178d89;
+  --dc-agent-soft: #e4f6f3;
+  --dc-font-xs: 12px;
+  --dc-font-sm: 13px;
+  --dc-font-body: 14px;
+  --dc-font-lg: 16px;
+  --dc-font-title: 20px;
+  --dc-font-display: 28px;
+  --dc-space-unit: 4px;
   --dc-topbar: 68px;
 }

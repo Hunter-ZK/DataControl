@@ -28,7 +28,7 @@
           <div class="chat-model-bar">
             <span class="chat-model-label">对话模型</span>
             <div class="model-options" role="group" aria-label="选择当前对话模型">
-              <button type="button" :class="{ selected: modelMode === 'deepseek' }" :disabled="loading || modelSwitching" :aria-pressed="modelMode === 'deepseek'" @click="switchModel('deepseek')">DeepSeek 官方</button>
+              <button type="button" :class="{ selected: modelMode === 'deepseek' }" :disabled="loading" :aria-pressed="modelMode === 'deepseek'" @click="switchModel('deepseek')">DeepSeek 官方</button>
             </div>
             <span class="model-context">官方 DeepSeek · 可信 SQL 校验 · 不执行 SQL</span>
           </div>
