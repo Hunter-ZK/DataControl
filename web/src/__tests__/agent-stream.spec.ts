@@ -35,7 +35,7 @@ describe('Agent NDJSON stream contract', () => {
 
   it('sends explicit mode and public-provider consent only for free test', async () => {
     let body: Record<string, unknown> = {}
-    globalThis.fetch = vi.fn(async (_url, init) => {
+    globalThis.fetch = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
       body = JSON.parse(String(init?.body)) as Record<string, unknown>
       return {
         ok: true,

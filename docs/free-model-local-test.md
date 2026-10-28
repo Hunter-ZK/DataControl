@@ -22,7 +22,7 @@ git pull --ff-only
 打开 **智能问数 → 对话窗口顶部「对话模型」→「免费模型测试」**，阅读第三方数据提示并确认。随时点击「DeepSeek 官方」即可切回；切换时自动新建会话，旧会话会保留在左侧历史。该模式选用 `our-free-model / kilo-auto/free`；不需要 DeepSeek API Key。若公共上游限制请求，测试不成功并非 DataControl 模型配置自动转为官方 DeepSeek。检查：
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8910/health | Format-List
+Invoke-RestMethod 'http://127.0.0.1:8910/health?modelMode=free-test' | Format-List
 Get-Content .\.local\agent-gateway.err.log -Tail 40
 ```
 
@@ -30,4 +30,4 @@ Get-Content .\.local\agent-gateway.err.log -Tail 40
 
 模型由页面逐次传给 Gateway，**无需通过 PowerShell 反复切换或重启**。原 `start-free-test.ps1` 已变为普通启动兼容入口，不再决定模型。首次安装第三方插件仍需要本地运行一次 `setup-free-model-test.ps1`；没有安装时 UI 会显示对应就绪错误。本选项不计入官方真实模型验收。
 
-切换模型模式后请在智能问数页面新建会话。服务端会在免费模式的 sessionId 上加 `free-test:` 前缀，并拒绝跨模式恢复历史会话，避免把官方模型的上下文意外传给第三方。
+切换模型时界面会自动新建会话，不会混用两种模型的上下文。服务端还会在免费模式的 sessionId 上加 `free-test:` 前缀，并拒绝跨模式恢复历史会话，避免把官方模型的上下文意外传给第三方。
