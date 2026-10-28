@@ -7,13 +7,13 @@
   </div></div>
 </template>
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from 'lucide-vue-next'
 import api from '@/api/client'
 const route=useRoute();const router=useRouter();const data=ref<any|null>(null);const keyword=ref('')
 const filtered=computed(()=>{const k=keyword.value.trim().toLowerCase();return !k?(data.value?.values||[]):(data.value?.values||[]).filter((x:any)=>`${x.value} ${x.name} ${x.description||''}`.toLowerCase().includes(k))})
-onMounted(async()=>{data.value=await api.get(`/code-tables/${String(route.params.no)}`)})
+watch(()=>route.params.no,async(value)=>{const no=String(value);data.value=null;keyword.value='';const result=await api.get(`/code-tables/${no}`);if(String(route.params.no)===no)data.value=result},{immediate:true})
 </script>
 <style scoped>
 .head{padding:25px 28px;display:flex;justify-content:space-between;gap:20px;align-items:center}.head h1{font-size:28px;margin:10px 0 5px}.head code{font-size:12px}.head p{margin:8px 0 0;color:var(--dc-text-2);font-size:12px}.status{padding:6px 10px;border-radius:999px;background:#edf8f3;color:#2f8b6c;font-size:11px;font-weight:700}.values{padding:20px;margin-top:16px}.value-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px}.value-head h2{font-size:18px;margin:5px 0 0}.value-head :deep(.el-input){width:260px}@media(max-width:620px){.head,.value-head{align-items:flex-start;flex-direction:column}.value-head :deep(.el-input){width:100%}}

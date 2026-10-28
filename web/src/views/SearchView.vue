@@ -25,7 +25,7 @@
         <div class="query-meta" v-if="q.trim()">
           <span>按 {{ terms.length }} 个词检索，结果需同时包含：</span>
           <b v-for="term in terms" :key="term">{{ term }}</b>
-          <span>支持 2 字词；加引号可按整句匹配</span>
+          <span>支持 2 字词；多个关键词按同时命中检索</span>
           <strong>共 {{ total }} 条</strong>
         </div>
         <div class="agent-intent" v-if="q.trim()">
@@ -114,7 +114,7 @@ const FilterGroup = defineComponent({
 
 const route = useRoute()
 const router = useRouter()
-const q = ref(String(route.query.q || '贷款 余额'))
+const q = ref(String(route.query.q || ''))
 const type = ref(String(route.query.type || ''))
 const layer = ref(String(route.query.layer || ''))
 const catalog = ref(String(route.query.catalog || ''))

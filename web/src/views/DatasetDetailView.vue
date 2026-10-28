@@ -33,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Copy, GitFork, Sparkles } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
@@ -43,7 +43,21 @@ const route=useRoute(); const router=useRouter(); const data=ref<any|null>(null)
 const filteredColumns=computed(()=>{const k=columnKeyword.value.trim().toLowerCase();return k?columns.value.filter(x=>`${x.columnName} ${x.cnName||''} ${x.bizDefinition||''}`.toLowerCase().includes(k)):columns.value})
 function formatTime(v?:string){return v?String(v).replace('T',' ').slice(0,16):'—'}
 async function copyName(){if(!data.value)return;await navigator.clipboard.writeText(data.value.tableName);ElMessage.success('已复制表名')}
-onMounted(async()=>{const id=String(route.params.id); data.value=await assetApi.table(id); await Promise.allSettled([assetApi.columns({dataset_id:id,limit:500}).then((v:any)=>columns.value=v),assetApi.tags(id).then((v:any)=>tags.value=v),assetApi.commonSql(id).then((v:any)=>sqlRows.value=v),assetApi.changes(id).then((v:any)=>changes.value=v),activityApi.recordView(id)])})
+watch(()=>route.params.id,async(value)=>{
+  const id=String(value)
+  data.value=null;columns.value=[];tags.value=[];sqlRows.value=[];changes.value=[];columnKeyword.value=''
+  const result=await assetApi.table(id)
+  if(String(route.params.id)!==id)return
+  data.value=result
+  await Promise.allSettled([
+    assetApi.columns({dataset_id:id,limit:500}).then((v:any)=>{if(String(route.params.id)===id)columns.value=v}),
+    assetApi.tags(id).then((v:any)=>{if(String(route.params.id)===id)tags.value=v}),
+    assetApi.commonSql(id).then((v:any)=>{if(String(route.params.id)===id)sqlRows.value=v}),
+    assetApi.changes(id).then((v:any)=>{if(String(route.params.id)===id)changes.value=v}),
+    activityApi.recordView(id),
+  ])
+},{immediate:true})
+watch(()=>route.query.tab,(value)=>{tab.value=String(value||'overview')})
 </script>
 
 <style scoped>

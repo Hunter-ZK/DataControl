@@ -7,12 +7,12 @@
   </div></div>
 </template>
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight, GitFork } from 'lucide-vue-next'
 import api from '@/api/client'
 const route=useRoute(); const router=useRouter(); const field=ref<any|null>(null)
-onMounted(async()=>{field.value=await api.get(`/columns/${String(route.params.id)}`)})
+watch(()=>route.params.id,async(value)=>{const id=String(value);field.value=null;const result=await api.get(`/columns/${id}`);if(String(route.params.id)===id)field.value=result},{immediate:true})
 </script>
 <style scoped>
 .field-head{padding:25px 28px;display:flex;justify-content:space-between;gap:20px;align-items:center}.field-head h1{font-size:28px;margin:10px 0 5px}.field-head code{font-size:12px}.field-head p{font-size:11px;color:var(--dc-text-3);margin:7px 0 0}.field-head p a{color:var(--dc-primary-strong)}.head-actions{display:flex;gap:8px;flex-wrap:wrap}.dataset-link,.lineage-link{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dc-primary-strong);padding:9px 12px;border-radius:9px;background:var(--dc-primary-soft)}.lineage-link{background:#e7f5f2;color:#176c61}.field-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;margin-top:16px}.info,.side{padding:22px}.info h2,.side h3{font-size:18px;margin:6px 0 12px}.info>p{font-size:13px;line-height:1.75;color:var(--dc-text-2)}.kv{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}.kv div,.side div{padding:14px;border:1px solid var(--dc-border);border-radius:10px}.kv span,.side span{display:block;font-size:10px;color:var(--dc-text-3);margin-bottom:5px}.kv b,.kv code,.side b{font-size:12px}.side{display:grid;gap:10px;align-content:start}.lineage-callout{margin-top:16px;padding:13px 14px;border:1px solid #cde5e0;border-radius:11px;background:#f2faf8;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;color:#2d7167}.lineage-callout b{font-size:12px}.lineage-callout p{font-size:10px;color:#5f817b;margin:4px 0 0}.lineage-callout a{font-size:10px;color:#176c61;font-weight:700}@media(max-width:800px){.field-head{align-items:flex-start;flex-direction:column}.field-grid{grid-template-columns:1fr}.kv{grid-template-columns:1fr}.lineage-callout{grid-template-columns:auto 1fr}.lineage-callout a{grid-column:2}}

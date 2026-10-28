@@ -79,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight, Database, ShieldCheck, Sparkles } from 'lucide-vue-next'
 import { semanticApi, type SemanticMetric } from '@/api/client'
@@ -123,9 +123,17 @@ function additivityLabel(value: string) { return value === 'NON_ADDITIVE' ? '时
 function filterText(filter: Record<string, unknown>) { return `${String(filter.field || '')} ${String(filter.op || '=')} ${String(filter.label || filter.value || '')}`.trim() }
 function askMetric() { if (!metric.value) return; router.push({ name: 'agent', query: { q: `请基于受治理指标“${metric.value.name}”（metric_id=${metric.value.metricCode}）回答我的问题，并严格遵守其时间、维度和必选过滤口径。` } }) }
 
-onMounted(async () => {
-  try { metric.value = await semanticApi.metric(String(route.params.code)) } finally { loading.value = false }
-})
+watch(() => route.params.code, async (value) => {
+  const code = String(value)
+  metric.value = null
+  loading.value = true
+  try {
+    const result = await semanticApi.metric(code)
+    if (String(route.params.code) === code) metric.value = result
+  } finally {
+    if (String(route.params.code) === code) loading.value = false
+  }
+}, { immediate: true })
 </script>
 
 <style scoped>
