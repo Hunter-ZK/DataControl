@@ -237,10 +237,10 @@ export async function streamAgentTurn(
     method: 'POST',
     headers,
     body: JSON.stringify({
-      question, sessionId: sessionId || undefined, runId, modelMode,
+      question, runId, modelMode,
       conversationId: conversationId || undefined,
       displayQuestion: displayQuestion || undefined,
-      publicGatewayConsent: modelMode === 'free-test',
+      publicGatewayConsent: false,
     }),
     signal,
   })

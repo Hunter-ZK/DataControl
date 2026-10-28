@@ -29,9 +29,8 @@
             <span class="chat-model-label">对话模型</span>
             <div class="model-options" role="group" aria-label="选择当前对话模型">
               <button type="button" :class="{ selected: modelMode === 'deepseek' }" :disabled="loading || modelSwitching" :aria-pressed="modelMode === 'deepseek'" @click="switchModel('deepseek')">DeepSeek 官方</button>
-              <button type="button" :class="{ selected: modelMode === 'free-test' }" :disabled="loading || modelSwitching" :aria-pressed="modelMode === 'free-test'" @click="switchModel('free-test')"><FlaskConical :size="14" />免费模型测试</button>
             </div>
-            <span class="model-context">{{ modelMode === 'free-test' ? '第三方公开网关 · 仅模拟数据' : '官方模型 · 可信 SQL 校验' }}</span>
+            <span class="model-context">官方 DeepSeek · 可信 SQL 校验 · 不执行 SQL</span>
           </div>
           <div v-if="contextAsset" class="context-strip">
             <Database :size="17" />
@@ -39,7 +38,6 @@
             <button @click="clearContext"><X :size="15" />清除</button>
           </div>
           <div v-if="!status?.ready" class="runtime-warning"><TriangleAlert :size="18" /><span>{{ agentUnavailableReason }}</span></div>
-          <div v-if="modelMode === 'free-test'" class="runtime-warning"><TriangleAlert :size="18" /><span>公开免费模型测试模式：提问及工具返回的信息会发送至第三方模型服务。请勿输入真实业务数据、内部 SQL 或个人信息。</span></div>
 
           <div ref="messageBox" class="messages">
             <div v-if="messages.length === 0" class="welcome">
@@ -93,7 +91,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpRight, Database, FlaskConical, LoaderCircle, Send, ShieldCheck, Sparkles, Square, TriangleAlert, X } from 'lucide-vue-next'
+import { ArrowUpRight, Database, LoaderCircle, Send, ShieldCheck, Sparkles, Square, TriangleAlert, X } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { agentApi, assetApi, type AgentActivity, type AgentModelMode, type AgentResult, type AgentStatus, type AgentStreamEvent, AgentTurnCancelledError } from '@/api/client'
 import AgentConversationSidebar from '@/components/agent/AgentConversationSidebar.vue'
@@ -106,8 +104,6 @@ const route = useRoute()
 const router = useRouter()
 const status = ref<AgentStatus | null>(null)
 const modelMode = ref<AgentModelMode>('deepseek')
-const modelSwitching = ref(false)
-const publicGatewayAcknowledged = ref(false)
 let statusRequestSerial = 0
 const agentUnavailableReason = computed(() => {
   if (!status.value) return '无法获取 Agent 状态：请确认 DataControl 后端已在 8000 端口启动。'
@@ -165,39 +161,7 @@ async function refreshStatus() {
   }
 }
 
-async function confirmPublicGateway(): Promise<boolean> {
-  if (publicGatewayAcknowledged.value) return true
-  try {
-    await ElMessageBox.confirm(
-      '免费模型由第三方公共服务提供。提问及 Agent 检索到的元数据可能发送给该服务。仅可使用模拟数据，禁止提交真实业务元数据、内部 SQL、客户资料或密钥。是否继续？',
-      '启用免费模型测试',
-      { confirmButtonText: '仅用于模拟数据，继续', cancelButtonText: '取消', type: 'warning' },
-    )
-    publicGatewayAcknowledged.value = true
-    return true
-  } catch { return false }
-}
-
-async function switchModel(nextMode: AgentModelMode) {
-  if (loading.value || modelSwitching.value || nextMode === modelMode.value) return
-  modelSwitching.value = true
-  try {
-    if (nextMode === 'free-test' && !(await confirmPublicGateway())) return
-    // Change model by opening a fresh conversation. Do not send the previous
-    // model's prompt history, session ID or selected business asset downstream.
-    if (route.query.asset || route.query.q) await router.replace({ name: 'agent' })
-    clearActive()
-    resetConversationState()
-    modelMode.value = nextMode
-    status.value = null
-    await refreshStatus()
-  } finally {
-    modelSwitching.value = false
-  }
-}
-
 async function loadContext() {
-  if (modelMode.value === 'free-test') { contextAsset.value = null; return }
   const asset = typeof route.query.asset === 'string' ? route.query.asset : ''
   if (!asset) { contextAsset.value = null; return }
   try {
@@ -207,11 +171,10 @@ async function loadContext() {
 }
 
 function restoreConversation(conversation: AgentConversation) {
-  modelMode.value = conversation.modelMode
-  sessionId.value = conversation.sessionId || null
+  modelMode.value = 'deepseek'
+  sessionId.value = conversation.modelMode === 'deepseek' ? conversation.sessionId || null : null
   messages.value = [...conversation.messages]
-  contextAsset.value = modelMode.value === 'free-test' ? null
-    : (conversation.contextAsset ? { ...conversation.contextAsset } : null)
+  contextAsset.value = conversation.contextAsset ? { ...conversation.contextAsset } : null
   nextTick(() => { resizeComposer(); scrollBottom() })
 }
 
@@ -335,22 +298,33 @@ async function stopAgentTurn() {
 }
 
 async function runAgentTurn(displayText: string, prompt: string, createTitle?: string) {
-  if (!status.value?.ready || loading.value || modelSwitching.value) return
-  const selectedMode = modelMode.value
-  if (selectedMode === 'free-test' && !(await confirmPublicGateway())) return
-  if (selectedMode !== modelMode.value || loading.value) return
+  if (!status.value?.ready || loading.value) return
+  if (!localStorage.getItem('datacontrol_token')) {
+    await router.push({ name: 'login', query: { redirect: '/agent' } })
+    return
+  }
+  const existing = conversations.value.find(c => c.id === activeConversationId.value)
+  if (existing?.modelMode === 'free-test') {
+    ElMessage.warning('旧免费测试会话只可查看，请创建新的官方模型会话。')
+    return
+  }
+  const selectedMode: AgentModelMode = 'deepseek'
   if (!activeConversationId.value) createConversation(createTitle || displayText, contextAsset.value, selectedMode)
   messages.value.push({ role: 'user', text: displayText })
   syncActive(messages.value, sessionId.value, contextAsset.value, selectedMode)
   loading.value = true
-  if (localStorage.getItem('datacontrol_token') && activeConversationId.value) {
+  if (activeConversationId.value) {
     const active = conversations.value.find((c) => c.id === activeConversationId.value)
     if (active && !active.serverId) {
       try {
         const saved = await agentApi.createConversation(active.title, selectedMode, active.contextAsset || null)
         attachServerId(active.id, saved.id)
       } catch {
-        ElMessage.warning('服务端会话不可用，本轮仍保存在当前浏览器。')
+        loading.value = false
+        ElMessage.error('无法创建服务端会话，已阻止本轮请求，请检查登录状态和服务。')
+        messages.value.pop()
+        syncActive(messages.value, null, contextAsset.value, 'deepseek')
+        return
       }
     }
   }
@@ -440,7 +414,7 @@ async function refreshServerHistory() {
         )
         const imported = await agentApi.importConversations(unlinked.map((c) => ({
           title: c.title, modelMode: c.modelMode, pinned: c.pinned,
-          sessionId: c.sessionId, messages: c.messages, contextAsset: c.contextAsset,
+          sessionId: null, messages: c.messages, contextAsset: c.contextAsset,
         })))
         for (let i = 0; i < imported.length; i++) attachServerId(unlinked[i].id, imported[i].id)
         mergeServer(imported as unknown as AgentConversation[])
@@ -454,6 +428,10 @@ async function refreshServerHistory() {
 onMounted(async () => {
   loadConversations()
   const initialQuestion = typeof route.query.q === 'string' ? route.query.q.trim() : ''
+  if (!localStorage.getItem('datacontrol_token')) {
+    await router.replace({ name: 'login', query: { redirect: route.fullPath } })
+    return
+  }
   const hasRouteAsset = typeof route.query.asset === 'string' && !!route.query.asset
   if (hasRouteAsset || initialQuestion) {
     clearActive(); resetConversationState()
