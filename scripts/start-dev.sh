@@ -46,6 +46,12 @@ fi
 [ -x web/node_modules/.bin/vite ] || { echo "Frontend dependencies are missing. Run ./scripts/setup-dev.sh (or npm install inside web) first." >&2; exit 1; }
 mkdir -p .local
 
+# Pulling a new branch can introduce Alembic revisions even when the Python
+# environment is already installed. Upgrade schema in place without reseeding
+# or deleting the user's existing local data.
+echo "[DataControl] Ensuring current local database schema..."
+"$PYTHON" -m alembic upgrade head
+
 # DataControl's Portal/Gateway/MCP are loopback-only process boundaries. Preserve
 # any external proxy for DeepSeek, but force local traffic to bypass it.
 export NO_PROXY="127.0.0.1,localhost,::1${NO_PROXY:+,$NO_PROXY}"
