@@ -28,4 +28,13 @@ onMounted(async()=>Object.assign(data,await assetApi.overview()))
  .reference-stats strong{color:var(--dc-primary);margin:2px 0}
  .bar i{background:linear-gradient(90deg,#93c5fd,var(--dc-primary))}
  .catalog-grid article,.reference-stats a{border-color:var(--dc-border)}
+
+.overview-grid{grid-template-columns:minmax(0,1.4fr) minmax(300px,.85fr)}
+.panel,.standards{padding:22px;border-radius:12px}
+.catalog-grid article,.reference-stats a{background:#fff;border-radius:9px}
+.catalog-grid code,.layers em,.reference-stats span{font-size:12px}
+.catalog-grid strong,.reference-stats strong{color:var(--dc-text);font-size:22px}
+.layers{gap:16px}
+.bar{height:7px;background:#edf2fb}
+.bar i{background:linear-gradient(90deg,#80b2ff,#2563eb)}
 </style>

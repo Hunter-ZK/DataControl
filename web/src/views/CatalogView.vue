@@ -107,4 +107,22 @@ onMounted(async()=>{try{catalogs.value=await assetApi.catalogs() as any[]}catch{
 @media(max-width:1100px){.asset-meta>span:nth-child(2){display:none}}
 @media(max-width:980px){.catalog-layout{grid-template-columns:1fr}.catalog-side{position:static;display:flex;overflow-x:auto}.catalog-side .side-title{display:none}.catalog-side button{flex:0 0 auto}}
 @media(max-width:650px){.catalog-search :deep(.el-input){width:100%}.asset-row{grid-template-columns:36px minmax(0,1fr)}.asset-meta{grid-column:2;justify-content:flex-start}.asset-meta>span:nth-child(2){display:none}.list-head{flex-wrap:wrap;padding:12px 0}}
+
+/* B2: table-like asset directory with restrained surface and readable metadata */
+.catalog-side{border-radius:11px;padding:15px;background:#fff}
+.side-title{color:#607692;font-size:12px}
+.catalog-side button{font-size:13px;color:#5a708d;min-height:42px}
+.catalog-side button.active{background:#edf4ff;color:var(--dc-primary);font-weight:700}
+.catalog-side button small{font-size:12px}
+.asset-list{border-radius:12px;padding:0 19px 14px}
+.list-head{min-height:58px}
+.list-head b{font-size:14px}
+.asset-row{padding:17px 8px;grid-template-columns:42px minmax(0,1fr) auto;border-bottom:1px solid #edf2f8}
+.asset-row:hover{background:#f8fbff}
+.asset-main code{font-size:12px}
+.asset-title b{font-size:14px}
+.asset-main p,.asset-meta{font-size:12px}
+.layer-chip{font-size:12px;background:#eef4ff;color:var(--dc-primary)}
+.pagination button.active{border-color:#c4d6f7;color:var(--dc-primary);background:var(--dc-primary-soft)}
+@media(max-width:980px){.catalog-side{border-radius:10px}}
 </style>

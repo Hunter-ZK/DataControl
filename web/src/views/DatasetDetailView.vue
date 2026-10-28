@@ -1,6 +1,6 @@
 <template>
   <div class="dc-page"><div class="dc-container">
-    <button class="dc-back" @click="router.back()"><ArrowLeft :size="16"/>返回</button>
+    <button class="dc-back" @click="router.back()"><ArrowLeft :size="16"/>返回资产列表</button>
     <section v-if="data" class="detail-head dc-card">
       <div class="head-main"><div class="head-tags"><AssetIcon type="TABLE" :size="18"/><span class="dc-chip">{{data.layerCode}}</span><span class="status"><CircleCheck v-if="data.status==='ONLINE'" :size="13"/><Clock3 v-else :size="13"/>{{data.status==='ONLINE'?'在用':data.status}}</span></div><h1>{{data.bizName}}</h1><code class="dc-tech">{{data.tableName}}</code><p>{{data.catalogCode}} · {{data.assetId}}</p></div>
       <div class="head-actions"><el-button @click="copyName"><Copy :size="15"/>复制表名</el-button><el-button @click="tab='relations'"><GitFork :size="15"/>关系与血缘</el-button><el-button type="primary" @click="router.push({name:'agent',query:{asset:data.assetId}})"><Sparkles :size="15"/>问这张表</el-button></div>
@@ -27,9 +27,9 @@
       </section>
 
       <aside class="detail-side">
-        <section class="dc-card side-card"><span class="dc-eyebrow">IDENTITY</span><h3>稳定身份</h3><dl><div><dt>Asset ID</dt><dd>{{data.assetId}}</dd></div><div><dt>物理表名</dt><dd class="dc-tech">{{data.tableName}}</dd></div><div><dt>生命周期</dt><dd>{{data.status}}</dd></div></dl></section>
+        <section class="dc-card side-card"><span class="dc-eyebrow">ASSET PROFILE</span><h3>资产标识</h3><dl><div><dt>Asset ID</dt><dd>{{data.assetId}}</dd></div><div><dt>物理表名</dt><dd class="dc-tech">{{data.tableName}}</dd></div><div><dt>生命周期</dt><dd>{{data.status}}</dd></div></dl></section>
         <section class="dc-card side-card"><span class="dc-eyebrow">TAGS</span><h3>资产标签</h3><div class="tag-wrap"><span v-for="x in tags" :key="x.code" class="dc-chip">{{x.name}}</span><span v-if="!tags.length" class="dc-muted">暂无标签</span></div></section>
-        <section class="dc-card side-card lineage-entry"><span class="dc-eyebrow">RELATIONS</span><h3>关系指引</h3><p>关系能力属于资产详情的一部分。这里查看当前表的上下游与字段血缘，需要多层分析时再进入完整工作区。</p><button @click="tab='relations'"><GitFork :size="14"/>查看关系与血缘</button></section>
+        <section class="dc-card side-card lineage-entry"><span class="dc-eyebrow">RELATIONS</span><h3>关联与血缘</h3><p>查看这张表的上下游关系与字段级来源。</p><button @click="tab='relations'"><GitFork :size="14"/>查看关系与血缘</button></section>
       </aside>
     </div>
     <el-drawer v-model="previewOpen" :size="previewDrawerWidth" direction="rtl" :with-header="false" append-to-body>
@@ -138,6 +138,30 @@ watch(()=>route.query.tab,(value)=>{tab.value=String(value||'overview')})
  .detail-layout{grid-template-columns:minmax(0,7fr) minmax(260px,3fr)}
  .detail-head,.meta-strip,.detail-main,.side-card{border-color:var(--dc-border)}
  .status{display:inline-flex;align-items:center;gap:5px}
+
+/* Detail shell: the asset name and fields are primary, relations are secondary. */
+.detail-head{background:#fff;border-color:var(--dc-border);border-radius:12px;padding:25px 26px}
+.detail-head h1{color:var(--dc-text);font-size:26px;font-weight:750;margin:11px 0 6px}
+.detail-head .head-tags{display:flex;align-items:center;gap:9px}
+.detail-head p{color:var(--dc-text-3);font-size:12px}
+.head-actions{align-items:center}
+.meta-strip{padding:16px 22px;border-radius:12px;border-color:var(--dc-border)}
+.meta-strip>div{gap:4px}
+.meta-strip span{font-size:12px;color:var(--dc-text-3)}
+.meta-strip b{font-size:13px;color:var(--dc-text)}
+.detail-layout{grid-template-columns:minmax(0,1fr) 265px;gap:16px;align-items:start}
+.detail-main{border-radius:12px;min-width:0}
+.detail-side{display:grid;gap:14px}
+.side-card{padding:18px;border-radius:12px}
+.side-card h3{color:var(--dc-text);font-size:14px;margin:7px 0 11px}
+.side-card p{font-size:12px;line-height:1.7;color:var(--dc-text-2)}
+.section-block h2{color:var(--dc-text);font-size:17px}
+.section-block p{font-size:13px;line-height:1.75}
+.field-link:hover{color:var(--dc-primary);text-decoration:underline}
+.reference-preview{background:#f5f8ff;border-color:#dce6f8;font-size:12px}
+.reference-preview:hover{background:#e9f1ff}
+@media(max-width:1060px){.detail-layout{grid-template-columns:1fr}.detail-side{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}}
+@media(max-width:720px){.detail-head{padding:18px}.detail-head h1{font-size:21px}.meta-strip{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.detail-side{grid-template-columns:1fr}}
 </style>
 <style>
 .reference-drawer{padding:20px 4px 28px;color:var(--dc-text)}
