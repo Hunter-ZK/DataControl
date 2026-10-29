@@ -88,6 +88,7 @@ watch(assetAgentRequest,async next=>{
   if(!next)return
   const token=++requestToken
   if(running.value&&context.value){
+    visible.value=true
     ElMessage.warning('当前资产任务仍在执行。请先停止任务再切换资产。')
     return
   }

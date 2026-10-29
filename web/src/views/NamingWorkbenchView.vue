@@ -143,7 +143,8 @@ const filtered=computed(()=>rows.value.filter(x=>filter.value==='all'||(filter.v
 function rowIssues(row:NamingRow){return validation.value.get(row.key)||[]}
 function changeSource(items:Array<Record<string,string>>,keys:string[],filename:string){
   if(!items.length){error.value='材料中没有可处理的记录';return}
-  sourceRows.value=items.slice(0,2000);headers.value=keys;fileName.value=filename
+  if(items.length>2000){error.value=`材料包含 ${items.length} 行，超过 2000 行限制。请拆分后重新导入，当前数据未截断。`;return}
+  sourceRows.value=items;headers.value=keys;fileName.value=filename
   cnColumn.value=keys.find(x=>/中文名|字段中文|中文名称|字段名称/.test(x))||keys[0]||''
   step.value=0;furthest.value=0;rows.value=[];error.value=''
 }
@@ -159,7 +160,7 @@ async function importSpreadsheet(event:Event){
   finally{busy.value=false;input.value=''}
 }
 function usePasted(){
-  const lines=pasted.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,2000)
+  const lines=pasted.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)
   changeSource(lines.map(x=>({'中文名':x})),['中文名'],'粘贴文本')
 }
 function goSettings(){if(sourceRows.value.length&&cnColumn.value){error.value='';step.value=1;furthest.value=Math.max(furthest.value,1)}}
