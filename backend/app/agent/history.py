@@ -24,6 +24,7 @@ TERMINAL = ("completed", "failed", "cancelled", "timeout", "interrupted")
 TOOL_NAMES = frozenset(json.loads(
     (Path(__file__).resolve().parents[3] / "agent" / "tool-catalog.json").read_text(encoding="utf-8")
 )["tools"])
+TRACE_TOOL_NAMES = TOOL_NAMES | frozenset({"todo_write", "goal", "subagent", "subagent_fork", "workflow"})
 
 
 def _json(value):
@@ -213,7 +214,7 @@ def append_activity(run_id: str, activity: dict):
     e = activity.get("event") if activity.get("type") == "activity" else None
     if not isinstance(e, dict) or e.get("type") not in ("tool_call", "tool_result"):
         return
-    if e.get("tool") not in TOOL_NAMES:
+    if e.get("tool") not in TRACE_TOOL_NAMES:
         return
     call_id = e.get("callId")
     if not isinstance(call_id, str) or not re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", call_id):
