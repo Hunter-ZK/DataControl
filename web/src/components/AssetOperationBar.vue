@@ -79,7 +79,7 @@ const actions = computed<AssetOperation[]>(() => {
       action('select','生成全字段查询模板','生成'),action('lineage','查看完整血缘','分析'),
       action('explain','解释这张表','问 Agent'),action('sql','基于这张表生成 SQL','问 Agent')]
     case 'COLUMN': return [...common,action('copy','复制字段名','常用'),action('parent','查看所属数据集','常用'),
-      action('lineage','查看字段血缘','分析'),action('sameName','查找同名字段','分析'),action('explain','解释这个字段','问 Agent')]
+      action('lineage','查看字段血缘','分析'),action('sameName','搜索字段名','分析'),action('explain','解释这个字段','问 Agent')]
     case 'METRIC': return [...common,action('copy','复制指标编码','常用'),
       action('parent','查看来源数据集','分析'),action('metricCsv','导出指标定义 CSV','导出'),action('explain','解释统计口径','问 Agent')]
     case 'CODE_TABLE': return [...common,action('copyValues','复制码值','常用'),
