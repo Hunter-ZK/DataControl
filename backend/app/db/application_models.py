@@ -60,6 +60,7 @@ class AgentTurn(Base):
     display_question: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
     result_json: Mapped[str | None] = mapped_column(Text)
+    debug_context_json: Mapped[str | None] = mapped_column(Text)
     error: Mapped[str | None] = mapped_column(String(240))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime)

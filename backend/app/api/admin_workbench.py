@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from backend.app.api.assets import get_db
 from backend.app.api.auth import get_current_user
+from backend.app.agent.history import _sanitize_trace_value
 from backend.app.core.config import ROOT
 from backend.app.db.application_models import AgentConversation, AgentToolEvent, AgentTurn
 from backend.app.db.models import ChangeLog, Column, Dataset, Metric, User
@@ -359,6 +360,7 @@ def get_agent_run(
         "status": turn.status, "createdAt": turn.created_at.isoformat() if turn.created_at else None,
         "finishedAt": turn.finished_at.isoformat() if turn.finished_at else None,
         "error": turn.error, "events": events, "result": result,
+        "debugContext": _decode(turn.debug_context_json, None),
         "toolEventCount": len(events), "durationMs": result.get("durationMs") if isinstance(result, dict) else None,
         "tracePayloadsAvailable": any(item["payload"] is not None for item in events),
         "tokenUsage": None, "tokenUsageNote": "当前 Harness 事件流未提供可靠的 token 统计。",
@@ -367,9 +369,10 @@ def get_agent_run(
 
 def _file_record(category: str, display_path: str, path: Path) -> dict[str, Any]:
     try:
-        content = path.read_text(encoding="utf-8")
+        raw = path.read_text(encoding="utf-8")
+        digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        content = _sanitize_trace_value(raw)
         exists = True
-        digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
     except (OSError, UnicodeError):
         content, exists, digest = "", False, None
     return {"category": category, "path": display_path, "exists": exists,
