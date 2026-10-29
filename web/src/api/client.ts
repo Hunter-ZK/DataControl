@@ -443,6 +443,8 @@ export const authApi = {
 
 export const activityApi = {
   favorites: () => get<any[]>('/activity/favorites'),
+  addFavorite: (assetType: string, assetId: string) => post('/activity/favorites', {assetType, assetId}),
+  removeFavorite: (assetType: string, assetId: string) => remove('/activity/favorites/' + encodeURIComponent(assetType) + '/' + encodeURIComponent(assetId)),
   recent: () => get<any[]>('/activity/recent-views'),
   history: () => get<any[]>('/activity/search-history'),
   recordSearch: (keyword: string) => post('/activity/search-history', { keyword }),
