@@ -25,7 +25,7 @@ test('naming workbench supports deterministic review without invented roots', as
   await expect(page.locator('.naming-table tbody tr')).toHaveCount(2)
   await expect(page.locator('.naming-table')).toContainText('未知字段 → 待补')
   await page.getByRole('button',{name:'批量确认无校验问题的行'}).click()
-  await expect(page.getByText('已确认 1')).toBeVisible()
+  await expect(page.locator('.review-stats')).toContainText('已确认 1')
   await page.getByRole('button',{name:/查看导出/}).click()
   await expect(page.getByText('建议新增词根',{exact:true})).toBeVisible()
   const downloadPromise=page.waitForEvent('download')
