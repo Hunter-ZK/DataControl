@@ -385,6 +385,12 @@ export const assetApi = {
   tablePage: (params?: Record<string, unknown>) => get<DatasetPage>('/tables/page', { params }),
   table: (id: string) => get<Record<string, any>>(`/tables/${id}`),
   columns: (params?: Record<string, unknown>) => get<unknown[]>('/columns', { params }),
+  completeColumns: (id: string) => get<{ assetId: string; total: number; complete: boolean; items: import('@/utils/assetExport').ExportColumn[] }>(
+    `/tables/${encodeURIComponent(id)}/columns/complete`),
+  references: (kind: string, id: string, limit = 100) => get<{
+    assetId: string; total?: number; status: string;
+    references: Array<{ assetId: string; assetType: string; title: string }>
+  }>('/agent-assets/references', { params: { asset_type: kind, asset_id: id, limit } }),
   search: (q: string, params?: Record<string, unknown>) =>
     get<SearchResponse>('/search', { params: { q, ...params } }),
   suggest: (q: string, limit = 8) =>

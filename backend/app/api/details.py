@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.app.api.assets import get_db
@@ -40,6 +40,22 @@ def columns(
         stmt = stmt.where(or_(Column.column_name.like(like), Column.cn_name.like(like), Column.biz_definition.like(like)))
     rows = db.execute(stmt.order_by(Column.dataset_id, Column.ordinal_no).limit(limit)).scalars().all()
     return {"code": "OK", "data": [_column_payload(x) for x in rows]}
+
+
+@router.get("/tables/{asset_id}/columns/complete")
+def complete_table_columns(asset_id: str, db: Session = Depends(get_db)):
+    """All-or-error export contract; no silent 500-column truncation."""
+    if db.get(Dataset, asset_id) is None:
+        raise HTTPException(404, "Dataset not found")
+    statement = select(Column).where(Column.dataset_id == asset_id)
+    total = db.scalar(select(func.count()).select_from(Column).where(Column.dataset_id == asset_id)) or 0
+    if total > 5000:
+        raise HTTPException(422, "Dataset exceeds supported export size (5000 columns)")
+    rows = db.execute(statement.order_by(Column.ordinal_no, Column.asset_id)).scalars().all()
+    if len(rows) != total:
+        raise HTTPException(409, "Column list changed during export; retry")
+    return {"code": "OK", "data": {"assetId": asset_id, "total": total, "complete": True,
+                                   "items": [_column_payload(row) for row in rows]}}
 
 
 @router.get("/columns/{asset_id}")

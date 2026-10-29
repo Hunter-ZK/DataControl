@@ -3,7 +3,7 @@
     <button class="dc-back" @click="router.back()"><ArrowLeft :size="16"/>返回资产列表</button>
     <section v-if="data" class="detail-head dc-card">
       <div class="head-main"><div class="head-tags"><AssetIcon type="TABLE" :size="18"/><span class="dc-chip">{{data.layerCode}}</span><span class="status"><CircleCheck v-if="data.status==='ONLINE'" :size="13"/><Clock3 v-else :size="13"/>{{data.status==='ONLINE'?'在用':data.status}}</span></div><h1>{{data.bizName}}</h1><code class="dc-tech">{{data.tableName}}</code><p>{{data.catalogCode}} · {{data.assetId}}</p></div>
-      <AssetOperationBar kind="TABLE" :asset="data" :columns="columns" :columns-complete="columnsComplete"/>
+      <AssetOperationBar kind="TABLE" :asset="data" :columns="exportColumns" :columns-complete="columnsComplete"/>
     </section>
 
     <section v-if="data" class="meta-strip dc-card">
@@ -78,7 +78,9 @@ import DatasetRelationPanel from '@/components/DatasetRelationPanel.vue'
 import { activityApi, assetApi } from '@/api/client'
 const route=useRoute(); const router=useRouter(); const data=ref<any|null>(null); const columns=ref<any[]>([]); const tags=ref<any[]>([]); const sqlRows=ref<any[]>([]); const changes=ref<any[]>([]); const tab=ref(String(route.query.tab||'overview')); const columnKeyword=ref('')
 const columnsLoaded=ref(false)
-const columnsComplete=computed(()=>columnsLoaded.value && columns.value.length>0 && columns.value.length<500)
+const exportColumns=ref<any[]>([])
+const exportError=ref('')
+const columnsComplete=computed(()=>columnsLoaded.value && !exportError.value && exportColumns.value.length>0)
 const previewOpen=ref(false)
 const previewLoading=ref(false)
 const previewError=ref('')
@@ -113,13 +115,15 @@ const filteredColumns=computed(()=>{const k=columnKeyword.value.trim().toLowerCa
 function formatTime(v?:string){return v?String(v).replace('T',' ').slice(0,16):'—'}
 watch(()=>route.params.id,async(value)=>{
   const id=String(value)
-  data.value=null;columns.value=[];columnsLoaded.value=false;tags.value=[];sqlRows.value=[];changes.value=[];columnKeyword.value=''
+  data.value=null;columns.value=[];columnsLoaded.value=false;exportColumns.value=[];exportError.value='';tags.value=[];sqlRows.value=[];changes.value=[];columnKeyword.value=''
   previewOpen.value=false;previewEpoch++
   const result=await assetApi.table(id)
   if(String(route.params.id)!==id)return
   data.value=result
   await Promise.allSettled([
-    assetApi.columns({dataset_id:id,limit:500}).then((v:any)=>{if(String(route.params.id)===id){columns.value=v;columnsLoaded.value=true}}),
+    assetApi.completeColumns(id).then(result=>{if(String(route.params.id)===id && result.complete && result.total===result.items.length){
+      columns.value=result.items;exportColumns.value=result.items;columnsLoaded.value=true
+    }}).catch(()=>{if(String(route.params.id)===id)exportError.value='完整字段信息不可用，请检查接口后重试。'}),
     assetApi.tags(id).then((v:any)=>{if(String(route.params.id)===id)tags.value=v}),
     assetApi.commonSql(id).then((v:any)=>{if(String(route.params.id)===id)sqlRows.value=v}),
     assetApi.changes(id).then((v:any)=>{if(String(route.params.id)===id)changes.value=v}),

@@ -5,7 +5,7 @@ Identifiers are looked up by primary key, not interpolated into SQL or URLs.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.app.api.assets import get_db
@@ -69,10 +69,12 @@ def references(
     else:
         return {"code": "OK", "data": {"assetId": asset_id, "references": [],
                                        "status": "unsupported_relationship"}}
+    stmt = stmt.order_by(Metric.asset_id if category == "STAT_SYSTEM" else Column.asset_id)
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.execute(stmt.limit(limit)).scalars().all()
     result_type = "METRIC" if category == "STAT_SYSTEM" else "COLUMN"
     return {"code": "OK", "data": {
-        "assetId": asset_id, "status": "complete",
+        "assetId": asset_id, "total": total, "status": "truncated" if total > len(rows) else "complete",
         "references": [{
             "assetId": row.asset_id, "assetType": result_type,
             "title": row.metric_name if result_type == "METRIC" else row.cn_name or row.column_name,
