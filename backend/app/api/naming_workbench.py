@@ -3,16 +3,21 @@ from __future__ import annotations
 
 import csv
 import io
+import json
+from datetime import datetime
+from uuid import uuid4
 from zipfile import BadZipFile, ZipFile
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from openpyxl import Workbook, load_workbook
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.api.assets import get_db
 from backend.app.api.auth import get_current_user
 from backend.app.db.models import User
+from backend.app.db.application_models import NamingRun
 from backend.app.services.naming import suggest_names
 
 router = APIRouter(prefix="/api/v1/workbench/naming", tags=["naming-workbench"])
@@ -93,6 +98,59 @@ def suggest(body: NamingRequest, _: User = Depends(get_current_user), db: Sessio
         "engine": "deterministic-root-matcher-v1",
         "notice": "规则预览：无模型臆测；需以正式命名规范与已确认词根审核后采纳。",
     }}
+
+class SaveRunRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=160)
+    payload: ExportRequest
+
+
+def _owned_run(db: Session, user_id: int, run_id: str) -> NamingRun:
+    item = db.get(NamingRun, run_id)
+    if item is None or item.user_id != user_id:
+        raise HTTPException(404, "Naming run not found")
+    return item
+
+
+@router.get("/runs")
+def list_runs(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    rows = db.execute(select(NamingRun).where(NamingRun.user_id == user.id)
+                      .order_by(NamingRun.created_at.desc()).limit(30)).scalars().all()
+    return {"code": "OK", "data": [{
+        "id": item.id, "title": item.title, "count": item.item_count,
+        "createdAt": item.created_at.isoformat(),
+    } for item in rows]}
+
+
+@router.post("/runs")
+def save_run(body: SaveRunRequest, user: User = Depends(get_current_user),
+             db: Session = Depends(get_db)):
+    contents = json.dumps(body.payload.model_dump(mode="json"), ensure_ascii=False)
+    if len(contents.encode("utf-8")) > 4 * 1024 * 1024:
+        raise HTTPException(413, "Naming result exceeds 4 MiB history limit")
+    record = NamingRun(id=str(uuid4()), user_id=user.id, title=body.title.strip(),
+                       item_count=len(body.payload.entries), result_json=contents,
+                       created_at=datetime.utcnow())
+    db.add(record)
+    db.commit()
+    return {"code": "OK", "data": {"id": record.id, "title": record.title,
+                                   "count": record.item_count}}
+
+
+@router.get("/runs/{run_id}/download")
+def download_saved(run_id: str, user: User = Depends(get_current_user),
+                   db: Session = Depends(get_db)):
+    item = _owned_run(db, user.id, run_id)
+    return export_file(ExportRequest.model_validate(json.loads(item.result_json)), user)
+
+
+@router.delete("/runs/{run_id}")
+def delete_run(run_id: str, user: User = Depends(get_current_user),
+               db: Session = Depends(get_db)):
+    item = _owned_run(db, user.id, run_id)
+    db.delete(item)
+    db.commit()
+    return {"code": "OK", "data": {"deleted": True}}
+
 
 @router.post("/export")
 def export_file(body: ExportRequest, _: User = Depends(get_current_user)):

@@ -16,7 +16,7 @@ from backend.app.api.relations import router as relations_router
 from backend.app.api.search import router as search_router
 from backend.app.api.semantic import router as semantic_router
 from backend.app.core.config import MODEL_NAME, MODEL_PROVIDER, ROOT
-from backend.app.db.application_models import AuditLog, SearchHistory, AgentConversation, AgentTurn, AgentToolEvent  # noqa: F401
+from backend.app.db.application_models import AuditLog, SearchHistory, AgentConversation, AgentTurn, AgentToolEvent, NamingRun  # noqa: F401
 
 P3_RUNTIME_CONTRACT = "embedded-agent-gateway-v1"
 
