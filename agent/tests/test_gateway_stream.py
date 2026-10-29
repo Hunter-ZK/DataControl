@@ -9,7 +9,8 @@ from dataagent_gateway.app import ACTIVE_TURNS, cancel_query, query_stream, Quer
 from dataagent_gateway.runner import HeadlessHarnessRunner
 
 
-def test_live_activity_projects_only_allowlisted_tool_and_status():
+def test_live_activity_projects_only_allowlisted_tool_and_status(monkeypatch):
+    monkeypatch.setenv("DATACONTROL_AGENT_DEBUG_CAPTURE", "0")
     secret = "user-sensitive-SQL-secret"
     seen: list[dict] = []
 
@@ -27,7 +28,7 @@ def test_live_activity_projects_only_allowlisted_tool_and_status():
              "result": secret},
             {"type": "final", "text": secret},
         ]
-        reader.feed_data(("\n".join(json.dumps(x) for x in items)+"\n").encode())
+        reader.feed_data(("\n".join(json.dumps(x) for x in items) + "\n").encode())
         reader.feed_eof()
         return await HeadlessHarnessRunner()._capture_trace(reader, "safe-id", seen.append)
 
@@ -38,6 +39,34 @@ def test_live_activity_projects_only_allowlisted_tool_and_status():
         {"type": "tool_result", "callId": "a1", "tool": "resolve_metric", "status": "completed"},
     ]
     assert secret not in json.dumps(seen)
+
+
+def test_debug_trace_captures_tool_payloads_but_not_private_reasoning(monkeypatch):
+    monkeypatch.setenv("DATACONTROL_AGENT_DEBUG_CAPTURE", "1")
+    secret = "trace-input-value"
+    seen: list[dict] = []
+
+    async def collect():
+        reader = asyncio.StreamReader()
+        items = [
+            {"type": "thinking", "text": "do not persist hidden reasoning"},
+            {"type": "tool_call", "callId": "a1", "tool": "mcp__agent3__resolve_metric",
+             "input": {"metric_id": "loan_balance", "query": secret}},
+            {"type": "tool_result", "callId": "a1", "status": "completed",
+             "result": {"metric": "loan_balance"}},
+            {"type": "final", "text": "Final answer"},
+        ]
+        reader.feed_data(("\n".join(json.dumps(x) for x in items) + "\n").encode())
+        reader.feed_eof()
+        return await HeadlessHarnessRunner()._capture_trace(reader, "debug-id", seen.append)
+
+    raw = asyncio.run(collect())
+    debug = [item for item in seen if item.get("type") == "debug_event"]
+    assert [item["eventType"] for item in debug] == ["thinking", "tool_call", "tool_result", "final"]
+    assert secret in json.dumps(debug)
+    assert "do not persist hidden reasoning" not in json.dumps(debug)
+    assert "contentCaptured" in json.dumps(debug)
+    assert "Final answer" in raw
 
 
 def test_cancel_endpoint_cancels_server_task():

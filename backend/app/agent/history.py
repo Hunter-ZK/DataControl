@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.app.db.application_models import AgentConversation, AgentToolEvent, AgentTurn
+from backend.app.db.application_models import AgentConversation, AgentDebugEvent, AgentToolEvent, AgentTurn
 from backend.app.db.session import SessionLocal
 
 ACTIVE = ("queued", "running", "cancel_requested")
@@ -211,6 +211,73 @@ def append_activity(run_id: str, activity: dict):
         db.add(AgentToolEvent(
             turn_id=run_id, sequence=sequence, event_type=e["type"],
             call_id=call_id, tool=e["tool"], status=status,
+            created_at=datetime.utcnow(),
+        ))
+        db.commit()
+
+
+
+_DEBUG_SECRET_KEY = re.compile(r"(?:api[_-]?key|password|secret|credential|authorization|cookie|session[_-]?id|access[_-]?token|refresh[_-]?token)", re.I)
+_DEBUG_PRIVATE_KEY = re.compile(r"^(?:thinking|reasoning|chain[_-]?of[_-]?thought|cot)$", re.I)
+_DEBUG_SECRET_VALUE = re.compile(r"(?i)(?:bearer\s+)[A-Za-z0-9._~+/-]+=*|\bsk-[A-Za-z0-9_-]{16,}\b")
+
+
+def _sanitize_debug(value, key: str = "", depth: int = 0):
+    """Retain useful local trace payloads while redacting credentials and hidden reasoning."""
+    if key and _DEBUG_SECRET_KEY.search(key):
+        return "[REDACTED]"
+    if key and _DEBUG_PRIVATE_KEY.fullmatch(key):
+        return "[NOT CAPTURED: private model reasoning]"
+    if depth > 12:
+        return "[TRUNCATED: nesting limit]"
+    if isinstance(value, dict):
+        return {
+            str(k): _sanitize_debug(v, str(k), depth + 1)
+            for k, v in list(value.items())[:300]
+        }
+    if isinstance(value, list):
+        return [_sanitize_debug(item, "", depth + 1) for item in value[:500]]
+    if isinstance(value, str):
+        text = _DEBUG_SECRET_VALUE.sub("[REDACTED]", value)
+        text = re.sub(
+            r"(?i)\b(api[_-]?key|password|secret|credential|authorization|token|access[_-]?token|refresh[_-]?token)\s*[:=]\s*[^\s,;]+",
+            r"\1=[REDACTED]", text,
+        )
+        if len(text) > 90_000:
+            return text[:90_000] + "\n[TRUNCATED: event content exceeded 90 KB]"
+        return text
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    return str(value)[:2000]
+
+
+def append_debug_event(run_id: str, event: dict):
+    """Persist a bounded developer trace event; only the admin API can read it."""
+    if not isinstance(event, dict) or event.get("type") != "debug_event":
+        return
+    event_type = str(event.get("eventType") or "unknown")[:64]
+    source = str(event.get("source") or "gateway")[:32]
+    payload = _sanitize_debug(event.get("payload", {}))
+    serialized = _json(payload)
+    if len(serialized) > 100_000:
+        serialized = _json({
+            "truncated": True,
+            "originalChars": len(serialized),
+            "preview": serialized[:94_000],
+        })
+    with SessionLocal() as db:
+        turn = db.get(AgentTurn, run_id)
+        if not turn or turn.status in TERMINAL:
+            return
+        sequence = db.query(AgentDebugEvent).filter_by(turn_id=run_id).count() + 1
+        if sequence > 500:
+            return
+        db.add(AgentDebugEvent(
+            turn_id=run_id,
+            sequence=sequence,
+            event_type=event_type,
+            source=source,
+            payload_json=serialized,
             created_at=datetime.utcnow(),
         ))
         db.commit()

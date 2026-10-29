@@ -476,6 +476,97 @@ export const agentApi = {
   cancel: (runId: string) => post<{ cancelled: boolean }>(`/agent/query/${runId}/cancel`),
 }
 
+export interface AdminAgentRun {
+  runId: string
+  conversationId: string
+  conversationTitle: string
+  userId: number
+  displayQuestion: string
+  status: string
+  modelMode: AgentModelMode
+  taskTier: 'standard' | 'multi'
+  createdAt: string | null
+  finishedAt: string | null
+  durationMs: number | null
+  debugEventCount: number
+  toolCallCount: number
+  debugCaptureAvailable: boolean
+  error?: string | null
+}
+
+export interface AdminAgentDebugEvent {
+  sequence: number
+  eventType: string
+  source?: string | null
+  createdAt: string | null
+  payload: unknown
+}
+
+export interface AdminAgentRunDetail {
+  run: {
+    runId: string
+    conversationId: string
+    conversationTitle?: string | null
+    userId?: number | null
+    displayQuestion: string
+    promptSentToHarness: string
+    status: string
+    modelMode: AgentModelMode
+    taskTier: 'standard' | 'multi'
+    createdAt: string | null
+    finishedAt: string | null
+    durationMs: number | null
+    error?: string | null
+    result?: Record<string, unknown> | null
+  }
+  debugCaptureAvailable: boolean
+  debugEvents: AdminAgentDebugEvent[]
+  toolEvents: Array<Record<string, unknown>>
+  limitations: string[]
+}
+
+export interface AdminAgentConfigFile {
+  id: string
+  label: string
+  kind: string
+  path: string
+  exists: boolean
+  activeForRequest: boolean
+  sha256?: string | null
+  bytes: number
+  content: string
+  truncated: boolean
+}
+
+export interface AdminAgentConfig {
+  captureEnabled: boolean
+  modelMode: AgentModelMode
+  taskTier: 'standard' | 'multi'
+  profile: string
+  profileDir: string
+  provider: string
+  model: string
+  timeoutSeconds: number
+  apiKeyPresent: boolean
+  sqlExecutionEnabled: boolean
+  hiddenReasoningCaptured: boolean
+  files: AdminAgentConfigFile[]
+  limitations: string[]
+}
+
+export interface AdminMetadataOverview {
+  counts: Record<string, number>
+  quality: Record<string, number>
+}
+
+export const adminApi = {
+  metadataOverview: () => get<AdminMetadataOverview>('/admin/metadata/overview'),
+  runs: (params?: Record<string, unknown>) => get<AdminAgentRun[]>('/admin/agent/runs', { params }),
+  run: (id: string) => get<AdminAgentRunDetail>('/admin/agent/runs/' + encodeURIComponent(id)),
+  config: (modelMode: AgentModelMode = 'deepseek', taskTier: 'standard' | 'multi' = 'standard') =>
+    get<AdminAgentConfig>('/admin/agent/config', { params: { modelMode, taskTier } }),
+}
+
 export const authApi = {
   login: (username: string, password: string) => post<any>('/auth/login', { username, password }),
   me: () => get<any>('/auth/me'),

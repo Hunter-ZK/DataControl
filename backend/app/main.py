@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.activity import router as activity_router
+from backend.app.api.admin import router as admin_router
 from backend.app.api.agent import router as agent_router
 from backend.app.api.agent_history import router as agent_history_router
 from backend.app.api.agent_assets import router as agent_assets_router
@@ -16,7 +17,7 @@ from backend.app.api.relations import router as relations_router
 from backend.app.api.search import router as search_router
 from backend.app.api.semantic import router as semantic_router
 from backend.app.core.config import MODEL_NAME, MODEL_PROVIDER, ROOT
-from backend.app.db.application_models import AuditLog, SearchHistory, AgentConversation, AgentTurn, AgentToolEvent, NamingRun  # noqa: F401
+from backend.app.db.application_models import AuditLog, SearchHistory, AgentConversation, AgentTurn, AgentToolEvent, AgentDebugEvent, NamingRun  # noqa: F401
 
 P3_RUNTIME_CONTRACT = "embedded-agent-gateway-v1"
 
@@ -40,6 +41,7 @@ app.include_router(agent_router)
 app.include_router(agent_history_router)
 app.include_router(agent_assets_router)
 app.include_router(activity_router)
+app.include_router(admin_router)
 
 
 @app.get("/health")
