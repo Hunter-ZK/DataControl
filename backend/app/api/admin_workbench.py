@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from backend.app.api.assets import get_db
 from backend.app.api.auth import get_current_user
-from backend.app.core.config import AGENT_HOME, ROOT
+from backend.app.core.config import ROOT
 from backend.app.db.application_models import AgentConversation, AgentToolEvent, AgentTurn
 from backend.app.db.models import ChangeLog, Column, Dataset, User
 
@@ -295,23 +295,24 @@ def get_effective_rules(
     else:
         profile = os.getenv("DATACONTROL_DSH_PROFILE", "dataagent-headless")
     dsh_home = Path(os.getenv("DSH_HOME", str(ROOT / ".local" / "dsh-home-v0.2.1-rc.3"))).resolve()
+    agent_root = ROOT / "agent"
     overlay = "headless-multi.patch.yml" if taskTier == "multi" else "headless.patch.yml"
     files = [
         _file_record("系统提示词 / Profile", f"agent/dsh/profile/{overlay}",
-                     AGENT_HOME / "dsh" / "profile" / overlay),
+                     agent_root / "dsh" / "profile" / overlay),
         _file_record("Profile 基础配置", "agent/dsh/profile/cordis.patch.yml",
-                     AGENT_HOME / "dsh" / "profile" / "cordis.patch.yml"),
+                     agent_root / "dsh" / "profile" / "cordis.patch.yml"),
         _file_record("运行时实际生成配置", f".local/profiles/{profile}/cordis.patch.yml",
                      dsh_home / "profiles" / profile / "cordis.patch.yml"),
-        _file_record("可用 MCP 工具目录", "agent/tool-catalog.json", AGENT_HOME / "tool-catalog.json"),
+        _file_record("可用 MCP 工具目录", "agent/tool-catalog.json", agent_root / "tool-catalog.json"),
         _file_record("Guard 硬规则", "agent/guard-plugin/src/policy.ts",
-                     AGENT_HOME / "guard-plugin" / "src" / "policy.ts"),
+                     agent_root / "guard-plugin" / "src" / "policy.ts"),
         _file_record("MCP 工具参数定义", "agent/src/agent3/adapters/mcp/tools.py",
-                     AGENT_HOME / "src" / "agent3" / "adapters" / "mcp" / "tools.py"),
+                     agent_root / "src" / "agent3" / "adapters" / "mcp" / "tools.py"),
         _file_record("确定性业务规则与 SQL 边界", "agent/src/agent3/services/core.py",
-                     AGENT_HOME / "src" / "agent3" / "services" / "core.py"),
+                     agent_root / "src" / "agent3" / "services" / "core.py"),
         _file_record("Harness 调用与事件解析", "agent/src/dataagent_gateway/runner.py",
-                     AGENT_HOME / "src" / "dataagent_gateway" / "runner.py"),
+                     agent_root / "src" / "dataagent_gateway" / "runner.py"),
         _file_record("Portal 事件过滤与安全策略", "backend/app/agent/history.py",
                      ROOT / "backend" / "app" / "agent" / "history.py"),
         _file_record("Portal API 执行边界", "backend/app/api/agent.py",

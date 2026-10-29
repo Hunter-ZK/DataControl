@@ -57,6 +57,10 @@ def _sanitize_trace_value(value):
     if isinstance(value, str):
         value = re.sub(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+", "Bearer [REDACTED]", value)
         value = re.sub(r"(?i)\bsk-[A-Za-z0-9_-]{12,}\b", "[REDACTED_KEY]", value)
+        value = re.sub(
+            r"(?i)\b(api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)\s*[:=]\s*([^\s,;]+)",
+            r"\1=[REDACTED]", value,
+        )
         return value
     return value
 

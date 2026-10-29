@@ -36,3 +36,10 @@ def test_public_answer_never_returns_full_trace_payloads():
     safe = history._safe_answer(result)
     assert "input" not in safe["events"][0]
     assert "output" not in safe["events"][1]
+
+
+
+def test_debug_trace_redacts_inline_secret_assignments():
+    clean = _sanitize_trace_value({"message": "api_key=sk-12345678901234567890 password: hunter2"})
+    assert "sk-12345678901234567890" not in clean["message"]
+    assert "hunter2" not in clean["message"]
