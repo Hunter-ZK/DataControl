@@ -88,6 +88,7 @@
                   <p v-html="safeMarkHtml(item.snippet||'打开资产详情查看业务定义与关联信息。')"/>
                 </div>
                 <div class="asset-footer"><span v-if="item.catalogCode"><FolderTree :size="14"/>{{item.catalogCode}}</span>
+                  <AssetQuickPreview :item="item" @open="open"/>
                   <button v-if="item.assetType==='TABLE'||item.assetType==='METRIC'" @click.stop="askAbout(item)"><WandSparkles :size="14"/>用此资产提问</button>
                   <span class="detail-link">查看详情 <ArrowRight :size="15"/></span>
                 </div>
@@ -110,6 +111,7 @@ import { computed, defineComponent, h, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowRight, ChevronRight, Database, Filter, FolderTree, Search, Sparkles, WandSparkles } from 'lucide-vue-next'
 import AssetIcon from '@/components/AssetIcon.vue'
+import AssetQuickPreview from '@/components/AssetQuickPreview.vue'
 import { buildCatalogTree, flattenCatalogs, type CatalogEntry, type CatalogNode } from '@/utils/catalogTree'
 import { activityApi, assetApi, type SearchItem, type SearchSuggestion } from '@/api/client'
 
@@ -348,4 +350,7 @@ onMounted(async() => {try{catalogEntries.value=await assetApi.catalogs() as Cata
 .density-compact .asset-footer{padding:6px 15px;min-height:35px}
 @media(max-width:680px){.results-head{align-items:start;gap:10px;flex-direction:column}.results-tools{justify-content:space-between;width:100%}.group-items{padding:9px;gap:9px}.asset-heading-block{padding:13px}.asset-definition{margin:0 11px 9px;grid-template-columns:1fr;gap:3px;padding:9px 11px}.asset-footer{flex-wrap:wrap;padding:9px 11px}}
 
+.asset-footer :deep(.preview-control){display:flex;align-items:center;margin-left:auto}
+.asset-footer button:not(.preview-trigger){margin-left:0}
+@media(max-width:680px){.asset-footer :deep(.preview-control){margin-left:0}.asset-footer .detail-link{margin-left:auto}}
 </style>
