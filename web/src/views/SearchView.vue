@@ -52,7 +52,7 @@
           <p>保存在当前浏览器中，可一键恢复搜索词、类型、数仓层级和业务目录。</p>
           <div v-if="presets.length" class="preset-list">
             <div v-for="preset in presets" :key="preset.id" class="preset-row">
-              <button class="preset-apply" @click="applyPreset(preset)" :title="'应用：'+preset.name"><Bookmark :size="15"/><span>{{preset.name}}</span></button>
+              <button class="preset-apply" @click="applyPreset(preset)" :title="'应用：'+preset.name" :aria-label="'应用：'+preset.name"><Bookmark :size="15"/><span>{{preset.name}}</span></button>
               <button class="preset-delete" @click="deletePreset(preset)" :aria-label="'删除筛选：'+preset.name"><X :size="15"/></button>
             </div>
           </div>
