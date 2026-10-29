@@ -22,7 +22,7 @@
 
     <section v-if="tab === 'runs'" class="tab-panel">
       <div class="section-heading">
-        <div><h2>运行记录</h2><p>展示真实服务端任务。选择一轮运行，查看捕获到的原始事件与结果。</p></div>
+        <div><h2>运行记录</h2><p>展示真实服务端任务。选择一轮运行，查看捕获到的原始事件与结果；运行中的任务每 2.5 秒自动刷新。</p></div>
         <button class="secondary-button" :disabled="runsLoading" @click="loadRuns"><RefreshCw :size="15" />刷新</button>
       </div>
       <div class="filter-bar">
@@ -163,7 +163,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   Activity, AlertTriangle, ArrowUpRight, BookOpen, Boxes, CheckCircle2, ChevronDown,
@@ -276,7 +276,24 @@ async function loadMetadata() {
   catch (error) { pageError.value = error instanceof Error ? error.message : '读取元数据统计失败。' }
   finally { metadataLoading.value = false }
 }
-onMounted(() => { void loadRuns(); void loadConfig(); void loadMetadata() })
+let refreshTimer: number | undefined
+onMounted(() => {
+  void loadRuns()
+  void loadConfig()
+  void loadMetadata()
+  refreshTimer = window.setInterval(() => {
+    if (tab.value !== 'runs') return
+    if (!runsLoading.value) void loadRuns()
+    if (selectedRunId.value && detail.value
+      && ['queued', 'running', 'cancel_requested'].includes(detail.value.run.status)
+      && !detailLoading.value) {
+      void selectRun(selectedRunId.value)
+    }
+  }, 2500)
+})
+onBeforeUnmount(() => {
+  if (refreshTimer !== undefined) window.clearInterval(refreshTimer)
+})
 </script>
 
 <style scoped>
