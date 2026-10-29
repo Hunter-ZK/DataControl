@@ -3,7 +3,7 @@
     <button class="dc-back" @click="router.back()"><ArrowLeft :size="16"/>返回</button>
     <section v-if="data" class="detail-head dc-card">
       <div><span class="dc-chip">{{config.badge}}</span><h1>{{titleOf(data)}}</h1><code class="dc-tech">{{codeOf(data)}}</code><p>{{descriptionOf(data)}}</p></div>
-      <span class="status">{{data.status||data.version||'VALID'}}</span>
+      <div class="reference-actions"><span class="status">{{data.status||data.version||'VALID'}}</span><AssetOperationBar :kind="kind==='word-roots'?'WORD_ROOT':'STAT_SYSTEM'" :asset="data"/></div>
     </section>
     <div v-if="data" class="detail-grid">
       <section class="dc-card panel">
@@ -30,6 +30,7 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from 'lucide-vue-next'
 import { assetApi } from '@/api/client'
+import AssetOperationBar from '@/components/AssetOperationBar.vue'
 const props=defineProps<{kind:string}>();const route=useRoute();const router=useRouter();const data=ref<any|null>(null);const loading=ref(true)
 const configs:any={
   'word-roots':{badge:'WORD ROOT',sectionTitle:'词根定义'},
