@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import csv
 import io
-from collections import Counter
 from zipfile import BadZipFile, ZipFile
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
