@@ -59,6 +59,24 @@ if($LASTEXITCODE -ne 0){throw "DataControl .venv must use Python 3.13 or 3.14."}
 if(-not(Get-Command npm -ErrorAction SilentlyContinue)){throw "npm is required."}
 if(-not(Test-Path (Join-Path $root "web\node_modules\.bin\vite.cmd"))){throw "Frontend dependencies are missing. Run .\scripts\setup-dev.ps1 first."}
 New-Item -ItemType Directory -Force -Path $localDir | Out-Null
+
+# A successful previous setup marker does not imply that newly added Python
+# dependencies are installed. Synchronize only the editable Portal package;
+# do not rerun setup-dev, demo-data generation, npm or Agent setup.
+$portalDependencyCheck = Join-Path $PSScriptRoot "check-portal-deps.py"
+& $python $portalDependencyCheck
+if($LASTEXITCODE -ne 0){
+  Write-Host "[DataControl] Updating Portal Python dependencies from pyproject.toml..."
+  & $python -m pip install -e .
+  if($LASTEXITCODE -ne 0){throw "Portal dependency synchronization failed. Check pip output above."}
+  & $python $portalDependencyCheck
+  if($LASTEXITCODE -ne 0){throw "Portal dependencies still incomplete after pip install -e ."}
+}
+# Import the real application before launching a detached Uvicorn process so
+# missing transitive imports fail with a visible, direct diagnostic.
+& $python -c "import backend.app.main"
+if($LASTEXITCODE -ne 0){throw "DataControl API import preflight failed. See the Python traceback above."}
+
 & $python -m alembic upgrade head
 if($LASTEXITCODE -ne 0){throw 'Database migration failed before service startup'}
 
