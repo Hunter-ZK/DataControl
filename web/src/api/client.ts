@@ -389,7 +389,7 @@ export const assetApi = {
     `/tables/${encodeURIComponent(id)}/columns/complete`),
   references: (kind: string, id: string, limit = 100) => get<{
     assetId: string; total?: number; status: string;
-    references: Array<{ assetId: string; assetType: string; title: string }>
+    references: Array<{ assetId: string; assetType: string; title: string; technicalName?: string }>
   }>('/agent-assets/references', { params: { asset_type: kind, asset_id: id, limit } }),
   search: (q: string, params?: Record<string, unknown>) =>
     get<SearchResponse>('/search', { params: { q, ...params } }),

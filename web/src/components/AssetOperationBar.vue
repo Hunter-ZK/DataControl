@@ -80,13 +80,13 @@ const actions = computed<AssetOperation[]>(() => {
     case 'METRIC': return [...common,action('copy','复制指标编码','常用'),
       action('parent','查看来源数据集','分析'),action('metricCsv','导出指标定义 CSV','导出'),action('explain','解释统计口径','问 Agent')]
     case 'CODE_TABLE': return [...common,action('copyValues','复制码值','常用'),
-      action('valuesCsv','导出码值 CSV','导出'),action('case','生成 CASE WHEN 模板','生成'),action('explain','解释码值含义','问 Agent')]
+      action('valuesCsv','导出码值 CSV','导出'),action('references','查看引用字段','分析'),action('case','生成 CASE WHEN 模板','生成'),action('explain','解释码值含义','问 Agent')]
     case 'STANDARD': return [...common,action('copy','复制标准编号','常用'),
-      action('definitionCsv','导出标准定义 CSV','导出'),...(props.asset.codeTableNo ? [action('linkedCode','查看关联码表','分析')] : []),
+      action('definitionCsv','导出标准定义 CSV','导出'),action('references','查看落标字段','分析'),...(props.asset.codeTableNo ? [action('linkedCode','查看关联码表','分析')] : []),
       action('explain','解释适用规则','问 Agent')]
     case 'WORD_ROOT': return [...common,action('naming','用于字段命名','常用'),action('copy','复制英文词根','生成'),action('copyCn','复制中文名称','生成'),
       action('explain','解释这个词根','问 Agent')]
-    case 'STAT_SYSTEM': return [...common,action('copy','复制制度编码','常用'),action('definitionCsv','导出制度信息 CSV','导出'),
+    case 'STAT_SYSTEM': return [...common,action('copy','复制制度编码','常用'),action('definitionCsv','导出制度信息 CSV','导出'),action('references','查看下属指标','分析'),
       action('explain','解释统计制度','问 Agent')]
   }
 })
@@ -153,6 +153,7 @@ function execute(operation:string) {
       void router.push(props.kind==='COLUMN'?{name:'relations',query:{mode:'field',field:id.value}}:{name:'relations',params:{id:id.value}});return
     }
     if(operation==='sameName'){void router.push({name:'search',query:{q:code.value}});return}
+    if(operation==='references'){document.querySelector('.refs-panel')?.scrollIntoView({behavior:'smooth',block:'start'});return}
     if(operation==='linkedCode'){void router.push({name:'codeTable',params:{no:String(props.asset.codeTableNo)}});return}
     if(operation==='ddl'){preview('建表 DDL 草案',createDdlDraft(code.value,props.columns,props.columnsComplete));return}
     if(operation==='select'){preview('全字段查询模板',createSelectDraft(code.value,props.columns,props.columnsComplete));return}

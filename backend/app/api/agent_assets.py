@@ -54,7 +54,7 @@ def _asset(db: Session, asset_type: str, asset_id: str):
 
 @router.get("/references")
 def references(
-    asset_type: str, asset_id: str, limit: int = Query(30, ge=1, le=100),
+    asset_type: str, asset_id: str, limit: int = Query(30, ge=1, le=5000),
     db: Session = Depends(get_db),
 ):
     item = _asset(db, asset_type, asset_id)
@@ -78,6 +78,7 @@ def references(
         "references": [{
             "assetId": row.asset_id, "assetType": result_type,
             "title": row.metric_name if result_type == "METRIC" else row.cn_name or row.column_name,
+            "technicalName": row.metric_code if result_type == "METRIC" else row.column_name,
         } for row in rows],
     }}
 
