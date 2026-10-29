@@ -10,10 +10,7 @@
           <code class="metric-code">{{ metric.metricCode }}</code>
           <p>{{ metric.definition || metric.caliber || '暂无指标定义。' }}</p>
         </div>
-        <div class="head-actions">
-          <RouterLink :to="`/datasets/${metric.source.assetId}`" class="soft-action"><Database :size="15" />查看来源资产</RouterLink>
-          <button class="primary-action" @click="askMetric"><Sparkles :size="15" />用此指标提问</button>
-        </div>
+        <AssetOperationBar kind="METRIC" :asset="metric"/>
       </section>
 
       <div class="metric-layout">
@@ -83,6 +80,7 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight, Database, ShieldCheck, Sparkles } from 'lucide-vue-next'
 import { semanticApi, type SemanticMetric } from '@/api/client'
+import AssetOperationBar from '@/components/AssetOperationBar.vue'
 
 const route = useRoute()
 const router = useRouter()
