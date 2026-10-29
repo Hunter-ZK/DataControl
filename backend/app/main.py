@@ -10,6 +10,7 @@ from backend.app.api.agent_assets import router as agent_assets_router
 from backend.app.api.assets import router as assets_router
 from backend.app.api.auth import router as auth_router
 from backend.app.api.details import router as details_router
+from backend.app.api.naming_workbench import router as naming_router
 from backend.app.api.reference import router as reference_router
 from backend.app.api.relations import router as relations_router
 from backend.app.api.search import router as search_router
@@ -30,6 +31,7 @@ app = FastAPI(title="DataControl API", version="0.5.0-p2", lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(assets_router)
 app.include_router(details_router)
+app.include_router(naming_router)
 app.include_router(reference_router)
 app.include_router(search_router)
 app.include_router(relations_router)
