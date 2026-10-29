@@ -395,6 +395,15 @@ export interface AdminColumnRecord {
   codeTableNo?: string | null; standardNo?: string | null
 }
 export interface AdminDatasetDetail { dataset: AdminDatasetRecord; columns: AdminColumnRecord[] }
+export interface AdminMetricRecord {
+  assetId: string; metricCode: string; metricName: string; aliases?: string | null
+  bizDefinition?: string | null; sourceDatasetId: string; sourceDatasetName: string; sourceTableName?: string | null
+  statSystemCode?: string | null; aggregation: string; measureColumn: string; timeField: string
+  timeAdditivity: string; caliberDesc?: string | null; validDimensions?: string | null
+  metricKind: string; numeratorMetricCode?: string | null; denominatorMetricCode?: string | null
+  formula?: string | null; timeGrain?: string | null; latestStrategy: string
+  mandatoryFilters?: string | null; semanticNotes?: string | null; status: string
+}
 export interface AdminRunSummary {
   runId: string; conversationId: string; conversationTitle: string; userId: number
   modelMode: AgentModelMode; taskTier: 'standard' | 'multi'; question: string; displayQuestion: string
@@ -414,7 +423,7 @@ export interface AdminRuleFile {
 }
 export interface AdminRulesResult {
   profile: string; modelMode: AgentModelMode; taskTier: 'standard' | 'multi'
-  files: AdminRuleFile[]; notice: string
+  files: AdminRuleFile[]; notice: string; precedence?: string[]
 }
 
 export const adminWorkbenchApi = {
@@ -429,6 +438,12 @@ export const adminWorkbenchApi = {
   ),
   updateColumn: (assetId: string, body: Record<string, unknown>) => patch<AdminColumnRecord>(
     '/admin/workbench/metadata/columns/' + encodeURIComponent(assetId), body,
+  ),
+  metrics: (keyword = '', limit = 150) => get<{ items: AdminMetricRecord[]; total: number }>(
+    '/admin/workbench/metadata/metrics', { params: { keyword: keyword || undefined, limit } },
+  ),
+  updateMetric: (metricCode: string, body: Record<string, unknown>) => patch<AdminMetricRecord>(
+    '/admin/workbench/metadata/metrics/' + encodeURIComponent(metricCode), body,
   ),
   runs: (keyword = '', status = 'all', limit = 100) => get<{ items: AdminRunSummary[]; total: number }>(
     '/admin/workbench/runs', { params: { keyword: keyword || undefined, status, limit } },
