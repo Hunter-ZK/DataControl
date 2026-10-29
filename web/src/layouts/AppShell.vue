@@ -64,6 +64,14 @@
     <el-dialog v-model="commandOpen" title="快速查找数据资产" width="min(620px,95vw)" class="command-dialog">
       <el-input v-model="commandQuery" autofocus placeholder="数据集、指标、字段或标准名称"
         @input="loadCommandSuggestions" @keydown.enter="openCommandSearch"/>
+      <div v-if="availableAssetCommands.length" class="command-asset-actions">
+        <div class="command-asset-heading">当前资产 · {{ activeAssetOperations?.label }}</div>
+        <button v-for="item in availableAssetCommands" :key="item.id" @click="runAssetOperation(item.id)">
+          <Sparkles v-if="item.group==='问 Agent'" :size="15"/>
+          <FileText v-else :size="15"/>
+          <span>{{item.label}}</span><small>{{item.group}}</small>
+        </button>
+      </div>
       <div class="command-results">
         <button v-for="item in commandSuggestions" :key="item.assetType+item.assetId"
           @click="chooseCommand(item)"><AssetIcon :type="item.assetType" :size="16" mode="inline"/><b>{{item.title}}</b><code>{{item.technicalName}}</code><small>{{item.assetType}}</small></button>
@@ -75,6 +83,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { activeAssetOperations } from '@/composables/assetOperations'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, BarChart3, BookOpenCheck, Boxes, CircleGauge, CircleHelp, Database, FileText, Hash, Layers3, Menu, PanelLeftClose, Search, Sparkles, UserRound } from 'lucide-vue-next'
 import { assetApi, type SearchSuggestion } from '@/api/client'
@@ -93,6 +102,15 @@ const breadcrumbType=computed(():string => ({
 const commandOpen=ref(false)
 const commandQuery=ref('')
 const commandSuggestions=ref<SearchSuggestion[]>([])
+const availableAssetCommands=computed(()=>activeAssetOperations.value?.path===route.fullPath
+  ? activeAssetOperations.value.actions.filter(item=>item.label.toLowerCase().includes(commandQuery.value.trim().toLowerCase()))
+  : [])
+function runAssetOperation(id:string) {
+  const current=activeAssetOperations.value
+  commandOpen.value=false
+  commandQuery.value=''
+  if(current?.path===route.fullPath)current.execute(id)
+}
 const serviceAvailable=ref<boolean|null>(null)
 let commandEpoch=0
 const userInitial=computed(()=>{
@@ -161,6 +179,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', shortcut))
  .mobile-links{display:grid;gap:5px;}
  .mobile-links a{display:flex;align-items:center;gap:12px;padding:11px;border-radius:9px;color:var(--dc-text);}
  .mobile-links a.router-link-active{background:var(--dc-primary-soft);color:var(--dc-primary);}
+ .command-asset-actions{border:1px solid var(--dc-border);border-radius:11px;background:var(--dc-surface-soft);margin-top:12px;padding:9px;max-height:320px;overflow:auto}.command-asset-heading{font-size:12px;font-weight:700;color:var(--dc-text-2);padding:5px 10px 9px}.command-asset-actions button{width:100%;display:flex;align-items:center;gap:10px;background:transparent;border:0;border-radius:8px;padding:10px;text-align:left;color:var(--dc-text);font-size:13px;cursor:pointer}.command-asset-actions button:hover{background:var(--dc-surface);color:var(--dc-primary)}.command-asset-actions button small{margin-left:auto;color:var(--dc-text-3)}
  .command-results{display:grid;gap:4px;max-height:340px;overflow:auto;margin-top:12px;}
  .command-results button{display:flex;align-items:center;gap:9px;padding:12px 8px;border:0;border-radius:7px;background:white;color:var(--dc-text);text-align:left;cursor:pointer;}
  .command-results button:hover{background:var(--dc-primary-soft);}
