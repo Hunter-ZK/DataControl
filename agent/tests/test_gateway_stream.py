@@ -28,7 +28,7 @@ def test_live_activity_projects_only_allowlisted_tool_and_status(monkeypatch):
              "result": secret},
             {"type": "final", "text": secret},
         ]
-        reader.feed_data(("\n".join(json.dumps(x) for x in items)+"\n").encode())
+        reader.feed_data(("\n".join(json.dumps(x) for x in items) + "\n").encode())
         reader.feed_eof()
         return await HeadlessHarnessRunner()._capture_trace(reader, "safe-id", seen.append)
 
@@ -56,7 +56,7 @@ def test_debug_trace_captures_tool_payloads_but_not_private_reasoning(monkeypatc
              "result": {"metric": "loan_balance"}},
             {"type": "final", "text": "Final answer"},
         ]
-        reader.feed_data(("\\n".join(json.dumps(x) for x in items) + "\\n").encode())
+        reader.feed_data(("\n".join(json.dumps(x) for x in items) + "\n").encode())
         reader.feed_eof()
         return await HeadlessHarnessRunner()._capture_trace(reader, "debug-id", seen.append)
 
