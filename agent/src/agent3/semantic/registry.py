@@ -113,6 +113,6 @@ class SemanticRegistry:
                 denominator_metric_id=raw.get("denominator_metric_id", ""),
                 formula=raw.get("formula", ""),
                 time_grain=raw.get("time_grain", ""),
-                latest_strategy=raw.get("latest_strategy", "MAX"),
+                latest_strategy=raw.get("latest_strategy", "PARAMETER"),
             ))
         return cls(tuple(metrics))

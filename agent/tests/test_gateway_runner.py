@@ -1,6 +1,11 @@
+import asyncio
 import json
+import logging
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+import dataagent_gateway.runner as runner_module
 
 from dataagent_gateway.runner import HarnessRunError, HeadlessHarnessRunner, parse_event_stream
 
@@ -279,3 +284,54 @@ def test_headless_command_never_contains_user_question_and_rejects_shell_like_se
 
     with pytest.raises(HarnessRunError, match="Invalid DataAgent session id"):
         runner._command("session-1 & whoami")
+
+
+def test_windows_headless_command_uses_node_entrypoint_without_shell(monkeypatch):
+    runner = HeadlessHarnessRunner()
+    monkeypatch.setattr(runner_module, "os", SimpleNamespace(name="nt"))
+    command = runner._command("session-1234")
+    assert command[:1] == ["node"]
+    assert Path(command[1]).as_posix().endswith("/@deepseek-ai/dsh/lib/bin.js")
+    assert "cmd.exe" not in command
+    assert command[-2:] == ["--session-id", "session-1234"]
+
+async def _capture_test_events(events: list[dict], request_id: str) -> str:
+    # StreamReader must be created inside its running event loop (Python 3.13+).
+    reader = asyncio.StreamReader()
+    reader.feed_data(_stream(events).encode("utf-8"))
+    reader.feed_eof()
+    return await HeadlessHarnessRunner()._capture_trace(reader, request_id)
+
+
+def test_live_console_trace_logs_tools_without_payloads(caplog):
+    secret = "private-token-and-hidden-reasoning"
+    events = [
+        {"type": "thinking", "text": secret},
+        {"type": "tool_call", "tool": "mcp__agent3__validate_sql", "callId": "t1",
+         "input": {"sql": f"SELECT '{secret}'"}},
+        {"type": "tool_result", "callId": "t1", "status": "completed",
+         "result": f"SELECT '{secret}'"},
+        {"type": "tool_call", "tool": "untrusted-user-controlled-name", "callId": "t2",
+         "input": {"api_key": secret}},
+        {"type": "final", "text": secret},
+    ]
+    with caplog.at_level(logging.INFO, logger="uvicorn.error"):
+        output = asyncio.run(_capture_test_events(events, "test1234"))
+    assert secret in output
+    assert "TOOL_START validate_sql" in caplog.text
+    assert "TOOL_END validate_sql status=completed" in caplog.text
+    assert "TOOL_START harness_tool" in caplog.text
+    assert secret not in caplog.text
+    assert "SELECT" not in caplog.text
+
+
+def test_console_trace_does_not_log_hidden_reasoning_or_raw_agent_content(caplog):
+    events = [
+        {"type": "thinking", "text": "secret-thought"},
+        {"type": "final", "text": "customer-secret"},
+        {"type": "status", "phase": "turn_end", "reason": "completed"},
+    ]
+    with caplog.at_level(logging.INFO, logger="uvicorn.error"):
+        asyncio.run(_capture_test_events(events, "test5678"))
+    assert "secret-thought" not in caplog.text
+    assert "customer-secret" not in caplog.text

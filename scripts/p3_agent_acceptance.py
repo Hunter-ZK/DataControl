@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -71,6 +72,12 @@ def main() -> None:
     # unit, stub and cross-platform gates live in CI and must not be conflated with
     # this evidence file.
     with httpx.Client(timeout=180.0, trust_env=False) as client:
+        credentials = {
+            "username": os.getenv("DATACONTROL_EVAL_USER", "demo"),
+            "password": os.getenv("DATACONTROL_EVAL_PASSWORD", "DataControl123!"),
+        }
+        login = unwrap(client.post(f"{BASE_URL}/auth/login", json=credentials))
+        client.headers.update({"Authorization": f"Bearer {login['accessToken']}"})
         health = client.get(HEALTH_URL)
         health.raise_for_status()
         health_data = health.json()

@@ -50,32 +50,30 @@ defineProps<{ message: AgentMessage }>()
 </script>
 
 <style scoped>
-.validation-panel { margin-top: 11px; padding: 15px 16px; border: 2px solid #9eafb8; border-radius: 12px; background: #eef2f4; }
-.validation-panel.success { border-color: #62ad86; background: #e1f3ea; }
-.validation-panel.warning { border-color: #d19b2f; background: #ffedb9; }
-.validation-panel.pending { border-color: #929fa6; background: #e8edef; }
-.validation-panel.danger { border-color: #cc6262; background: #fbdcdc; }
-.validation-head { display: flex; gap: 11px; align-items: flex-start; }
-.validation-icon { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; flex: none; background: #c5e8d6; color: #176f4c; }
-.warning .validation-icon { background: #ffdc86; color: #85570e; }
-.pending .validation-icon { background: #d1d9dd; color: #53656f; }
-.danger .validation-icon { background: #efb7b7; color: #983333; }
-.validation-head b { font-size: 15px; color: #204d61; }
-.validation-head p { margin: 4px 0 0; font-size: 13px; line-height: 1.6; color: #4b6e7f; }
-.validation-facts { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 9px; margin-top: 13px; }
-.validation-facts > div { min-width: 0; padding: 10px 11px; border-radius: 9px; background: rgba(255,255,255,.8); border: 1px solid rgba(126,159,174,.68); }
-.validation-facts span { display: block; font-size: 11px; color: #64808e; margin-bottom: 4px; }
-.validation-facts b { display: block; font-size: 13px; color: #29576c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.issue-list { display: grid; gap: 9px; margin-top: 11px; }
-.issue-row { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 10px; align-items: flex-start; padding: 11px; border-radius: 9px; background: #fff; border: 1px solid #c8d8df; }
-.issue-row.issue-error { border-color: #cf6c6c; background: #fff1f1; }
-.issue-row.issue-warning { border-color: #ce9d38; background: #fff7dd; }
-.issue-badge { border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 800; background: #dce5e9; color: #506a76; }
-.issue-error .issue-badge { background: #f1bcbc; color: #8c3030; }
-.issue-warning .issue-badge { background: #ffdc8c; color: #78500c; }
-.issue-row b { font-size: 13px; line-height: 1.55; color: #315767; }
-.issue-row p { margin: 4px 0 0; font-size: 12px; line-height: 1.55; color: #607c89; }
-.validation-empty { margin-top: 11px; display: flex; gap: 7px; align-items: center; color: #246b50; font-size: 13px; font-weight: 650; }
-.validation-empty.pending { color: #62563d; }
-@media(max-width:980px){.validation-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.validation-panel { margin-top: 8px; padding: 12px 14px; border: 1px solid #e0e9ee; border-radius: 10px; background: #fafcfd; }
+.validation-panel.success { border-color: #d7e8de; background: #fafdfb; }
+.validation-panel.warning { border-color: #ecdfbb; background: #fffdf7; }
+.validation-panel.danger { border-color: #edcbcb; background: #fffafa; }
+.validation-head { display:flex; align-items:flex-start; gap:10px; }
+.validation-icon { display:grid; place-items:center; width:24px; height:24px; flex:none; color:#3d8967; }
+.warning .validation-icon { color:#ab833a; }
+.pending .validation-icon { color:#6c7e89; }
+.danger .validation-icon { color:#b75c5c; }
+.validation-head b { color:#38596b; font-size:12px; }
+.validation-head p { margin:3px 0 0; font-size:11px; line-height:1.55; color:#708796; }
+.validation-facts { display:flex; flex-wrap:wrap; gap:7px 15px; margin-top:10px; }
+.validation-facts>div { display:flex; align-items:center; gap:5px; }
+.validation-facts span { color:#8599a4; font-size:10px; }
+.validation-facts b { color:#4b697a; font-size:11px; font-weight:650; }
+.issue-list { display:grid; gap:8px; margin-top:11px; }
+.issue-row { display:flex; gap:9px; padding:10px 11px; border:1px solid #e1ebf0; border-radius:8px; background:#fff; }
+.issue-row.issue-error { border-color:#e8c7c7; }
+.issue-row.issue-warning { border-color:#ebdfc8; }
+.issue-badge { align-self:flex-start; white-space:nowrap; font-size:10px; color:#718795; }
+.issue-error .issue-badge { color:#a75151; }
+.issue-warning .issue-badge { color:#987333; }
+.issue-row b { font-size:12px; color:#456376; font-weight:650; }
+.issue-row p { margin:3px 0 0; font-size:11px; color:#738b98; }
+.validation-empty { display:flex; align-items:center; gap:7px; margin-top:9px; color:#388363; font-size:11px; }
+.validation-empty.pending { color:#8a7139; }
 </style>

@@ -21,7 +21,8 @@ def test_gateway_health_disables_environment_proxies(monkeypatch):
         async def __aexit__(self, exc_type, exc, tb):
             return False
 
-        async def get(self, url):
+        async def get(self, url, **kwargs):
+            assert kwargs['params'] == {'modelMode': 'deepseek', 'taskTier': 'standard'}
             request = httpx.Request("GET", url)
             return httpx.Response(200, request=request, json={"ready": True})
 

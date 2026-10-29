@@ -68,6 +68,38 @@ The current validator improves CTE/alias handling but is not yet a complete MaxC
 - dsh telemetry, session upload and web tools remain disabled in the current DataAgent profile;
 - the Guard plugin is defense in depth, not the sole security boundary.
 
+## Windows one-command launcher and npm repair
+
+Use `start.bat` from the DataControl repository root. It checks installed
+Portal, frontend, and Agent dependencies and only runs missing setup; daily
+starts skip reinstallation. It also recognizes:
+
+```bat
+start.bat           REM automatically set up if needed, then start
+start.bat setup     REM setup only (do not start services)
+start.bat repair    REM repair Agent npm dependencies and start
+start.bat stop      REM stop stale DataControl services
+```
+
+Store `DEEPSEEK_API_KEY=your_key_here` in the git-ignored local `.env`
+file (or provide the key via environment variables) for real-model queries.
+Never commit your key. Keep `.env` private.
+
+Windows `TAR_ENTRY_ERROR`, `ENOENT`, and `.DELETE.*` during dsh npm
+installation indicate a failed/locked dependency tree. Stop overlapping npm
+processes and run `start.bat repair`. Repair only removes
+`agent/dsh/node_modules`, not your Python environment, sample database,
+old dsh sessions, or tracked source code. Installation logs are kept at
+`.local/npm-dsh.stderr.log` and `.local/npm-dsh.stdout.log`.
+Dependency install scripts are permitted by pinned `allowScripts` entries for the five
+reviewed transitive packages required by dsh 0.2.1-rc.3; unreviewed scripts
+remain blocked on npm versions that enforce approval. Never run broad
+`approve --all` or disable lifecycle script protection. The installer now
+captures a reliable Windows child-process exit code and includes both stdout
+and stderr when installation fails.
+The setup lock prevents parallel installer runs, and npm has an explicit
+timeout rather than silently blocking forever.
+
 ## Development quick start
 The normal setup uses one Python environment for Portal and Agent. Use Python 3.13 or 3.14.
 
@@ -85,11 +117,26 @@ To stop stale DataControl listeners safely:
 ```
 
 ### macOS / Linux
+
+Recommended one-command launcher (first start installs missing dependencies, later
+starts reuse them):
+
 ```bash
-bash scripts/setup-dev.sh
-export DEEPSEEK_API_KEY="sk-..."    # required only for real Agent queries
-bash scripts/start-dev.sh
+bash start.sh          # setup if needed, then start Portal + Agent + Vue
+bash start.sh setup    # setup only; no services started
+bash start.sh repair   # repair Agent, then start
+bash start.sh stop     # stop stale DataControl backend services
 ```
+
+Requires Node.js 24+ and Python 3.13/3.14. On macOS, Homebrew users can install
+`python@3.14` and `node@24`. The start script can read
+`DEEPSEEK_API_KEY=...` from the private, git-ignored `.env`, without sourcing
+the file as shell commands. It also refreshes outdated Harness standard/multi
+profiles and applies Alembic schema upgrades without reseeding local data.
+
+For a full manual Mac checklist, see
+[docs/mac-manual-acceptance.md](docs/mac-manual-acceptance.md).
+
 
 To stop stale DataControl listeners safely:
 

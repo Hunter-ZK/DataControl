@@ -170,7 +170,25 @@ export interface SemanticMetric {
   researchPolicy: 'internal_only'
 }
 
+export type AgentModelMode = 'deepseek' | 'free-test'
+
+export interface ServerAgentConversation {
+  id: string
+  serverId?: string | null
+  title: string
+  sessionId: string | null
+  modelMode: AgentModelMode
+  taskTier?: 'standard' | 'multi'
+  pinned: boolean
+  createdAt: number
+  updatedAt: number
+  messages: Array<Record<string, unknown>>
+  contextAsset?: Record<string, unknown> | null
+  lastRunStatus?: string | null
+}
+
 export interface AgentStatus {
+  modelMode?: AgentModelMode
   ready: boolean
   mode: string
   source: string
@@ -186,6 +204,79 @@ export interface AgentStatus {
   reason?: string | null
   sqlExecutionEnabled: boolean
   hiddenReasoningExposed: boolean
+}
+
+export type AgentStreamEvent =
+  | { type: 'started'; runId: string }
+  | { type: 'activity'; event: AgentActivity }
+  | { type: 'result'; result: AgentResult }
+  | { type: 'cancelled' }
+  | { type: 'error'; message: string }
+
+export class AgentTurnCancelledError extends Error {
+  constructor() {
+    super('Agent run cancelled')
+    this.name = 'AgentTurnCancelledError'
+  }
+}
+
+/** Fetch the actual newline-delimited Agent stream; no simulated progress. */
+export async function streamAgentTurn(
+  question: string,
+  _sessionId: string | null,
+  runId: string,
+  onEvent: (event: AgentStreamEvent) => void,
+  signal: AbortSignal,
+  modelMode: AgentModelMode = 'deepseek',
+  conversationId: string | null = null,
+  displayQuestion: string | null = null,
+  taskTier: 'standard' | 'multi' = 'standard',
+  publicGatewayConsent = false,
+): Promise<AgentResult> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const token = localStorage.getItem('datacontrol_token')
+  if (token) headers.Authorization = `Bearer ${token}`
+  const response = await fetch('/api/v1/agent/query/stream', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      question, runId, modelMode,
+      conversationId: conversationId || undefined,
+      displayQuestion: displayQuestion || undefined, taskTier,
+      publicGatewayConsent,
+    }),
+    signal,
+  })
+  if (!response.ok) throw new Error(`Agent streaming request failed (HTTP ${response.status})`)
+  if (!response.body) throw new Error('Agent stream is unavailable in this browser')
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let pending = ''
+  let result: AgentResult | null = null
+  const parseLine = (line: string) => {
+    if (!line.trim()) return
+    const event = JSON.parse(line) as AgentStreamEvent
+    if (event.type === 'error') throw new Error(event.message)
+    if (event.type === 'cancelled') throw new AgentTurnCancelledError()
+    if (event.type === 'result') result = event.result
+    onEvent(event)
+  }
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      pending += decoder.decode(value, { stream: true })
+      const lines = pending.split('\n')
+      pending = lines.pop() || ''
+      for (const line of lines) parseLine(line)
+    }
+    pending += decoder.decode()
+    if (pending.trim()) parseLine(pending)
+    if (!result) throw new Error('Agent stream ended without a final result')
+    return result
+  } finally {
+    reader.releaseLock()
+  }
 }
 
 export interface AgentActivity {
@@ -213,6 +304,7 @@ export interface AgentDatasetEvidence {
 }
 
 export interface AgentEvidence {
+  assets?: Array<{ assetId: string; assetType: string; title: string; technicalName?: string; sourceCallId?: string }>
   metrics?: AgentMetricEvidence[]
   datasets?: AgentDatasetEvidence[]
   dimensions?: string[]
@@ -264,6 +356,8 @@ export interface AgentValidation {
 }
 
 export interface AgentResult {
+  durationMs?: number
+  toolCallCount?: number
   sessionId?: string | null
   answer: string
   summary?: string | null
@@ -291,6 +385,12 @@ export const assetApi = {
   tablePage: (params?: Record<string, unknown>) => get<DatasetPage>('/tables/page', { params }),
   table: (id: string) => get<Record<string, any>>(`/tables/${id}`),
   columns: (params?: Record<string, unknown>) => get<unknown[]>('/columns', { params }),
+  completeColumns: (id: string) => get<{ assetId: string; total: number; complete: boolean; items: import('@/utils/assetExport').ExportColumn[] }>(
+    `/tables/${encodeURIComponent(id)}/columns/complete`),
+  references: (kind: string, id: string, limit = 100) => get<{
+    assetId: string; total?: number; status: string;
+    references: Array<{ assetId: string; assetType: string; title: string; technicalName?: string }>
+  }>('/agent-assets/references', { params: { asset_type: kind, asset_id: id, limit } }),
   search: (q: string, params?: Record<string, unknown>) =>
     get<SearchResponse>('/search', { params: { q, ...params } }),
   suggest: (q: string, limit = 8) =>
@@ -319,10 +419,61 @@ export const relationApi = {
     get<any>('/relations/path', { params: { source, target, max_depth: maxDepth } }),
 }
 
+export const namingApi = {
+  importFile: async (file: File): Promise<{headers:string[];items:Array<Record<string,string>>;count:number}> => {
+    const form=new FormData();form.append('file',file)
+    const token=localStorage.getItem('datacontrol_token')
+    const response=await fetch('/api/v1/workbench/naming/import',{
+      method:'POST',headers:token?{Authorization:'Bearer '+token}:{},body:form,
+    })
+    if(!response.ok)throw Error('import failed: HTTP '+response.status)
+    return (await response.json()).data
+  },
+  suggest: (names: string[], maxLength: number) => post<{items:import('@/utils/namingReview').NamingSuggestion[];engine:string;notice:string}>(
+    '/workbench/naming/suggest',{names,maxLength}),
+  listRuns: () => get<Array<{id:string;title:string;count:number;createdAt:string}>>('/workbench/naming/runs'),
+  saveRun: (title:string,payload:Record<string,unknown>) => post<{id:string;title:string;count:number}>('/workbench/naming/runs',{title,payload}),
+  deleteRun: (id:string) => remove('/workbench/naming/runs/'+encodeURIComponent(id)),
+  savedExcel: async (id:string):Promise<Blob> => {
+    const token=localStorage.getItem('datacontrol_token')
+    const response=await fetch('/api/v1/workbench/naming/runs/'+encodeURIComponent(id)+'/download',{
+      headers:token?{Authorization:'Bearer '+token}:{},
+    })
+    if(!response.ok)throw Error('download failed')
+    return response.blob()
+  },
+  exportExcel: async (payload: Record<string,unknown>): Promise<Blob> => {
+    const token=localStorage.getItem('datacontrol_token')
+    const response=await fetch('/api/v1/workbench/naming/export',{
+      method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},
+      body:JSON.stringify(payload),
+    })
+    if(!response.ok)throw Error('export failed: HTTP '+response.status)
+    return response.blob()
+  },
+}
+
 export const agentApi = {
-  status: () => get<AgentStatus>('/agent/status'),
-  query: (question: string, sessionId?: string | null) =>
-    post<AgentResult>('/agent/query', { question, sessionId: sessionId || undefined }),
+  conversations: () => get<ServerAgentConversation[]>('/agent/conversations'),
+  createConversation: (title: string, modelMode: AgentModelMode,
+    contextAsset?: Record<string, unknown> | null, taskTier: 'standard' | 'multi' = 'standard') =>
+    post<ServerAgentConversation>('/agent/conversations', { title, modelMode, contextAsset, taskTier }),
+  importConversations: (conversations: Array<Record<string, unknown>>) =>
+    post<ServerAgentConversation[]>('/agent/conversations/import', { conversations }),
+  editConversation: (id: string, data: { title?: string; pinned?: boolean }) =>
+    http.patch<{ code: string; data: ServerAgentConversation }>(`/agent/conversations/${id}`, data).then(r => r.data.data),
+  deleteConversation: (id: string) => remove<{ deleted: boolean }>(`/agent/conversations/${id}`),
+  runStatus: (runId: string) => get<{ status: string; runId: string; modelMode: AgentModelMode }>(`/agent/runs/${runId}`),
+  status: (modelMode: AgentModelMode = 'deepseek',
+    taskTier: 'standard' | 'multi' = 'standard') =>
+    get<AgentStatus>('/agent/status', { params: { modelMode, taskTier } }),
+  query: (question: string, sessionId?: string | null, modelMode: AgentModelMode = 'deepseek') =>
+    post<AgentResult>('/agent/query', {
+      question, sessionId: sessionId || undefined, modelMode,
+      publicGatewayConsent: modelMode === 'free-test',
+    }),
+  stream: streamAgentTurn,
+  cancel: (runId: string) => post<{ cancelled: boolean }>(`/agent/query/${runId}/cancel`),
 }
 
 export const authApi = {
@@ -332,6 +483,8 @@ export const authApi = {
 
 export const activityApi = {
   favorites: () => get<any[]>('/activity/favorites'),
+  addFavorite: (assetType: string, assetId: string) => post('/activity/favorites', {assetType, assetId}),
+  removeFavorite: (assetType: string, assetId: string) => remove('/activity/favorites/' + encodeURIComponent(assetType) + '/' + encodeURIComponent(assetId)),
   recent: () => get<any[]>('/activity/recent-views'),
   history: () => get<any[]>('/activity/search-history'),
   recordSearch: (keyword: string) => post('/activity/search-history', { keyword }),

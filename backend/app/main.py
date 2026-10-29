@@ -1,30 +1,44 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.activity import router as activity_router
 from backend.app.api.agent import router as agent_router
+from backend.app.api.agent_history import router as agent_history_router
+from backend.app.api.agent_assets import router as agent_assets_router
 from backend.app.api.assets import router as assets_router
 from backend.app.api.auth import router as auth_router
 from backend.app.api.details import router as details_router
+from backend.app.api.naming_workbench import router as naming_router
 from backend.app.api.reference import router as reference_router
 from backend.app.api.relations import router as relations_router
 from backend.app.api.search import router as search_router
 from backend.app.api.semantic import router as semantic_router
 from backend.app.core.config import MODEL_NAME, MODEL_PROVIDER, ROOT
-from backend.app.db.application_models import AuditLog, SearchHistory  # noqa: F401
+from backend.app.db.application_models import AuditLog, SearchHistory, AgentConversation, AgentTurn, AgentToolEvent, NamingRun  # noqa: F401
 
 P3_RUNTIME_CONTRACT = "embedded-agent-gateway-v1"
 
-app = FastAPI(title="DataControl API", version="0.5.0-p2")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from backend.app.agent.history import reconcile_startup
+    reconcile_startup()
+    yield
+
+
+app = FastAPI(title="DataControl API", version="0.5.0-p2", lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(assets_router)
 app.include_router(details_router)
+app.include_router(naming_router)
 app.include_router(reference_router)
 app.include_router(search_router)
 app.include_router(relations_router)
 app.include_router(semantic_router)
 app.include_router(agent_router)
+app.include_router(agent_history_router)
+app.include_router(agent_assets_router)
 app.include_router(activity_router)
 
 

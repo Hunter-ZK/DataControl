@@ -14,3 +14,9 @@ dist/
 .local/*.log
 .local/p3-agent-acceptance.json
 .DS_Store
+
+# Local bootstrap markers, locks and installation diagnostics
+.local/*.ready
+.local/*-setup-ready.txt
+.local/agent-setup.lock
+.local/npm-*.log

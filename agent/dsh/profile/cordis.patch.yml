@@ -40,11 +40,16 @@
         sandbox: workspace-write
         approval: ask
         name: 数据工程师
-- id: agent-presets
+# dsh 0.2.1 replaces filesystem-loaded agent-presets with declarative
+# agent-preset-registry. The built-in standard preset is used in the optional
+# Harness Web debugger; the DataControl Portal uses dataagent-headless.
+- id: agent-preset-registry
   config:
-    default: dataagent-query
-    roots:
-      - path: ./agent/dsh/presets
-        trust: system
-    includeShippedRoot: false
-    includeUserRoot: false
+    default: standard
+
+# Load the built, local Guard as a module without dsh plugin add / pnpm.
+# The project checkout may contain non-ASCII characters on Windows.
+- insert:
+    - id: agent3-guard
+      name: !!js process.cwd() + '/agent/guard-plugin/dist/index.js'
+      config: {}

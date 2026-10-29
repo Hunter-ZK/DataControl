@@ -272,6 +272,11 @@ def main() -> None:
         wait_http(services[3], "http://127.0.0.1:8910/health", timeout=45.0)
 
         with httpx.Client(timeout=120.0, trust_env=False) as client:
+            login = unwrap(client.post(
+                "http://127.0.0.1:8000/api/v1/auth/login",
+                json={"username": "demo", "password": "DataControl123!"},
+            ))
+            client.headers["Authorization"] = f"Bearer {login['accessToken']}"
             status = unwrap(client.get("http://127.0.0.1:8000/api/v1/agent/status"))
             if status.get("ready") is not True:
                 raise AssertionError(f"DataAgent gateway is not ready: {status}")

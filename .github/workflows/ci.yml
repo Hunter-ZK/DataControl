@@ -33,6 +33,25 @@ jobs:
       - run: python -m pytest -q
       - run: python scripts/search_benchmark.py
 
+  browser-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '24'}
+      - working-directory: web
+        run: npm install --no-audit --no-fund
+      - working-directory: web
+        run: npx playwright install --with-deps chromium
+      - working-directory: web
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: datacontrol-browser-screenshots
+          path: web/test-results/
+          retention-days: 7
+
   agent-cross-platform:
     strategy:
       fail-fast: false
@@ -53,6 +72,11 @@ jobs:
       - run: python -c "import agent3, dataagent_gateway, cryptography; major=int(cryptography.__version__.split('.')[0]); assert major == 48, cryptography.__version__; print('Agent runtime OK; cryptography=' + cryptography.__version__)"
       - run: python agent/scripts/check_architecture.py
       - run: python -m pytest -q agent/tests
+      - name: Exercise npm 12 install-script approvals on Windows
+        if: runner.os == 'Windows'
+        run: |
+          npm install -g npm@12.2.1 --no-audit --no-fund
+          npm --version
       - name: Install pinned dsh
         working-directory: agent/dsh
         run: npm install --no-audit --no-fund
@@ -62,10 +86,75 @@ jobs:
       - name: Build and test guard plugin
         working-directory: agent/guard-plugin
         run: npm install --no-audit --no-fund && npm run build && npm test
-      - name: Bootstrap DataAgent profiles (Windows)
+      - name: Validate Windows one-command launcher
         if: runner.os == 'Windows'
         shell: pwsh
-        run: .\agent\scripts\setup_dataagent.ps1 -DshHome (Join-Path $env:RUNNER_TEMP 'datacontrol-dsh-home')
+        run: |
+          $scripts = @('scripts/dev.ps1', 'scripts/agent-profile-state.ps1', 'scripts/start-dev.ps1', 'scripts/setup-free-model-test.ps1', 'scripts/start-free-test.ps1', 'scripts/setup-agent.ps1', 'scripts/setup-dev.ps1', 'scripts/run-npm-install.ps1', 'agent/scripts/setup_dataagent.ps1')
+          foreach ($script in $scripts) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $script).Path, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) { throw "$script has syntax errors: $($errors | Out-String)" }
+          }
+          # Prove native exit codes are preserved, including nonzero failures.
+          & .\scripts\run-npm-install.ps1 -Name smoke-success -WorkingDirectory agent/dsh -LogDirectory $env:RUNNER_TEMP -CommandLine "echo successful" -TimeoutSeconds 20
+          $failedAsExpected = $false
+          try {
+            & .\scripts\run-npm-install.ps1 -Name smoke-failure -WorkingDirectory agent/dsh -LogDirectory $env:RUNNER_TEMP -CommandLine "echo intentional_failure & exit /b 17" -TimeoutSeconds 20
+          } catch {
+            if ($_.Exception.Message -match 'exit code 17') { $failedAsExpected = $true }
+            else { throw }
+          }
+          if (-not $failedAsExpected) { throw "Windows npm wrapper did not propagate the nonzero exit code." }
+          cmd.exe /d /c start.bat stop
+          if ($LASTEXITCODE -ne 0) { throw "Windows launcher's stop command failed" }
+      - name: Exercise actual Agent profile readiness guard in Windows PowerShell 5.1
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          . ./scripts/agent-profile-state.ps1
+          $fixtureRoot = Join-Path $env:RUNNER_TEMP '学习 Agent readiness'
+          $headlessSource = Join-Path $fixtureRoot 'agent/dsh/profile/headless.patch.yml'
+          $multiSource = Join-Path $fixtureRoot 'agent/dsh/profile/headless-multi.patch.yml'
+          $webSource = Join-Path $fixtureRoot 'agent/dsh/profile/cordis.patch.yml'
+          $headlessProfile = Join-Path $fixtureRoot '.local/dsh-home-v0.2.1-rc.3/profiles/dataagent-headless'
+          $multiProfile = Join-Path $fixtureRoot '.local/dsh-home-v0.2.1-rc.3/profiles/dataagent-headless-multi'
+          $webProfile = Join-Path $fixtureRoot '.local/dsh-home-v0.2.1-rc.3/profiles/dataagent'
+          foreach ($path in @((Split-Path $headlessSource), (Split-Path $webSource), $headlessProfile, $multiProfile, $webProfile)) {
+            New-Item -ItemType Directory -Force -Path $path | Out-Null
+          }
+          Copy-Item -LiteralPath 'agent/dsh/profile/headless.patch.yml' -Destination $headlessSource
+          Copy-Item -LiteralPath 'agent/dsh/profile/headless-multi.patch.yml' -Destination $multiSource
+          Copy-Item -LiteralPath 'agent/dsh/profile/cordis.patch.yml' -Destination $webSource
+          Copy-Item -LiteralPath $headlessSource -Destination (Join-Path $headlessProfile 'cordis.patch.yml')
+          Copy-Item -LiteralPath $multiSource -Destination (Join-Path $multiProfile 'cordis.patch.yml')
+          Copy-Item -LiteralPath $webSource -Destination (Join-Path $webProfile 'cordis.patch.yml')
+          '{}' | Set-Content -LiteralPath (Join-Path $headlessProfile 'package.json') -Encoding UTF8
+          '{}' | Set-Content -LiteralPath (Join-Path $multiProfile 'package.json') -Encoding UTF8
+          '{}' | Set-Content -LiteralPath (Join-Path $webProfile 'package.json') -Encoding UTF8
+          $originalHome = $HOME
+          if (-not (Test-DataAgentProfilesCurrent -RepoRoot $fixtureRoot)) { throw 'Current profiles were not recognized' }
+          if ($HOME -ne $originalHome) { throw 'PowerShell HOME was modified' }
+          'obsolete plugin' | Add-Content -LiteralPath (Join-Path $headlessProfile 'cordis.patch.yml') -Encoding UTF8
+          if (Test-DataAgentProfilesCurrent -RepoRoot $fixtureRoot) { throw 'Stale profile was not rejected' }
+          Copy-Item -LiteralPath $headlessSource -Destination (Join-Path $headlessProfile 'cordis.patch.yml') -Force
+          Remove-Item -LiteralPath (Join-Path $webProfile 'package.json')
+          if (Test-DataAgentProfilesCurrent -RepoRoot $fixtureRoot) { throw 'Incomplete profile was not rejected' }
+          Write-Host 'Agent profile readiness guard passed (valid/stale/incomplete, Unicode path, Windows PowerShell 5.1).'
+      - name: Bootstrap DataAgent profiles from a Unicode Windows path (PowerShell 5.1)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $unicodeRepo = Join-Path $env:RUNNER_TEMP '学习 DataControl'
+          New-Item -ItemType Junction -Path $unicodeRepo -Target $env:GITHUB_WORKSPACE | Out-Null
+          $unicodeHome = Join-Path $env:RUNNER_TEMP '元数据 模拟测试'
+          & (Join-Path $unicodeRepo 'agent\scripts\setup_dataagent.ps1') -DshHome $unicodeHome
+          if ($LASTEXITCODE -ne 0) { throw "Unicode-path profile setup failed" }
+          if (-not (Test-Path (Join-Path $unicodeHome 'profiles\dataagent-headless\package.json'))) {
+            throw "Unicode-path profile was not initialized"
+          }
       - name: Bootstrap DataAgent profiles (Unix)
         if: runner.os != 'Windows'
         shell: bash

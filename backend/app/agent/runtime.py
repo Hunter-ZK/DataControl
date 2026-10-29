@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,7 @@ class RuntimeStatus:
     gatewayUrl: str
     provider: str
     model: str
+    modelMode: str
     sourceMigrated: bool
     sessionBridgeImplemented: bool
     integrated: bool
@@ -61,17 +63,20 @@ class EmbeddedAgentGateway:
     def _local_acceptance(self) -> dict[str, Any]:
         return self._read_json(self.agent_home.parent / ".local" / "p3-agent-acceptance.json")
 
-    async def _gateway_health(self) -> tuple[bool, dict[str, Any]]:
+    async def _gateway_health(self, model_mode: str = "deepseek",
+                              task_tier: str = "standard") -> tuple[bool, dict[str, Any]]:
         try:
             # 8910 is a loopback process boundary. Ignore developer proxy env here.
             async with httpx.AsyncClient(timeout=1.5, trust_env=False) as client:
-                response = await client.get(f"{self.gateway_url}/health")
+                response = await client.get(f"{self.gateway_url}/health",
+                                            params={"modelMode": model_mode, "taskTier": task_tier})
                 payload = response.json() if response.content else {}
                 return response.is_success, payload if isinstance(payload, dict) else {}
         except (httpx.HTTPError, ValueError):
             return False, {}
 
-    async def status(self) -> RuntimeStatus:
+    async def status(self, model_mode: str = "deepseek",
+                     task_tier: str = "standard") -> RuntimeStatus:
         manifest = self._manifest()
         acceptance = self._local_acceptance()
         source_migrated = bool(manifest.get("sourceMigrated"))
@@ -85,7 +90,10 @@ class EmbeddedAgentGateway:
             and acceptance.get("hiddenReasoningExposed") is False
             and acceptance.get("destructiveRequestExecuted") is False
         )
-        real_model_accepted = bool(manifest.get("realModelAccepted")) or local_accepted
+        # Free public-provider trials must never count as official DeepSeek acceptance.
+        real_model_accepted = (
+            bool(manifest.get("realModelAccepted")) or local_accepted
+        ) if model_mode == "deepseek" else False
         integrated = bool(manifest.get("integrated")) or real_model_accepted
         next_gate = None if real_model_accepted else (
             str(manifest.get("nextGate")) if manifest.get("nextGate") else None
@@ -101,7 +109,7 @@ class EmbeddedAgentGateway:
         elif not bridge_implemented:
             reason = "embedded DataAgent headless session bridge is not implemented"
         else:
-            reachable, gateway_health = await self._gateway_health()
+            reachable, gateway_health = await self._gateway_health(model_mode, task_tier)
             if not reachable:
                 reason = f"embedded agent gateway is not reachable at {self.gateway_url}"
             elif not gateway_health.get("ready"):
@@ -113,8 +121,13 @@ class EmbeddedAgentGateway:
             mode="embedded-monorepo",
             source="DataControl/agent",
             gatewayUrl=self.gateway_url,
-            provider=MODEL_PROVIDER,
-            model=MODEL_NAME,
+            provider=str(gateway_health.get("provider") or (
+                "our-free-model" if model_mode == "free-test" else MODEL_PROVIDER
+            )),
+            model=str(gateway_health.get("model") or (
+                "kilo-auto/free" if model_mode == "free-test" else MODEL_NAME
+            )),
+            modelMode=model_mode,
             sourceMigrated=source_migrated,
             sessionBridgeImplemented=bridge_implemented,
             integrated=integrated,
@@ -124,11 +137,18 @@ class EmbeddedAgentGateway:
             reason=reason,
         )
 
-    async def run(self, prompt: str, *, session_id: str | None = None) -> dict[str, Any]:
-        status = await self.status()
+    async def run(
+        self, prompt: str, *, session_id: str | None = None,
+        model_mode: str = "deepseek", public_gateway_consent: bool = False,
+        task_tier: str = "standard",
+    ) -> dict[str, Any]:
+        status = await self.status(model_mode, task_tier)
         if not status.ready:
             raise AgentRuntimeError(status.reason or "embedded Agent runtime is not ready")
-        body: dict[str, Any] = {"question": prompt}
+        body: dict[str, Any] = {
+            "question": prompt, "modelMode": model_mode, "taskTier": task_tier,
+            "publicGatewayConsent": public_gateway_consent,
+        }
         if session_id:
             body["sessionId"] = session_id
         try:
@@ -155,3 +175,36 @@ class EmbeddedAgentGateway:
         payload.setdefault("sqlExecuted", False)
         payload.setdefault("hiddenReasoningExposed", False)
         return payload
+
+    async def stream(
+        self, prompt: str, *, run_id: str, session_id: str | None = None,
+        model_mode: str = "deepseek", public_gateway_consent: bool = False,
+        task_tier: str = "standard",
+    ) -> AsyncIterator[bytes]:
+        status = await self.status(model_mode, task_tier)
+        if not status.ready:
+            raise AgentRuntimeError(status.reason or "embedded Agent runtime is not ready")
+        body: dict[str, Any] = {
+            "question": prompt, "runId": run_id, "modelMode": model_mode,
+            "taskTier": task_tier, "publicGatewayConsent": public_gateway_consent,
+        }
+        if session_id:
+            body["sessionId"] = session_id
+        try:
+            async with httpx.AsyncClient(timeout=None, trust_env=False) as client:
+                async with client.stream("POST", f"{self.gateway_url}/v1/query/stream", json=body) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if line:
+                            yield (line + "\n").encode("utf-8")
+        except httpx.HTTPError as exc:
+            raise AgentRuntimeError("Agent event stream disconnected") from exc
+
+    async def cancel(self, run_id: str) -> bool:
+        try:
+            async with httpx.AsyncClient(timeout=5.0, trust_env=False) as client:
+                response = await client.post(f"{self.gateway_url}/v1/query/{run_id}/cancel")
+                response.raise_for_status()
+                return bool(response.json().get("cancelled"))
+        except (httpx.HTTPError, ValueError):
+            return False

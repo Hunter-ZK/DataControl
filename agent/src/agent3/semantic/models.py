@@ -60,7 +60,7 @@ class MetricDefinition:
     denominator_metric_id: str = ""
     formula: str = ""
     time_grain: str = ""
-    latest_strategy: str = "MAX"
+    latest_strategy: str = "PARAMETER"
 
 
 @dataclass(frozen=True, slots=True)

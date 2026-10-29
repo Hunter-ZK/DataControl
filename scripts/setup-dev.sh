@@ -9,7 +9,7 @@ command -v npm >/dev/null 2>&1 || { echo "Node.js 24+ / npm is required." >&2; e
 
 find_python() {
   local candidate resolved
-  for candidate in "${PYTHON_BIN:-}" python3 python; do
+  for candidate in "${PYTHON_BIN:-}" python3.14 python3.13 python3 python; do
     [ -n "$candidate" ] || continue
     resolved="$(command -v "$candidate" 2>/dev/null || true)"
     [ -n "$resolved" ] || continue

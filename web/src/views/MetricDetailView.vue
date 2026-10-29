@@ -10,10 +10,7 @@
           <code class="metric-code">{{ metric.metricCode }}</code>
           <p>{{ metric.definition || metric.caliber || '暂无指标定义。' }}</p>
         </div>
-        <div class="head-actions">
-          <RouterLink :to="`/datasets/${metric.source.assetId}`" class="soft-action"><Database :size="15" />查看来源资产</RouterLink>
-          <button class="primary-action" @click="askMetric"><Sparkles :size="15" />用此指标提问</button>
-        </div>
+        <AssetOperationBar kind="METRIC" :asset="metric"/>
       </section>
 
       <div class="metric-layout">
@@ -38,7 +35,7 @@
             <div class="time-grid">
               <div><span>时间字段</span><code>{{ metric.time.field }}</code></div>
               <div><span>时间粒度</span><b>{{ metric.time.grain || '未登记' }}</b></div>
-              <div><span>最新期策略</span><b>{{ metric.time.latestStrategy }}</b><small>本期 / 当前 / 最新统一按该策略解析</small></div>
+              <div><span>调度时间参数</span><b>${dt}</b><small>SQL 草案使用 DataWorks 参数占位，不计算最新物理分区</small></div>
               <div><span>跨期规则</span><b>{{ additivityLabel(metric.time.additivity) }}</b><small v-if="metric.time.additivity === 'NON_ADDITIVE'">余额/快照类指标禁止跨期直接求和</small></div>
             </div>
           </section>
@@ -79,10 +76,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight, Database, ShieldCheck, Sparkles } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-vue-next'
 import { semanticApi, type SemanticMetric } from '@/api/client'
+import AssetOperationBar from '@/components/AssetOperationBar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -121,13 +119,21 @@ const modelPreview = computed(() => {
 function kindLabel(value: string) { return { BASE: '基础指标', RATIO: '比率指标', DERIVED: '派生指标' }[value] || value }
 function additivityLabel(value: string) { return value === 'NON_ADDITIVE' ? '时间不可加' : '可加' }
 function filterText(filter: Record<string, unknown>) { return `${String(filter.field || '')} ${String(filter.op || '=')} ${String(filter.label || filter.value || '')}`.trim() }
-function askMetric() { if (!metric.value) return; router.push({ name: 'agent', query: { q: `请基于受治理指标“${metric.value.name}”（metric_id=${metric.value.metricCode}）回答我的问题，并严格遵守其时间、维度和必选过滤口径。` } }) }
 
-onMounted(async () => {
-  try { metric.value = await semanticApi.metric(String(route.params.code)) } finally { loading.value = false }
-})
+watch(() => route.params.code, async (value) => {
+  const code = String(value)
+  metric.value = null
+  loading.value = true
+  try {
+    const result = await semanticApi.metric(code)
+    if (String(route.params.code) === code) metric.value = result
+  } finally {
+    if (String(route.params.code) === code) loading.value = false
+  }
+}, { immediate: true })
 </script>
 
 <style scoped>
 .metric-page{background:#eef6fa;min-height:100%}.metric-head{padding:25px 27px;display:flex;justify-content:space-between;align-items:center;gap:22px}.head-tags{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.type-pill{padding:4px 8px;border-radius:999px;background:#dff1f8;color:#176f94;font-size:9px;font-weight:800}.status{font-size:10px;color:#237759}.policy{display:flex;align-items:center;gap:4px;padding:4px 7px;border-radius:999px;background:#e9f5ef;color:#2e725d;font-size:9px}.metric-head h1{font-size:30px;margin:9px 0 5px;color:#153f54}.metric-code{font-size:12px;color:#2b718f}.metric-head p{font-size:12px;line-height:1.65;color:#587484;max-width:760px;margin:8px 0 0}.head-actions{display:flex;gap:8px}.soft-action,.primary-action{display:flex;align-items:center;gap:6px;padding:9px 11px;border-radius:9px;font-size:10px;font-weight:700;white-space:nowrap}.soft-action{background:#edf7fb;color:#236f8f}.primary-action{border:0;background:#177da7;color:#fff;cursor:pointer}.metric-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:15px;margin-top:15px;align-items:start}.metric-main,.metric-side{display:grid;gap:14px}.formula-card,.source-card,.dimension-card,.governance-card,.side-card,.yaml-card{padding:18px}.section-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}.section-head h2{font-size:17px;margin:4px 0 0;color:#214c61}.section-head>span{font-size:9px;color:#738b97}.kind-badge{padding:4px 7px;border-radius:6px;background:#e9f4f8;color:#27718f;font-weight:800}.formula-grid{display:grid;grid-template-columns:2fr repeat(3,1fr);gap:9px}.formula-grid>div{padding:13px;border:1px solid #dbe7ec;border-radius:9px;background:#fbfdfe}.formula-grid span,.time-grid span{display:block;font-size:9px;color:#778e9a;margin-bottom:5px}.formula-main strong{display:block;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;color:#165f80;overflow-wrap:anywhere}.formula-grid b,.formula-grid code{font-size:11px}.formula-grid small{display:block;font-size:8px;color:#78909c;margin-top:5px}.danger{color:#a45d18}.source-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:9px;align-items:center;padding:12px;border:1px solid #d9e7ed;border-radius:9px;background:#f8fcfd;color:#2c566a}.source-row div{min-width:0}.source-row b,.source-row code{display:block}.source-row b{font-size:11px}.source-row code{font-size:9px;color:#708894;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layer-chip{padding:3px 6px;border-radius:5px;background:#e4f2f8;color:#176f94;font-size:8px;font-weight:800}.time-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:10px}.time-grid>div{padding:11px;border:1px solid #e0e9ed;border-radius:8px}.time-grid b,.time-grid code{font-size:10px}.time-grid small{display:block;font-size:8px;color:#7b919c;margin-top:4px;line-height:1.45}.dimension-list{display:grid}.dimension-list article{display:grid;grid-template-columns:minmax(0,1fr) 90px 130px;gap:10px;align-items:center;padding:10px 4px;border-top:1px solid #edf2f4}.dimension-list article:first-child{border-top:0}.dimension-list b,.dimension-list code{display:block}.dimension-list b{font-size:11px}.dimension-list code{font-size:9px;color:#718b98;margin-top:2px}.dimension-list>article>span,.dimension-list a,.dimension-list em{font-size:9px;color:#587989;font-style:normal}.dimension-list a{color:#167397}.filter-list{display:grid;gap:7px}.filter-list article{display:grid;grid-template-columns:80px 1fr;gap:9px;padding:9px 10px;border-radius:8px;background:#f1f8fb}.filter-list span{font-size:9px;color:#6e8794}.filter-list code{font-size:10px;color:#255f79}.empty-inline{font-size:10px;color:#7b909b;padding:8px 0}.caliber,.notes{margin-top:10px;padding:11px 12px;border:1px solid #e0e9ed;border-radius:9px}.caliber b,.notes b{font-size:10px;color:#285f78}.caliber p,.notes p{font-size:10px;line-height:1.6;color:#657f8d;margin:5px 0 0}.side-card h3,.yaml-card h3{font-size:15px;margin:5px 0 11px;color:#214b60}.tag-list{display:flex;flex-wrap:wrap;gap:6px}.tag-list span{padding:5px 7px;border-radius:999px;background:#edf6f9;color:#3c7187;font-size:9px}.tag-list em{font-size:9px;color:#8497a0;font-style:normal}.side-card dl{display:grid;gap:11px;margin:0}.side-card dl div{display:grid;gap:3px}.side-card dt{font-size:8px;color:#81939d}.side-card dd{margin:0;font-size:10px;color:#345d70;line-height:1.5}.yaml-card pre{margin:0;padding:12px;border-radius:8px;background:#122a39;color:#d6edf7;overflow:auto;font-size:9px;line-height:1.6}.dc-back{margin-bottom:12px}@media(max-width:1100px){.metric-layout{grid-template-columns:1fr}.metric-side{grid-template-columns:1fr 1fr}.yaml-card{grid-column:1/-1}.formula-grid{grid-template-columns:1fr 1fr}.time-grid{grid-template-columns:1fr 1fr}}@media(max-width:720px){.metric-head{align-items:flex-start;flex-direction:column}.head-actions{width:100%}.soft-action,.primary-action{flex:1;justify-content:center}.metric-side{grid-template-columns:1fr}.yaml-card{grid-column:auto}.formula-grid,.time-grid{grid-template-columns:1fr}.dimension-list article{grid-template-columns:1fr}.dimension-list article>*{justify-self:start}}
+.metric-head{padding:28px;border-radius:15px;border-color:#cbdff8;box-shadow:var(--dc-shadow-md);background:linear-gradient(120deg,#fff,#f2f7ff)}.metric-head h1{font-size:29px;color:#193d76}.metric-head p{font-size:14px;line-height:1.7;color:#536e91}.metric-code{font-size:13px}.metric-main,.metric-side{gap:17px}.metric-layout{gap:19px}.formula-card,.source-card,.dimension-card,.governance-card,.side-card{border-radius:14px;padding:24px}.section-head h2{font-size:20px;color:#1c3b65}.formula-main{background:linear-gradient(125deg,#eaf3ff,#f9fbff);border-color:#d4e5fa}.formula-main strong{color:#245fc5;font-size:19px}.formula-grid>div{border-radius:10px}.formula-grid span,.time-grid span{font-size:13px}.formula-grid b,.time-grid b{font-size:14px}.time-grid>div{background:#f6faff;border-color:#dce8f8}.dimension-list article{padding:14px 13px;border-color:#e0eafa}.dimension-list b{font-size:14px}.dimension-list code{font-size:13px}.caliber p,.notes p{font-size:14px;color:#5c7796}.side-card h3{font-size:17px}
 </style>

@@ -7,7 +7,7 @@ command -v npm >/dev/null 2>&1 || { echo "Node.js/npm is required for the embedd
 
 find_python() {
   local candidate resolved
-  for candidate in "${PYTHON_BIN:-}" python3 python; do
+  for candidate in "${PYTHON_BIN:-}" python3.14 python3.13 python3 python; do
     [ -n "$candidate" ] || continue
     resolved="$(command -v "$candidate" 2>/dev/null || true)"
     [ -n "$resolved" ] || continue
@@ -49,11 +49,25 @@ echo "Installing wheel-compatible cryptography runtime..."
 "$PYTHON" -m pip install -e './agent[all]'
 
 (cd agent/dsh && npm install --no-audit --no-fund)
-(cd agent/guard-plugin && npm install --no-audit --no-fund && npm run build && npm test)
-DSH_HOME="$ROOT/.local/dsh-home" bash agent/scripts/setup_dataagent.sh
+# Installing or repairing a development runtime must not run its test suite.
+# CI retains the full guard-plugin tests; local setup only needs the built guard.
+(cd agent/guard-plugin && npm install --no-audit --no-fund && npm run build)
+DSH_HOME="$ROOT/.local/dsh-home-v0.2.1-rc.3" bash agent/scripts/setup_dataagent.sh
 
 "$PYTHON" -c 'import agent3, dataagent_gateway, cryptography; print("Agent Python imports OK; cryptography=" + cryptography.__version__)'
 [ -x agent/dsh/node_modules/.bin/dsh ] || { echo "dsh installation did not produce agent/dsh/node_modules/.bin/dsh" >&2; exit 1; }
-[ -f .local/dsh-home/profiles/dataagent-headless/package.json ] || { echo "DataAgent headless profile bootstrap did not complete." >&2; exit 1; }
+for profile in dataagent dataagent-headless dataagent-headless-multi; do
+  [ -f ".local/dsh-home-v0.2.1-rc.3/profiles/$profile/package.json" ] || {
+    echo "DataAgent profile $profile bootstrap did not complete." >&2
+    exit 1
+  }
+done
+
+# The third-party provider is preinstalled for developer convenience, but
+# failure never prevents the official model or the metadata portal from starting.
+# All public-provider requests still require choosing "免费模型测试" in the UI.
+if ! bash "$ROOT/scripts/setup-free-model-test.sh"; then
+  echo "[DataControl] Optional free model install unavailable; official DeepSeek remains usable." >&2
+fi
 
 echo "Embedded DataAgent setup complete (shared .venv + local dsh profile)."

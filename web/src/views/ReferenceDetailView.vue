@@ -3,7 +3,7 @@
     <button class="dc-back" @click="router.back()"><ArrowLeft :size="16"/>返回</button>
     <section v-if="data" class="detail-head dc-card">
       <div><span class="dc-chip">{{config.badge}}</span><h1>{{titleOf(data)}}</h1><code class="dc-tech">{{codeOf(data)}}</code><p>{{descriptionOf(data)}}</p></div>
-      <span class="status">{{data.status||data.version||'VALID'}}</span>
+      <div class="reference-actions"><span class="status">{{data.status||data.version||'VALID'}}</span><AssetOperationBar :kind="kind==='word-roots'?'WORD_ROOT':'STAT_SYSTEM'" :asset="data"/></div>
     </section>
     <div v-if="data" class="detail-grid">
       <section class="dc-card panel">
@@ -22,14 +22,17 @@
       </section>
       <aside class="dc-card panel side"><span class="dc-eyebrow">IDENTITY</span><h3>资产身份</h3><div><span>稳定标识</span><code class="dc-tech">{{data.assetId||'—'}}</code></div><div><span>状态</span><b>{{data.status||'VALID'}}</b></div></aside>
     </div>
-    <div v-else-if="loading" class="dc-empty">正在加载资产详情…</div><div v-else class="dc-empty">未找到该资产。</div>
+    <AssetReferencePanel v-if="data && kind==='stat-systems'" kind="STAT_SYSTEM" :asset-id="data.assetId" title="统计制度下属指标"/>
+    <div v-if="!data && loading" class="dc-empty">正在加载资产详情…</div><div v-if="!data && !loading" class="dc-empty">未找到该资产。</div>
   </div></div>
 </template>
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from 'lucide-vue-next'
 import { assetApi } from '@/api/client'
+import AssetOperationBar from '@/components/AssetOperationBar.vue'
+import AssetReferencePanel from '@/components/AssetReferencePanel.vue'
 const props=defineProps<{kind:string}>();const route=useRoute();const router=useRouter();const data=ref<any|null>(null);const loading=ref(true)
 const configs:any={
   'word-roots':{badge:'WORD ROOT',sectionTitle:'词根定义'},
@@ -41,10 +44,13 @@ function identifier(){return String(route.params.id||route.params.root||route.pa
 function titleOf(r:any){return r.name||r.cnName||r.metricName||r.root||r.code||'未命名资产'}
 function codeOf(r:any){return r.metricCode||r.root||r.code||r.assetId||'—'}
 function descriptionOf(r:any){return r.caliber||r.description||r.definition||r.aliases||'暂无补充说明。'}
-async function load(){loading.value=true;try{const id=identifier();const rows=await assetApi.reference(`/${props.kind}`,id) as any[];data.value=rows.find((x:any)=>codeOf(x)===id)||rows[0]||null}finally{loading.value=false}}
-watch(()=>[props.kind,route.fullPath],load)
-onMounted(load)
+async function load(){const id=identifier();loading.value=true;data.value=null;try{const rows=await assetApi.reference(`/${props.kind}`,id) as any[];if(id===identifier())data.value=rows.find((x:any)=>codeOf(x)===id)||null}finally{if(id===identifier())loading.value=false}}
+watch(()=>[props.kind,route.fullPath],load,{immediate:true})
 </script>
 <style scoped>
 .detail-head{padding:25px 28px;display:flex;justify-content:space-between;align-items:center;gap:20px}.detail-head h1{font-size:28px;margin:10px 0 5px}.detail-head code{font-size:12px}.detail-head p{max-width:760px;color:var(--dc-text-2);font-size:12px;line-height:1.7}.status{padding:6px 10px;border-radius:999px;background:#edf8f3;color:#2f8b6c;font-size:11px;font-weight:700}.detail-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;margin-top:16px}.panel{padding:22px}.panel h2,.panel h3{font-size:18px;margin:6px 0 12px}.panel>p{font-size:12px;line-height:1.75;color:var(--dc-text-2)}.kv-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}.kv-grid>div,.side>div{padding:14px;border:1px solid var(--dc-border);border-radius:10px}.kv-grid span,.side span{display:block;font-size:10px;color:var(--dc-text-3);margin-bottom:5px}.kv-grid a{font-size:12px;color:var(--dc-primary-strong)}.side{display:grid;gap:10px;align-content:start}@media(max-width:800px){.detail-head{align-items:flex-start;flex-direction:column}.detail-grid{grid-template-columns:1fr}.kv-grid{grid-template-columns:1fr}}
+
+.detail-head{background:linear-gradient(115deg,#fff,#f3f8ff);border-color:#cbddf6;box-shadow:var(--dc-shadow-md);padding:28px;border-radius:14px}.detail-head h1{font-size:28px;color:#23446e}.detail-head p{font-size:14px;line-height:1.75}.detail-grid{gap:18px}.panel{padding:24px;border-color:#d4e3f7}.panel h2,.panel h3{font-size:19px;color:#23466f}.kv-grid>div{background:#f8fbff;border-color:#dce7f7}.kv-grid span{font-size:13px}
+
+.head-actions,.reference-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px;min-width:0}.reference-actions .status,.head-actions .status{white-space:nowrap}@media(max-width:760px){.head-actions,.reference-actions{width:100%;justify-content:flex-start}}
 </style>

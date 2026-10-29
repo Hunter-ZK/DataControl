@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -38,8 +38,9 @@ class Dataset(Base):
     schedule_node: Mapped[str | None] = mapped_column(String(128))
     status: Mapped[str] = mapped_column(String(16), default="ONLINE", index=True)
     is_common: Mapped[bool] = mapped_column(Boolean, default=False)
-    storage_bytes: Mapped[int | None] = mapped_column(Integer)
-    row_count: Mapped[int | None] = mapped_column(Integer)
+    # SQLite INTEGER already holds signed 64-bit values. Use BIGINT on other DBs.
+    storage_bytes: Mapped[int | None] = mapped_column(BigInteger().with_variant(Integer, 'sqlite'))
+    row_count: Mapped[int | None] = mapped_column(BigInteger().with_variant(Integer, 'sqlite'))
     data_updated_at: Mapped[datetime | None] = mapped_column(DateTime)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     columns: Mapped[list["Column"]] = relationship(back_populates="dataset", cascade="all, delete-orphan")

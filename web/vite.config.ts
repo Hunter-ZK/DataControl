@@ -13,5 +13,5 @@ export default defineConfig({
       '/health': 'http://127.0.0.1:8000',
     },
   },
-  test: { environment: 'jsdom' },
+  test: { environment: 'jsdom', include: ['src/**/*.{test,spec}.{ts,tsx,js,jsx}'] },
 })

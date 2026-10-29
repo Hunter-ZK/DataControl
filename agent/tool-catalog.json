@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "tools": [
+    "search_tables",
+    "search_assets",
+    "get_asset",
+    "find_references",
+    "get_lineage_summary",
+    "revise_query",
+    "get_schema",
+    "resolve_code_value",
+    "get_semantic_model",
+    "resolve_metric",
+    "plan_metric",
+    "search_verified_sql",
+    "validate_sql",
+    "explain_sql",
+    "compile_query",
+    "check_naming",
+    "generate_ddl",
+    "generate_etl",
+    "generate_dq_checks",
+    "submit_ddl"
+  ]
+}

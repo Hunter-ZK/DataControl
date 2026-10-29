@@ -15,11 +15,12 @@ import ProfileView from '@/views/ProfileView.vue'
 import LoginView from '@/views/LoginView.vue'
 import RelationView from '@/views/RelationView.vue'
 import AgentView from '@/views/AgentView.vue'
+import NamingWorkbenchView from '@/views/NamingWorkbenchView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/login', component: LoginView },
+    { path: '/login', name: 'login', component: LoginView },
     {
       path: '/', component: AppShell, children: [
         { path: '', name: 'home', component: HomeView, meta: { title: '首页' } },
@@ -28,6 +29,7 @@ const router = createRouter({
         { path: 'search', name: 'search', component: SearchView, meta: { title: '资产检索' } },
         { path: 'relations/:id?', name: 'relations', component: RelationView, meta: { title: '关系指引' } },
         { path: 'agent', name: 'agent', component: AgentView, meta: { title: '智能问数' } },
+        { path: 'workbench/naming', name: 'namingWorkbench', component: NamingWorkbenchView, meta: { title: '字段规范化命名' } },
         { path: 'datasets/:id', name: 'dataset', component: DatasetDetailView, meta: { title: '数据集详情' } },
         { path: 'fields/:id', name: 'field', component: FieldDetailView, meta: { title: '字段详情' } },
         { path: 'code-tables', name: 'codeTables', component: ReferenceListView, props: { kind: 'code-tables' }, meta: { title: '标准码值' } },
@@ -36,7 +38,7 @@ const router = createRouter({
         { path: 'standards/:no', name: 'standard', component: DataStandardDetailView, meta: { title: '数据标准详情' } },
         { path: 'word-roots', name: 'wordRoots', component: ReferenceListView, props: { kind: 'word-roots' }, meta: { title: '词根索引' } },
         { path: 'word-roots/:root', name: 'wordRoot', component: ReferenceDetailView, props: { kind: 'word-roots' }, meta: { title: '词根详情' } },
-        { path: 'metrics', name: 'metrics', component: ReferenceListView, props: { kind: 'metrics' }, meta: { title: '指标与制度' } },
+        { path: 'metrics', name: 'metrics', component: ReferenceListView, props: { kind: 'metrics' }, meta: { title: '业务指标' } },
         { path: 'metrics/:code', name: 'metric', component: MetricDetailView, meta: { title: '指标语义详情' } },
         { path: 'stat-systems', name: 'statSystems', component: ReferenceListView, props: { kind: 'stat-systems' }, meta: { title: '统计制度' } },
         { path: 'stat-systems/:code', name: 'statSystem', component: ReferenceDetailView, props: { kind: 'stat-systems' }, meta: { title: '统计制度详情' } },

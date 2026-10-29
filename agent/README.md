@@ -35,3 +35,33 @@ Production SQL execution remains disabled. DuckDB exists only behind the evaluat
 `runtime-manifest.json` records that source migration and the session bridge are implemented. Repository/CI checks can verify the architecture without a model key. The manifest stays `integrated: false` until a user-owned real `DEEPSEEK_API_KEY` completes `scripts/p3_agent_acceptance.py` and product acceptance.
 
 A successful local acceptance writes `.local/p3-agent-acceptance.json`; Portal status treats that local evidence as the real-model gate for the current machine without committing credentials or machine-specific evidence to Git.
+
+## Local developer autonomy and runtime upgrade (2026-10-27)
+
+- Pinned dsh: `@deepseek-ai/dsh@0.2.1-rc.3`. A separate default home at
+  `.local/dsh-home-v0.2.1-rc.3` leaves the previous `.local/dsh-home` intact for rollback.
+- The optional Harness Web debugger now uses the v0.2.1 declarative
+  `agent-preset-registry` and the shipped `standard` preset; the old
+  file-based `dataagent-query` directory is retained only as migration history.
+- The headless profile exposes Goal / Todo / subagents / workflow / Plan Mode
+  integration and compaction. Model-driven multi-step planning works without
+  requiring the interactive Plan Mode approval UI; do not enter interactive
+  plan-review mode from the headless API until a user-question channel exists.
+- The development runtime remains **read-only** with Agent3 MCP as its only
+  business tool surface. Shell, file mutation, public Web, production SQL execution
+  and DDL submission remain unavailable. Auto-planning is not blanket execution permission.
+- On Windows: `./scripts/setup-agent.ps1` then `./scripts/start-dev.ps1`.
+  On macOS/Linux: `bash scripts/setup-agent.sh` then `bash scripts/start-dev.sh`.
+- A real `DEEPSEEK_API_KEY` is needed for actual model acceptance. CI stub
+  coverage cannot certify model behavior; run `python scripts/p3_agent_acceptance.py`
+  locally with a running 8000/8900/8910 stack.
+- Rollback: select the previous branch and rerun setup; the old pinned package
+  and old DSH home remain separate. Never run a test on irreplaceable sessions.
+
+
+## Optional public-model test lane
+
+Windows users may opt in to `Ebony-Vinyl/dsh-our-free-model@v2.7.2` via
+`scripts/setup-free-model-test.ps1` and `scripts/start-free-test.ps1`.
+It runs in an independent read-only profile, not the official default.
+See `docs/free-model-local-test.md`; never send non-synthetic metadata to public providers.

@@ -1,10 +1,38 @@
 import { computed, ref } from 'vue'
 import type { AgentConversation, AgentMessage, ContextAsset, ConversationGroup } from '@/components/agent/types'
+import type { AgentModelMode } from '@/api/client'
 
 const STORAGE_KEY = 'datacontrol_agent_conversations_v1'
 const ACTIVE_KEY = 'datacontrol_agent_active_conversation_v1'
+const LEGACY_REVIEW_KEY = 'datacontrol_agent_legacy_review_v1'
 const MAX_CONVERSATIONS = 40
 const MAX_MESSAGES_PER_CONVERSATION = 80
+
+// Local browser history is an optional cache; the server remains the source of
+// truth. Never show one account's cached conversations under another login.
+function accountId(): string | null {
+  try {
+    const account = JSON.parse(localStorage.getItem('datacontrol_user') || '{}') as { id?: unknown }
+    const id = account.id
+    if (typeof id === 'number' && Number.isSafeInteger(id) && id > 0) return String(id)
+    if (typeof id === 'string' && /^[1-9][0-9]{0,15}$/.test(id)) return id
+  } catch { /* missing or invalid login cache */ }
+  return null
+}
+
+function scopedKey(base: string): string | null {
+  const id = accountId()
+  return id ? `${base}_user_${id}` : null
+}
+
+function legacyUnscoped(): AgentConversation[] {
+  try {
+    const rows: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+    return Array.isArray(rows)
+      ? rows.map(normalizeConversation).filter((item): item is AgentConversation => item !== null)
+      : []
+  } catch { return [] }
+}
 
 function newConversationId() {
   return `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -22,8 +50,15 @@ function normalizeConversation(value: unknown): AgentConversation | null {
   const now = Date.now()
   return {
     id: row.id,
+    serverId: typeof row.serverId === 'string' ? row.serverId : null,
     title: typeof row.title === 'string' && row.title.trim() ? row.title.trim() : '历史会话',
-    sessionId: typeof row.sessionId === 'string' ? row.sessionId : null,
+    // Provider session tokens belong to the Portal, not the browser.
+    sessionId: null,
+    modelMode: row.modelMode === 'free-test' || (
+      row.modelMode !== 'deepseek' && typeof row.sessionId === 'string'
+      && row.sessionId.startsWith('free-test:')
+    ) ? 'free-test' : 'deepseek',
+    taskTier: row.taskTier === 'multi' ? 'multi' : 'standard',
     createdAt: typeof row.createdAt === 'number' ? row.createdAt : now,
     updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : now,
     pinned: row.pinned === true,
@@ -79,14 +114,21 @@ export function useAgentConversations() {
         messages: conversation.messages.slice(-MAX_MESSAGES_PER_CONVERSATION),
       }))
     conversations.value = snapshot
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
-    if (activeConversationId.value) localStorage.setItem(ACTIVE_KEY, activeConversationId.value)
-    else localStorage.removeItem(ACTIVE_KEY)
+    const historyKey = scopedKey(STORAGE_KEY)
+    const activeKey = scopedKey(ACTIVE_KEY)
+    if (!historyKey || !activeKey) return
+    localStorage.setItem(historyKey, JSON.stringify(snapshot))
+    if (activeConversationId.value) localStorage.setItem(activeKey, activeConversationId.value)
+    else localStorage.removeItem(activeKey)
   }
 
   function load() {
+    conversations.value = []
+    activeConversationId.value = null
+    const historyKey = scopedKey(STORAGE_KEY)
+    if (!historyKey) return
     try {
-      const raw = localStorage.getItem(STORAGE_KEY)
+      const raw = localStorage.getItem(historyKey)
       const parsed: unknown = raw ? JSON.parse(raw) : []
       conversations.value = Array.isArray(parsed)
         ? parsed.map(normalizeConversation).filter((item): item is AgentConversation => item !== null).slice(0, MAX_CONVERSATIONS)
@@ -97,18 +139,57 @@ export function useAgentConversations() {
   }
 
   function restoreLast(): AgentConversation | null {
-    const activeId = localStorage.getItem(ACTIVE_KEY)
+    const activeKey = scopedKey(ACTIVE_KEY)
+    const activeId = activeKey ? localStorage.getItem(activeKey) : null
     const conversation = conversations.value.find((item) => item.id === activeId) || null
     activeConversationId.value = conversation?.id || null
     return conversation
   }
 
-  function create(firstQuestion: string, contextAsset?: ContextAsset | null): AgentConversation {
+  function hasUnscopedLegacy(): boolean {
+    const reviewKey = scopedKey(LEGACY_REVIEW_KEY)
+    return Boolean(reviewKey && !localStorage.getItem(reviewKey) && legacyUnscoped().length)
+  }
+
+  function declineUnscopedLegacy() {
+    const reviewKey = scopedKey(LEGACY_REVIEW_KEY)
+    if (reviewKey) localStorage.setItem(reviewKey, 'declined')
+  }
+
+  function adoptUnscopedLegacy(): number {
+    const reviewKey = scopedKey(LEGACY_REVIEW_KEY)
+    if (!reviewKey) return 0
+    const legacy = legacyUnscoped()
+    const existingIds = new Set(conversations.value.map(c => c.id))
+    let adopted = 0
+    for (const row of legacy) {
+      if (existingIds.has(row.id)) continue
+      // The old cache did not identify its owner. Explicit import creates a
+      // local draft only; never reuse an old user's serverId or dsh session.
+      conversations.value.push({ ...row, serverId: null, sessionId: null })
+      existingIds.add(row.id)
+      adopted++
+    }
+    persist()
+    localStorage.setItem(reviewKey, 'adopted')
+    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(ACTIVE_KEY)
+    return adopted
+  }
+
+  function create(
+    firstQuestion: string, contextAsset?: ContextAsset | null,
+    modelMode: AgentModelMode = 'deepseek',
+    taskTier: 'standard' | 'multi' = 'standard',
+  ): AgentConversation {
     const now = Date.now()
     const conversation: AgentConversation = {
       id: newConversationId(),
+      serverId: null,
       title: defaultTitle(firstQuestion),
       sessionId: null,
+      modelMode,
+      taskTier,
       createdAt: now,
       updatedAt: now,
       pinned: false,
@@ -135,12 +216,14 @@ export function useAgentConversations() {
 
   function syncActive(
     messages: AgentMessage[],
-    sessionId: string | null,
+    _sessionId: string | null,
     contextAsset?: ContextAsset | null,
+    modelMode?: AgentModelMode,
   ) {
     const conversation = activeConversation.value
     if (!conversation) return
-    conversation.sessionId = sessionId
+    conversation.sessionId = null
+    if (modelMode) conversation.modelMode = modelMode
     conversation.updatedAt = Date.now()
     conversation.messages = [...messages]
     conversation.contextAsset = contextAsset ? { ...contextAsset } : null
@@ -172,6 +255,25 @@ export function useAgentConversations() {
     persist()
   }
 
+  function attachServerId(id: string, serverId: string) {
+    const conversation = conversations.value.find((item) => item.id === id)
+    if (!conversation) return
+    conversation.serverId = serverId
+    persist()
+  }
+
+  function mergeServer(remote: AgentConversation[]) {
+    // Keep existing local IDs for active view state; server owns published turns.
+    for (const incoming of remote) {
+      const existing = conversations.value.find((item) => item.serverId === incoming.id || item.id === incoming.id)
+      if (existing) Object.assign(existing, incoming, {
+        id: existing.id, serverId: incoming.id, sessionId: null,
+      })
+      else conversations.value.push({ ...incoming, serverId: incoming.id, sessionId: null })
+    }
+    persist()
+  }
+
   return {
     conversations,
     activeConversationId,
@@ -187,5 +289,10 @@ export function useAgentConversations() {
     rename,
     remove,
     togglePin,
+    attachServerId,
+    mergeServer,
+    hasUnscopedLegacy,
+    adoptUnscopedLegacy,
+    declineUnscopedLegacy,
   }
 }

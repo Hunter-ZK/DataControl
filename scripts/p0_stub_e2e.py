@@ -88,6 +88,19 @@ def wait_tcp(service: Service, host: str, port: int, timeout: float = 30.0) -> N
 
 
 def unwrap(response: httpx.Response) -> dict:
+    if response.status_code >= 500:
+        detail = response.text[:1200]
+        # CI keeps these service logs local to the ephemeral stub environment.
+        diagnostics = []
+        for name in ("agent-gateway", "agent3-mcp", "portal"):
+            log_path = LOCAL / f"{name}.err.log"
+            if log_path.exists():
+                lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+                diagnostics.append(f"{name} stderr (last 18 lines):\n" + "\\n".join(lines[-18:]))
+        raise RuntimeError(
+            f"Stub endpoint returned {response.status_code} {response.url}: {detail}\\n"
+            + "\\n".join(diagnostics)
+        )
     response.raise_for_status()
     payload = response.json()
     if payload.get("code") != "OK" or not isinstance(payload.get("data"), dict):
@@ -203,9 +216,14 @@ def main() -> None:
                 "本期各地区贷款余额是多少？请生成并校验 SQL；不要执行。 "
                 f"& printf injected > {INJECTION_MARKER}"
             )
+            login = unwrap(client.post(
+                "http://127.0.0.1:8000/api/v1/auth/login",
+                json={"username": "demo", "password": "DataControl123!"},
+            ))
             result = unwrap(
                 client.post(
                     "http://127.0.0.1:8000/api/v1/agent/query",
+                    headers={"Authorization": f"Bearer {login['accessToken']}"},
                     json={"question": prompt},
                 )
             )
@@ -225,7 +243,7 @@ def main() -> None:
             raise AssertionError(f"unexpected SQL source: {sql}")
         if "region_code" not in sql or "GROUP BY region_code" not in sql:
             raise AssertionError(f"stub did not preserve the regional dimension: {sql}")
-        if "MAX(stat_month)" not in sql:
+        if "stat_month = '${dt}'" not in sql:
             raise AssertionError(f"LATEST semantic was not compiled deterministically: {sql}")
 
         validation = result.get("validation")

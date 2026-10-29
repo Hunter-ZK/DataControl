@@ -2,12 +2,12 @@
   <aside class="history-pane">
     <div class="history-head">
       <div class="history-meta">
-        <span>对话记录</span>
+        <span>历史会话</span>
         <b>{{ count }}</b>
       </div>
-      <button class="history-new" :disabled="loading" @click="$emit('new')"><Plus :size="16" />新会话</button>
+      <button class="history-new" :disabled="loading" @click="$emit('new')"><Plus :size="19" />新建对话</button>
       <label class="history-search">
-        <Search :size="15" />
+        <Search :size="18" />
         <input
           :value="searchQuery"
           type="search"
@@ -51,7 +51,7 @@
       </div>
     </div>
 
-    <div class="history-foot"><ShieldCheck :size="13" />对话保存在当前浏览器</div>
+    <div class="history-foot"><ShieldCheck :size="16" />会话仅对当前用户可见</div>
   </aside>
 </template>
 
@@ -107,4 +107,25 @@ defineEmits<{
 .history-empty b { font-size: 13px; color: #426c80; }
 .history-empty span { font-size: 12px; line-height: 1.55; }
 .history-foot { flex: none; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 11px 8px; border-top: 1px solid #bcd6e2; color: #628090; font-size: 11px; }
+
+
+.history-pane{background:linear-gradient(160deg,#f5f9ff,#ecf4ff);border-right:1px solid #d0e0f5}
+.history-head{padding:19px 15px;border-bottom:1px solid #d9e5f6}
+.history-meta{color:#34547d;font-size:16px;font-weight:780}
+.history-meta b{background:#e1edff;color:#2868d9;font-size:13px}
+.history-new{min-height:46px;background:linear-gradient(105deg,#2b68e5,#4a90f8);border:1px solid #4a83e6;border-radius:10px;font-size:14px;box-shadow:0 9px 23px rgba(45,104,209,.2)}
+.history-new:hover{background:#1e60db}
+.history-search{background:#fff;border-color:#cfdef3;height:41px}
+.history-search input{font-size:13px;color:#26426d}
+.history-group-title{font-size:12px;color:#7e94b0;padding:9px 8px}
+.history-item{border-radius:10px;margin-bottom:5px}
+.history-item:hover{background:#e7f1ff;border-color:#c9dcfa}
+.history-item.active{background:#dbeaff;border-color:#adcbf4;box-shadow:inset 4px 0 #3776e9}
+.history-select{padding:12px 8px;color:#375476}
+.history-select span{font-size:13px}
+.history-item-actions button{background:#fff;color:#6d85a3}
+.history-foot{color:#8298b4;background:#eef5ff;border-color:#d9e7fa;font-size:12px;padding:12px}
+.history-empty{background:#ffffff75;border-color:#c4d9f4}
+.history-empty b{font-size:14px;color:#45658e}
+
 </style>

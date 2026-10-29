@@ -2,12 +2,13 @@
 param([switch]$SkipAgent)
 
 $ErrorActionPreference="Stop"
+. (Join-Path $PSScriptRoot "agent-profile-state.ps1")
 $root=(Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $root
 
 $python=Join-Path $root ".venv\Scripts\python.exe"
 $dshBin=Join-Path $root "agent\dsh\node_modules\.bin\dsh.cmd"
-$headlessProfile=Join-Path $root ".local\dsh-home\profiles\dataagent-headless\package.json"
+$headlessProfile=Join-Path $root ".local\dsh-home-v0.2.1-rc.3\profiles\dataagent-headless\package.json"
 $localDir=Join-Path $root ".local"
 $backendOut=Join-Path $localDir "backend.log"
 $backendErr=Join-Path $localDir "backend.err.log"
@@ -59,6 +60,26 @@ if(-not(Get-Command npm -ErrorAction SilentlyContinue)){throw "npm is required."
 if(-not(Test-Path (Join-Path $root "web\node_modules\.bin\vite.cmd"))){throw "Frontend dependencies are missing. Run .\scripts\setup-dev.ps1 first."}
 New-Item -ItemType Directory -Force -Path $localDir | Out-Null
 
+# A successful previous setup marker does not imply that newly added Python
+# dependencies are installed. Synchronize only the editable Portal package;
+# do not rerun setup-dev, demo-data generation, npm or Agent setup.
+$portalDependencyCheck = Join-Path $PSScriptRoot "check-portal-deps.py"
+& $python $portalDependencyCheck
+if($LASTEXITCODE -ne 0){
+  Write-Host "[DataControl] Updating Portal Python dependencies from pyproject.toml..."
+  & $python -m pip install -e .
+  if($LASTEXITCODE -ne 0){throw "Portal dependency synchronization failed. Check pip output above."}
+  & $python $portalDependencyCheck
+  if($LASTEXITCODE -ne 0){throw "Portal dependencies still incomplete after pip install -e ."}
+}
+# Import the real application before launching a detached Uvicorn process so
+# missing transitive imports fail with a visible, direct diagnostic.
+& $python -c "import backend.app.main"
+if($LASTEXITCODE -ne 0){throw "DataControl API import preflight failed. See the Python traceback above."}
+
+& $python -m alembic upgrade head
+if($LASTEXITCODE -ne 0){throw 'Database migration failed before service startup'}
+
 # Preserve any external proxy needed for model traffic while guaranteeing that
 # Portal/Gateway/MCP loopback traffic is never sent through it.
 $existingNoProxy=[string]$env:NO_PROXY
@@ -69,12 +90,21 @@ $env:no_proxy=$env:NO_PROXY
 if(-not $SkipAgent){
   & $python -c "import agent3, dataagent_gateway" 2>$null
   $agentImportsOk=$LASTEXITCODE -eq 0
-  if(-not $agentImportsOk -or -not(Test-Path $dshBin) -or -not(Test-Path $headlessProfile)){
+  if(-not $agentImportsOk -or -not(Test-Path $dshBin) -or -not(Test-Path $headlessProfile) -or
+     -not(Test-DataAgentProfilesCurrent -RepoRoot $root)){
     Write-Host "Embedded DataAgent setup is incomplete; bootstrapping it in the shared .venv now..."
     & .\scripts\setup-agent.ps1
   }
   & $python -c "import agent3, dataagent_gateway"
   if($LASTEXITCODE -ne 0){throw "Embedded DataAgent package is unavailable after setup."}
+  if(-not(Test-Path (Join-Path $localDir "free-model-test-v2.7.2.ready"))){
+    try {
+      & (Join-Path $root "scripts\setup-free-model-test.ps1")
+      if($LASTEXITCODE -ne 0){Write-Warning "Optional free model installer exited with code $LASTEXITCODE"}
+    } catch {
+      Write-Warning "Optional free model could not be installed: $($_.Exception.Message). Official Agent is unaffected."
+    }
+  }
 }
 
 Assert-PortFree 8000 "DataControl API"
@@ -99,7 +129,7 @@ try {
 
     $env:AGENT3_MCP_POC_MODE="1"
     $env:DATACONTROL_PORTAL_URL="http://127.0.0.1:8000/api/v1"
-    $env:DSH_HOME=(Join-Path $root ".local\dsh-home")
+    $env:DSH_HOME=(Join-Path $root ".local\dsh-home-v0.2.1-rc.3")
     $env:DSH_TELEMETRY_MODE="DISABLED"
     $mcp=Start-Process -FilePath $python -ArgumentList "-m","agent3.adapters.mcp.server" -WorkingDirectory (Join-Path $root "agent") -RedirectStandardOutput $mcpOut -RedirectStandardError $mcpErr -PassThru
     Wait-ServicePort $mcp 8900 "Agent3 MCP" $mcpErr 30
@@ -109,8 +139,15 @@ try {
     $gatewayHealthJson=& $python -c "import httpx,json; r=httpx.get('http://127.0.0.1:8910/health',timeout=2.0,trust_env=False); r.raise_for_status(); print(json.dumps(r.json()))"
     $gatewayHealth=$gatewayHealthJson | ConvertFrom-Json
     Write-Host "Agent3 MCP:        READY http://127.0.0.1:8900/mcp"
-    if($gatewayHealth.ready){Write-Host "DataAgent Gateway: READY http://127.0.0.1:8910"}else{Write-Warning ("DataAgent Gateway is running but degraded: "+[string]$gatewayHealth.reason)}
-    if([string]::IsNullOrWhiteSpace($env:DEEPSEEK_API_KEY)){Write-Warning "DEEPSEEK_API_KEY is not set; Agent Gateway will be degraded until DataControl is restarted with the key present."}
+    if($gatewayHealth.ready){
+      Write-Host "DataAgent Gateway: READY http://127.0.0.1:8910 (queries enabled)"
+    }else{
+      Write-Warning ("DataAgent Gateway PROCESS STARTED on 8910, but Agent queries are UNAVAILABLE: "+[string]$gatewayHealth.reason)
+      Write-Host "Agent setup: .\start.bat repair (includes the optional free model)."
+    }
+    Write-Host "Agent 运行记录:     在另一 PowerShell 窗口执行："
+    Write-Host "  Get-Content .\.local\agent-gateway.err.log -Tail 40 -Wait"
+    if($env:DATACONTROL_AGENT_MODEL_MODE -ne "free-test" -and [string]::IsNullOrWhiteSpace($env:DEEPSEEK_API_KEY)){Write-Warning "DEEPSEEK_API_KEY is not set; Agent Gateway will be degraded until DataControl is restarted with the key present."}
   }
 
   Write-Host ("Python runtime:      "+(& $python --version))

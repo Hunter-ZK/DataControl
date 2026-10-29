@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import re
-import subprocess
+import time
+import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 
@@ -15,19 +17,14 @@ class HarnessRunError(RuntimeError):
     pass
 
 
-MCP_TOOL_SUFFIXES = {
-    "search_tables",
-    "get_schema",
-    "get_semantic_model",
-    "resolve_metric",
-    "plan_metric",
-    "resolve_code_value",
-    "search_verified_sql",
-    "validate_sql",
-    "explain_sql",
-    "compile_query",
-    "submit_ddl",
-}
+# Uvicorn's configured stderr logger is redirected to .local/agent-gateway.err.log.
+# Only bounded event metadata is logged: never prompt, tool inputs, SQL, or reasoning.
+LOGGER = logging.getLogger("uvicorn.error")
+
+
+MCP_TOOL_SUFFIXES = frozenset(json.loads(
+    (Path(__file__).resolve().parents[2] / "tool-catalog.json").read_text(encoding="utf-8")
+)["tools"])
 
 _LOOPBACK_NO_PROXY = ("127.0.0.1", "localhost", "::1")
 _SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
@@ -201,6 +198,7 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
     call_inputs: dict[str, dict[str, Any]] = {}
     metrics: list[dict[str, Any]] = []
     datasets: list[dict[str, Any]] = []
+    assets: list[dict[str, Any]] = []
     code_values: list[dict[str, Any]] = []
     dimensions: list[str] = []
     period: dict[str, str] | None = None
@@ -352,6 +350,25 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
                                 ],
                             }
                         )
+                elif tool == "search_assets":
+                    for row in result.get("assets", [])[:40] if isinstance(result.get("assets"), list) else []:
+                        if isinstance(row, dict) and row.get("assetId") and row.get("assetType"):
+                            assets.append({
+                                "assetId": str(row["assetId"]),
+                                "assetType": str(row["assetType"]),
+                                "title": str(row.get("title") or row.get("technicalName") or ""),
+                                "technicalName": str(row.get("technicalName") or ""),
+                                "sourceCallId": call_id,
+                            })
+                elif tool == "get_asset":
+                    if result.get("assetId") and result.get("assetType"):
+                        assets.append({
+                            "assetId": str(result["assetId"]),
+                            "assetType": str(result["assetType"]),
+                            "title": str(result.get("title") or ""),
+                            "technicalName": str(result.get("technicalName") or ""),
+                            "sourceCallId": call_id,
+                        })
                 elif tool == "search_tables":
                     tables = result.get("tables", [])
                     for table in tables if isinstance(tables, list) else []:
@@ -406,6 +423,7 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
         "semanticValidation": semantic_validation,
         "evidence": {
             "metrics": _dedupe_dicts(metrics, "code"),
+            "assets": _dedupe_dicts(assets, "assetId"),
             "datasets": _dedupe_dicts(datasets, "tableName"),
             "codeValues": code_values,
             "dimensions": list(dict.fromkeys(dimensions)),
@@ -419,18 +437,38 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
 
 
 class HeadlessHarnessRunner:
-    def __init__(self, *, timeout_seconds: float | None = None) -> None:
+    def __init__(self, *, timeout_seconds: float | None = None, model_mode: str | None = None,
+                 task_tier: str = "standard") -> None:
         self.repo_root = Path(__file__).resolve().parents[3]
         self.agent_root = self.repo_root / "agent"
+        if task_tier not in ("standard", "multi"):
+            raise ValueError("Unknown Agent task tier")
+        self.task_tier = task_tier
         self.timeout_seconds = timeout_seconds or float(
-            os.getenv("DATACONTROL_AGENT_RUN_TIMEOUT", "120")
+            os.getenv("DATACONTROL_AGENT_RUN_TIMEOUT_MULTI" if task_tier == "multi"
+                      else "DATACONTROL_AGENT_RUN_TIMEOUT",
+                      "600" if task_tier == "multi" else "120")
         )
         self.dsh_home = Path(
-            os.getenv("DSH_HOME", str(self.repo_root / ".local" / "dsh-home"))
+            os.getenv("DSH_HOME", str(self.repo_root / ".local" / "dsh-home-v0.2.1-rc.3"))
         ).resolve()
         suffix = "dsh.cmd" if os.name == "nt" else "dsh"
         self.dsh_bin = self.agent_root / "dsh" / "node_modules" / ".bin" / suffix
-        self.profile = os.getenv("DATACONTROL_DSH_PROFILE", "dataagent-headless")
+        self.dsh_js_entry = (
+            self.agent_root / "dsh" / "node_modules" / "@deepseek-ai" / "dsh" / "lib" / "bin.js"
+        )
+        # An explicit request choice always wins over legacy process-level settings.
+        self.model_mode = model_mode if model_mode is not None else os.getenv(
+            "DATACONTROL_AGENT_MODEL_MODE", "deepseek"
+        )
+        if self.model_mode not in ("deepseek", "free-test"):
+            raise ValueError("Unsupported DataAgent model mode")
+        self.free_test = self.model_mode == "free-test"
+        self.profile = (
+            "dataagent-headless-free" if self.free_test
+            else ("dataagent-headless-multi" if task_tier == "multi"
+                  else os.getenv("DATACONTROL_DSH_PROFILE", "dataagent-headless"))
+        )
 
     @property
     def profile_dir(self) -> Path:
@@ -445,32 +483,74 @@ class HeadlessHarnessRunner:
             return False
 
     async def health(self) -> dict[str, Any]:
-        dsh_installed = self.dsh_bin.exists()
-        profile_ready = (self.profile_dir / "package.json").exists()
+        dsh_installed = (self.dsh_js_entry if os.name == "nt" else self.dsh_bin).exists()
+        profile_package_ready = (self.profile_dir / "package.json").exists()
+        source_overlay = (self.agent_root / "dsh" / "profile" /
+                          ("headless-multi.patch.yml" if self.task_tier == "multi"
+                           else "headless.patch.yml"))
+        active_overlay = self.profile_dir / "cordis.patch.yml"
+        provider = "our-free-model" if self.free_test else "deepseek-official"
+        model = "kilo-auto/free" if self.free_test else "deepseek-flash"
+        try:
+            expected = source_overlay.read_bytes()
+            if self.free_test:
+                expected = expected.replace(
+                    b"provider: deepseek-official\n    model: deepseek-flash",
+                    b"provider: our-free-model\n    model: kilo-auto/free",
+                ).replace(
+                    b"provider: deepseek-official\r\n    model: deepseek-flash",
+                    b"provider: our-free-model\r\n    model: kilo-auto/free",
+                )
+            patch_ok = active_overlay.is_file() and active_overlay.read_bytes() == expected
+        except OSError:
+            patch_ok = False
+        plugin_ok = True
+        if self.free_test:
+            try:
+                pkg = json.loads((self.profile_dir / "package.json").read_text(encoding="utf-8"))
+                plugin = json.loads((self.profile_dir / "node_modules" / "dsh-our-free-model" / "package.json").read_text(encoding="utf-8"))
+                plugin_ok = (
+                    (self.repo_root / ".local" / "free-model-test-v2.7.2.ready").is_file()
+                    and plugin.get("version") == "2.7.2"
+                    and "dsh-our-free-model" in pkg.get("dsh", {}).get("profile", {}).get("bundles", [])
+                )
+            except (OSError, ValueError, AttributeError):
+                plugin_ok = False
+        profile_ready = profile_package_ready and patch_ok and plugin_ok
         api_key_present = bool(os.getenv("DEEPSEEK_API_KEY"))
+        # Public gateway consent belongs to each request, not the server process.
+        # This health check reports whether the optional profile is installed.
+        key_ready = self.free_test or api_key_present
         mcp_reachable = await self._mcp_reachable()
-        ready = dsh_installed and profile_ready and api_key_present and mcp_reachable
+        ready = dsh_installed and profile_ready and key_ready and mcp_reachable
         blockers: list[str] = []
         if not dsh_installed:
             blockers.append("DeepSeek Harness is not installed")
         if not profile_ready:
-            blockers.append(f"dsh profile '{self.profile}' is not initialized")
-        if not api_key_present:
+            blockers.append(
+                "Free model test profile missing; run the optional scripts/setup-free-model-test installer"
+                if self.free_test else "DataAgent profile is missing/outdated: rerun setup-agent"
+            )
+        if not key_ready:
             blockers.append("DEEPSEEK_API_KEY is not set")
         if not mcp_reachable:
             blockers.append("Agent3 MCP is not reachable on 127.0.0.1:8900")
         return {
-            "ready": ready,
-            "dshInstalled": dsh_installed,
-            "profileReady": profile_ready,
-            "apiKeyPresent": api_key_present,
-            "mcpReachable": mcp_reachable,
-            "profile": self.profile,
+            "ready": ready, "dshInstalled": dsh_installed,
+            "profileReady": profile_ready, "apiKeyPresent": api_key_present,
+            "apiKeyRequired": not self.free_test, "mcpReachable": mcp_reachable,
+            "profile": self.profile, "modelMode": "free-test" if self.free_test else "deepseek",
+            "provider": provider, "model": model,
             "reason": "; ".join(blockers) if blockers else None,
         }
 
     def _command(self, session_id: str | None) -> list[str]:
-        command = [str(self.dsh_bin), "--profile", self.profile, "--json"]
+        if os.name == "nt":
+            # Launch the actual pinned JS entrypoint, not npm's .cmd wrapper.
+            # This preserves Unicode checkout paths and avoids cmd.exe quoting.
+            command = ["node", str(self.dsh_js_entry), "--profile", self.profile, "--json"]
+        else:
+            command = [str(self.dsh_bin), "--profile", self.profile, "--json"]
         if session_id:
             command.extend(["--session-id", _safe_session_id(session_id)])
         return command
@@ -482,15 +562,61 @@ class HeadlessHarnessRunner:
             "stdin": asyncio.subprocess.PIPE,
             "stdout": asyncio.subprocess.PIPE,
             "stderr": asyncio.subprocess.PIPE,
+            "limit": 8 * 1024 * 1024,
         }
-        if os.name == "nt":
-            cmdline = subprocess.list2cmdline(command)
-            return await asyncio.create_subprocess_exec(
-                "cmd.exe", "/d", "/s", "/c", cmdline, **process_kwargs
-            )
+        # Argument-vector execution is safe for CJK/space-containing Windows
+        # paths because the Windows command begins with node.exe, not a .cmd file.
         return await asyncio.create_subprocess_exec(*command, **process_kwargs)
 
-    async def run(self, question: str, *, session_id: str | None = None) -> dict[str, Any]:
+    async def _capture_trace(
+        self, stream: asyncio.StreamReader, request_id: str,
+        on_activity: Callable[[dict[str, Any]], None] | None = None,
+    ) -> str:
+        """Collect complete JSONL for the existing parser while reporting safe live events."""
+        lines: list[str] = []
+        tool_labels: dict[str, str] = {}
+        safe_native = {"todo_write", "goal", "subagent", "subagent_fork", "workflow"}
+        while True:
+            raw = await stream.readline()
+            if not raw:
+                break
+            line = raw.decode("utf-8", errors="replace")
+            lines.append(line)
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(event, dict):
+                continue
+            event_type = event.get("type")
+            # Never stream user questions, raw tool payloads, SQL, or hidden reasoning.
+            # Only known Agent3 tool identities and validated statuses are UI activity.
+            if event_type == "tool_call":
+                tool_name = str(event.get("tool") or "")
+                suffix = _tool_suffix(tool_name)
+                tool = suffix if suffix in MCP_TOOL_SUFFIXES or suffix in safe_native else "harness_tool"
+                call_id = event.get("callId")
+                if isinstance(call_id, str):
+                    tool_labels[call_id] = tool
+                LOGGER.info("[Agent:%s] TOOL_START %s", request_id, tool)
+                if on_activity and tool_name.startswith("mcp__agent3__") and suffix in MCP_TOOL_SUFFIXES:
+                    if isinstance(call_id, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", call_id):
+                        on_activity({"type": "tool_call", "callId": call_id, "tool": suffix})
+            elif event_type == "tool_result":
+                call_id = event.get("callId")
+                tool = tool_labels.get(call_id, "harness_tool") if isinstance(call_id, str) else "harness_tool"
+                raw_status = event.get("status")
+                status = raw_status if raw_status in {"completed", "error", "failed", "success"} else "unknown"
+                LOGGER.info("[Agent:%s] TOOL_END %s status=%s", request_id, tool, status)
+                if on_activity and tool in MCP_TOOL_SUFFIXES:
+                    if isinstance(call_id, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", call_id):
+                        on_activity({"type": "tool_result", "callId": call_id, "tool": tool, "status": status})
+        return "".join(lines)
+
+    async def run(
+        self, question: str, *, session_id: str | None = None,
+        on_activity: Callable[[dict[str, Any]], None] | None = None,
+    ) -> dict[str, Any]:
         if not question.strip():
             raise HarnessRunError("DataAgent question cannot be empty")
 
@@ -501,22 +627,72 @@ class HeadlessHarnessRunner:
         env = _with_loopback_no_proxy(os.environ.copy())
         env["DSH_HOME"] = str(self.dsh_home)
         env["DSH_TELEMETRY_MODE"] = "DISABLED"
-        process = await self._spawn(self._command(session_id), env)
+        request_id = uuid.uuid4().hex[:8]
+        started = time.monotonic()
+        LOGGER.info("[Agent:%s] START session=%s", request_id, "resume" if session_id else "new")
+        if self.free_test:
+            if session_id and not session_id.startswith("free-test:"):
+                raise HarnessRunError("Start a new conversation for public free-test mode")
+            native_session_id = session_id[len("free-test:"):] if session_id else None
+        else:
+            if session_id and session_id.startswith("free-test:"):
+                raise HarnessRunError("Start a new conversation for the official DeepSeek model")
+            native_session_id = session_id
+        process = await self._spawn(self._command(native_session_id), env)
         try:
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(input=question.encode("utf-8")),
+            assert process.stdin is not None
+            assert process.stdout is not None
+            assert process.stderr is not None
+            process.stdin.write(question.encode("utf-8"))
+            await process.stdin.drain()
+            process.stdin.close()
+
+            stdout_text, stderr, _ = await asyncio.wait_for(
+                asyncio.gather(
+                    self._capture_trace(process.stdout, request_id, on_activity),
+                    process.stderr.read(),
+                    process.wait(),
+                ),
                 timeout=self.timeout_seconds,
             )
+        except asyncio.CancelledError:
+            # Stop the actual Harness process, not just the browser spinner.
+            if process.returncode is None:
+                process.kill()
+                await process.wait()
+            LOGGER.info("[Agent:%s] CANCELLED elapsed=%.1fs", request_id, time.monotonic() - started)
+            raise
         except TimeoutError as exc:
-            process.kill()
-            await process.wait()
+            if process.returncode is None:
+                process.kill()
+                await process.wait()
+            LOGGER.warning("[Agent:%s] TIMEOUT elapsed=%.1fs", request_id, time.monotonic() - started)
             raise HarnessRunError(
                 f"dsh request exceeded {self.timeout_seconds:g}s timeout"
             ) from exc
 
-        stdout_text = stdout.decode("utf-8", errors="replace")
         stderr_text = stderr.decode("utf-8", errors="replace")
         if process.returncode != 0:
+            LOGGER.error("[Agent:%s] ERROR exit_code=%d elapsed=%.1fs", request_id, process.returncode, time.monotonic() - started)
             detail = stderr_text.strip()[-1600:] or "dsh exited without diagnostics"
             raise HarnessRunError(f"dsh exited with code {process.returncode}: {detail}")
-        return parse_event_stream(stdout_text)
+        try:
+            result = parse_event_stream(stdout_text)
+        except HarnessRunError:
+            LOGGER.error("[Agent:%s] ERROR missing_final_answer elapsed=%.1fs", request_id, time.monotonic() - started)
+            raise
+        LOGGER.info(
+            "[Agent:%s] DONE elapsed=%.1fs tools=%d sql=%s validation=%s",
+            request_id,
+            time.monotonic() - started,
+            sum(1 for event in result["events"] if event["type"] == "tool_call"),
+            "yes" if result["sql"] else "no",
+            result["validationState"],
+        )
+        if self.free_test and result.get("sessionId"):
+            result["sessionId"] = "free-test:" + result["sessionId"]
+        result["durationMs"] = int((time.monotonic() - started) * 1000)
+        result["toolCallCount"] = sum(
+            1 for event in result["events"] if event["type"] == "tool_call"
+        )
+        return result

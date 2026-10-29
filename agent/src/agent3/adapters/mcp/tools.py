@@ -17,6 +17,21 @@ class MCPToolAdapter:
     def search_tables(self, query: str, limit: int = 8) -> dict[str, Any]:
         return self._core.search_tables(self._authz(), query, limit=limit)
 
+    def search_assets(self, query: str, limit: int = 12) -> dict[str, Any]:
+        return self._core.search_assets(self._authz(), query, limit=limit)
+
+    def get_asset(self, asset_type: str, asset_id: str) -> dict[str, Any]:
+        return self._core.get_asset(self._authz(), asset_type, asset_id)
+
+    def find_references(self, asset_type: str, asset_id: str) -> dict[str, Any]:
+        return self._core.find_references(self._authz(), asset_type, asset_id)
+
+    def get_lineage_summary(self, asset_type: str, asset_id: str, depth: int = 1) -> dict[str, Any]:
+        return self._core.get_lineage_summary(self._authz(), asset_type, asset_id, depth=depth)
+
+    def revise_query(self, semantic_plan: dict[str, Any], changes: dict[str, Any]) -> dict[str, Any]:
+        return self._core.revise_query(self._authz(), semantic_plan, changes)
+
     def get_schema(self, table_name: str) -> dict[str, Any]:
         return self._core.get_schema(self._authz(), table_name)
 
@@ -104,6 +119,25 @@ class MCPToolAdapter:
             limit=limit,
         )
         return self._core.compile_query(self._authz(), ir)
+
+    def check_naming(self, name: str) -> dict[str, Any]:
+        return self._core.check_naming(self._authz(), name)
+
+    def generate_ddl(self, table: str, columns: list[dict[str, Any]],
+                     comment: str = "", partition_key: str | None = None) -> dict[str, Any]:
+        return self._core.generate_ddl(self._authz(), table, columns,
+                                       comment=comment, partition_key=partition_key)
+
+    def generate_etl(self, source_table: str, target_table: str,
+                     mappings: list[dict[str, str]],
+                     source_partition: str | None = None) -> dict[str, Any]:
+        return self._core.generate_etl(self._authz(), source_table, target_table, mappings,
+                                       source_partition=source_partition)
+
+    def generate_dq_checks(self, table_name: str, required_columns: list[str] | None = None,
+                           unique_keys: list[str] | None = None) -> dict[str, Any]:
+        return self._core.generate_dq_checks(self._authz(), table_name, required_columns,
+                                             unique_keys)
 
     def submit_ddl(self, ddl: str) -> dict[str, Any]:
         return self._core.submit_ddl(self._authz(), ddl)

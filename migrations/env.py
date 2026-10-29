@@ -6,7 +6,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from backend.app.core.config import DATABASE_URL
-from backend.app.db.application_models import AuditLog, SearchHistory  # noqa: F401
+from backend.app.db.application_models import AuditLog, SearchHistory, AgentConversation, AgentTurn, AgentToolEvent, NamingRun  # noqa: F401
 from backend.app.db.models import Base
 
 config = context.config

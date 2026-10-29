@@ -1,5 +1,6 @@
 import type {
   AgentActivity,
+  AgentModelMode,
   AgentClarification,
   AgentEvidence,
   AgentValidation,
@@ -10,6 +11,8 @@ export type AgentMessage = {
   role: 'user' | 'assistant'
   text: string
   summary?: string | null
+  durationMs?: number
+  toolCallCount?: number
   sql?: string | null
   validation?: AgentValidation | null
   validationState?: AgentValidationState
@@ -28,8 +31,11 @@ export type ContextAsset = {
 
 export type AgentConversation = {
   id: string
+  serverId?: string | null
   title: string
   sessionId: string | null
+  modelMode: AgentModelMode
+  taskTier?: 'standard' | 'multi'
   createdAt: number
   updatedAt: number
   pinned: boolean
