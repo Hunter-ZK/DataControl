@@ -40,6 +40,26 @@ def _decode(raw, fallback):
         return fallback
 
 
+def _sanitize_trace_value(value):
+    """Keep useful local debug payloads while always redacting credentials."""
+    if isinstance(value, dict):
+        clean = {}
+        for key, item in value.items():
+            name = str(key)
+            if re.search(r"token|secret|password|credential|api[_-]?key|authorization|cookie", name, re.I):
+                clean[name] = "[REDACTED]"
+            else:
+                clean[name] = _sanitize_trace_value(item)
+        return clean
+    if isinstance(value, list):
+        return [_sanitize_trace_value(item) for item in value]
+    if isinstance(value, str):
+        value = re.sub(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+", "Bearer [REDACTED]", value)
+        value = re.sub(r"(?i)\bsk-[A-Za-z0-9_-]{12,}\b", "[REDACTED_KEY]", value)
+        return value
+    return value
+
+
 def owned(db: Session, user_id: int, conversation_id: str) -> AgentConversation:
     conv = db.get(AgentConversation, conversation_id)
     if conv is None or conv.user_id != user_id:
@@ -206,12 +226,13 @@ def append_activity(run_id: str, activity: dict):
         if not turn or turn.status in TERMINAL:
             return
         sequence = db.query(AgentToolEvent).filter_by(turn_id=run_id).count() + 1
-        if sequence > 120:
+        if sequence > 2000:
             return
+        payload = _sanitize_trace_value(e)
         db.add(AgentToolEvent(
             turn_id=run_id, sequence=sequence, event_type=e["type"],
             call_id=call_id, tool=e["tool"], status=status,
-            created_at=datetime.utcnow(),
+            payload_json=_json(payload), created_at=datetime.utcnow(),
         ))
         db.commit()
 

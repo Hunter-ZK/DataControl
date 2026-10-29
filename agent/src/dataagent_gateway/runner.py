@@ -266,6 +266,7 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
                     "callId": call_id,
                     "tool": tool,
                     "status": event.get("status"),
+                    "output": result,
                 }
             )
 
@@ -601,7 +602,8 @@ class HeadlessHarnessRunner:
                 LOGGER.info("[Agent:%s] TOOL_START %s", request_id, tool)
                 if on_activity and tool_name.startswith("mcp__agent3__") and suffix in MCP_TOOL_SUFFIXES:
                     if isinstance(call_id, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", call_id):
-                        on_activity({"type": "tool_call", "callId": call_id, "tool": suffix})
+                        on_activity({"type": "tool_call", "callId": call_id, "tool": suffix,
+                                     "input": event.get("input") if isinstance(event.get("input"), dict) else {}})
             elif event_type == "tool_result":
                 call_id = event.get("callId")
                 tool = tool_labels.get(call_id, "harness_tool") if isinstance(call_id, str) else "harness_tool"
@@ -610,7 +612,8 @@ class HeadlessHarnessRunner:
                 LOGGER.info("[Agent:%s] TOOL_END %s status=%s", request_id, tool, status)
                 if on_activity and tool in MCP_TOOL_SUFFIXES:
                     if isinstance(call_id, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", call_id):
-                        on_activity({"type": "tool_result", "callId": call_id, "tool": tool, "status": status})
+                        on_activity({"type": "tool_result", "callId": call_id, "tool": tool,
+                                     "status": status, "output": _json_or_text(event.get("result"))})
         return "".join(lines)
 
     async def run(

@@ -74,4 +74,5 @@ class AgentToolEvent(Base):
     call_id: Mapped[str | None] = mapped_column(String(128))
     tool: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[str | None] = mapped_column(String(16))
+    payload_json: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

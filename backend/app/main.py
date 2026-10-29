@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.activity import router as activity_router
+from backend.app.api.admin_workbench import router as admin_workbench_router
 from backend.app.api.agent import router as agent_router
 from backend.app.api.agent_history import router as agent_history_router
 from backend.app.api.agent_assets import router as agent_assets_router
@@ -40,6 +41,7 @@ app.include_router(agent_router)
 app.include_router(agent_history_router)
 app.include_router(agent_assets_router)
 app.include_router(activity_router)
+app.include_router(admin_workbench_router)
 
 
 @app.get("/health")

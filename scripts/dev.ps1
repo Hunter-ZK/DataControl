@@ -9,6 +9,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "agent-profile-state.ps1")
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $root
+$env:DATACONTROL_ADMIN_WORKBENCH_ENABLED = "1"
 $local = Join-Path $root ".local"
 $python = Join-Path $root ".venv\Scripts\python.exe"
 $vite = Join-Path $root "web\node_modules\.bin\vite.cmd"
@@ -87,6 +88,10 @@ if (-not (Test-PortalReady)) {
 } else {
   Write-Host "[DataControl] Portal and frontend already installed; skipping setup."
 }
+
+Write-Host "[DataControl] Applying database migrations..."
+& $python -m alembic upgrade head
+if ($LASTEXITCODE -ne 0) { throw "Database migration failed. Check the Alembic output above." }
 
 if (-not $SkipAgent) {
   if ($Action -eq "repair") {
