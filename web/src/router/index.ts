@@ -16,6 +16,7 @@ import LoginView from '@/views/LoginView.vue'
 import RelationView from '@/views/RelationView.vue'
 import AgentView from '@/views/AgentView.vue'
 import NamingWorkbenchView from '@/views/NamingWorkbenchView.vue'
+import AdminWorkbenchView from '@/views/AdminWorkbenchView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -30,6 +31,7 @@ const router = createRouter({
         { path: 'relations/:id?', name: 'relations', component: RelationView, meta: { title: '关系指引' } },
         { path: 'agent', name: 'agent', component: AgentView, meta: { title: '智能问数' } },
         { path: 'workbench/naming', name: 'namingWorkbench', component: NamingWorkbenchView, meta: { title: '字段规范化命名' } },
+        { path: 'admin', name: 'adminWorkbench', component: AdminWorkbenchView, meta: { title: '开发管理工作台' } },
         { path: 'datasets/:id', name: 'dataset', component: DatasetDetailView, meta: { title: '数据集详情' } },
         { path: 'fields/:id', name: 'field', component: FieldDetailView, meta: { title: '字段详情' } },
         { path: 'code-tables', name: 'codeTables', component: ReferenceListView, props: { kind: 'code-tables' }, meta: { title: '标准码值' } },
@@ -49,6 +51,13 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
+  if (to.name === 'adminWorkbench') {
+    if (!import.meta.env.DEV) return { name: 'home' }
+    try {
+      const user = JSON.parse(localStorage.getItem('datacontrol_user') || '{}') as { role?: string }
+      if (String(user.role || '').toUpperCase() !== 'ADMIN') return { name: 'home' }
+    } catch { return { name: 'home' } }
+  }
   if (to.name === 'search' && to.query.mode === 'ai') return { name: 'agent' }
   if (to.name === 'search' && to.query.mode === 'relation') return { name: 'relations' }
 })

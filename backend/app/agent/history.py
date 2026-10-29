@@ -5,7 +5,9 @@ Gateway remains the sole owner of Harness execution; Portal owns history and ide
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
 from pathlib import Path
 from datetime import datetime
@@ -24,6 +26,7 @@ TERMINAL = ("completed", "failed", "cancelled", "timeout", "interrupted")
 TOOL_NAMES = frozenset(json.loads(
     (Path(__file__).resolve().parents[3] / "agent" / "tool-catalog.json").read_text(encoding="utf-8")
 )["tools"])
+TRACE_TOOL_NAMES = TOOL_NAMES | frozenset({"todo_write", "goal", "subagent", "subagent_fork", "workflow"})
 
 
 def _json(value):
@@ -38,6 +41,82 @@ def _decode(raw, fallback):
         return value if isinstance(value, type(fallback)) else fallback
     except (ValueError, TypeError):
         return fallback
+
+
+def _sanitize_trace_value(value):
+    """Keep useful local debug payloads while always redacting credentials."""
+    if isinstance(value, dict):
+        clean = {}
+        for key, item in value.items():
+            name = str(key)
+            if re.search(r"token|secret|password|credential|api[_-]?key|authorization|cookie", name, re.I):
+                clean[name] = "[REDACTED]"
+            else:
+                clean[name] = _sanitize_trace_value(item)
+        return clean
+    if isinstance(value, list):
+        return [_sanitize_trace_value(item) for item in value]
+    if isinstance(value, str):
+        value = re.sub(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+", "Bearer [REDACTED]", value)
+        value = re.sub(r"(?i)\bsk-[A-Za-z0-9_-]{12,}\b", "[REDACTED_KEY]", value)
+        value = re.sub(
+            r"(?i)\b(api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)\s*[:=]\s*([^\s,;]+)",
+            r"\1=[REDACTED]", value,
+        )
+        return value
+    return value
+
+
+def _capture_rule_snapshot(model_mode: str, task_tier: str) -> dict:
+    """Snapshot the actual rule/config sources when a run is reserved."""
+    root = Path(__file__).resolve().parents[3]
+    agent_root = root / "agent"
+    if model_mode == "free-test":
+        profile = "dataagent-headless-free"
+    elif task_tier == "multi":
+        profile = "dataagent-headless-multi"
+    else:
+        profile = os.getenv("DATACONTROL_DSH_PROFILE", "dataagent-headless")
+    overlay = "headless-multi.patch.yml" if task_tier == "multi" else "headless.patch.yml"
+    dsh_home = Path(os.getenv("DSH_HOME", str(root / ".local" / "dsh-home-v0.2.1-rc.3"))).resolve()
+    sources = [
+        ("System Prompt / Profile", f"agent/dsh/profile/{overlay}", agent_root / "dsh" / "profile" / overlay),
+        ("Agent query preset / system instructions", "agent/dsh/presets/dataagent-query/agent.cordis.yml",
+         agent_root / "dsh" / "presets" / "dataagent-query" / "agent.cordis.yml"),
+        ("Profile baseline", "agent/dsh/profile/cordis.patch.yml", agent_root / "dsh" / "profile" / "cordis.patch.yml"),
+        ("Active runtime profile", f".local/profiles/{profile}/cordis.patch.yml", dsh_home / "profiles" / profile / "cordis.patch.yml"),
+        ("MCP tool allowlist", "agent/tool-catalog.json", agent_root / "tool-catalog.json"),
+        ("Guard wiring", "agent/guard-plugin/src/index.ts", agent_root / "guard-plugin" / "src" / "index.ts"),
+        ("Guard policy", "agent/guard-plugin/src/policy.ts", agent_root / "guard-plugin" / "src" / "policy.ts"),
+        ("MCP tool schemas", "agent/src/agent3/adapters/mcp/tools.py", agent_root / "src" / "agent3" / "adapters" / "mcp" / "tools.py"),
+        ("Core business and SQL rules", "agent/src/agent3/services/core.py", agent_root / "src" / "agent3" / "services" / "core.py"),
+        ("Warehouse draft rules", "agent/src/agent3/services/development.py", agent_root / "src" / "agent3" / "services" / "development.py"),
+        ("Gateway runtime/event parser", "agent/src/dataagent_gateway/runner.py", agent_root / "src" / "dataagent_gateway" / "runner.py"),
+        ("Portal response filtering", "backend/app/agent/history.py", root / "backend" / "app" / "agent" / "history.py"),
+        ("Portal execution boundary", "backend/app/api/agent.py", root / "backend" / "app" / "api" / "agent.py"),
+    ]
+    files = []
+    for category, display_path, path in sources:
+        try:
+            raw = path.read_text(encoding="utf-8")
+            digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+            content = _sanitize_trace_value(raw)
+            exists = True
+        except (OSError, UnicodeError):
+            digest, content, exists = None, "", False
+        files.append({"category": category, "path": display_path, "exists": exists,
+                      "sha256": digest, "content": content})
+    return {
+        "profile": profile, "modelMode": model_mode, "taskTier": task_tier,
+        "capturedAt": datetime.utcnow().isoformat() + "Z", "files": files,
+        "precedence": [
+            "运行时生成的 cordis.patch.yml 是当前 Harness profile 的实际配置。",
+            "headless.patch.yml / headless-multi.patch.yml 是项目维护的 Profile 源配置。",
+            "tool-catalog.json 与 MCP tools.py 限定暴露的工具及参数。",
+            "Guard、Agent3 Core 和 Portal API 代码执行确定性拦截、业务验证与安全边界。",
+        ],
+        "notice": "这是本轮任务预留时读取的规则文件快照；文件内容中的凭据模式会脱敏，SHA-256 基于原始文件内容计算。",
+    }
 
 
 def owned(db: Session, user_id: int, conversation_id: str) -> AgentConversation:
@@ -145,7 +224,11 @@ def reserve(db: Session, user_id: int, conversation_id: str, run_id: str,
     turn = AgentTurn(
         id=run_id, conversation_id=conversation_id, model_mode=mode,
         question=question, display_question=display_question or question,
-        status="queued", created_at=datetime.utcnow()
+        status="queued", debug_context_json=(
+            _json(_capture_rule_snapshot(mode, conv.task_tier))
+            if os.getenv("DATACONTROL_ADMIN_WORKBENCH_ENABLED") == "1" else None
+        ),
+        created_at=datetime.utcnow()
     )
     db.add(turn)
     try:
@@ -193,7 +276,7 @@ def append_activity(run_id: str, activity: dict):
     e = activity.get("event") if activity.get("type") == "activity" else None
     if not isinstance(e, dict) or e.get("type") not in ("tool_call", "tool_result"):
         return
-    if e.get("tool") not in TOOL_NAMES:
+    if e.get("tool") not in TRACE_TOOL_NAMES:
         return
     call_id = e.get("callId")
     if not isinstance(call_id, str) or not re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", call_id):
@@ -206,11 +289,13 @@ def append_activity(run_id: str, activity: dict):
         if not turn or turn.status in TERMINAL:
             return
         sequence = db.query(AgentToolEvent).filter_by(turn_id=run_id).count() + 1
-        if sequence > 120:
+        if sequence > 2000:
             return
+        payload = _sanitize_trace_value(e)
         db.add(AgentToolEvent(
             turn_id=run_id, sequence=sequence, event_type=e["type"],
             call_id=call_id, tool=e["tool"], status=status,
+            payload_json=(_json(payload) if os.getenv("DATACONTROL_ADMIN_WORKBENCH_ENABLED") == "1" else None),
             created_at=datetime.utcnow(),
         ))
         db.commit()

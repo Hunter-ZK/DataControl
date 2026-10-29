@@ -56,7 +56,7 @@
     </div>
     <el-drawer v-model="mobileNavOpen" title="DataControl 导航" direction="ltr" size="min(300px,85vw)">
       <div class="mobile-links">
-        <RouterLink v-for="item in [...primary,...secondary]" :key="item.to" :to="item.to" @click="mobileNavOpen=false">
+        <RouterLink v-for="item in mobileNavItems" :key="item.to" :to="item.to" @click="mobileNavOpen=false">
           <AssetIcon v-if="'assetType' in item && item.assetType" :type="String(item.assetType)" :size="18" mode="inline"/>
           <component :is="item.icon" v-else :size="18"/>{{item.label}}
         </RouterLink>
@@ -86,7 +86,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { activeAssetOperations } from '@/composables/assetOperations'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, BarChart3, BookOpenCheck, Boxes, CircleGauge, CircleHelp, Database, FileText, Hash, Layers3, Menu, PanelLeftClose, Search, Sparkles, UserRound } from 'lucide-vue-next'
+import { ArrowLeft, BarChart3, BookOpenCheck, Boxes, CircleGauge, CircleHelp, Database, FileText, Hash, Layers3, Menu, PanelLeftClose, Search, Sparkles, UserRound, Wrench } from 'lucide-vue-next'
 import { assetApi, type SearchSuggestion } from '@/api/client'
 import AssetIcon from '@/components/AssetIcon.vue'
 import AssetAgentDrawer from '@/components/AssetAgentDrawer.vue'
@@ -154,12 +154,18 @@ const secondary = [
   { to: '/overview', label: '数据概览', icon: BarChart3 },
   { to: '/profile', label: '个人中心', icon: UserRound },
 ]
-const navGroups = [
+const adminNavEnabled = ref(false)
+const adminNavItem = { to: '/admin', label: '开发管理工作台', icon: Wrench }
+const navGroups = computed(() => [
   { title: '工作空间', items: [primary[0], primary[6], primary[7]] },
   { title: '数据发现', items: [primary[2], primary[1]] },
   { title: '数据理解', items: [primary[5], primary[8], primary[3], primary[9], primary[4]] },
   { title: '其他', items: secondary },
-]
+  ...(adminNavEnabled.value ? [{ title: '开发管理', items: [adminNavItem] }] : []),
+])
+const mobileNavItems = computed(() => [
+  ...primary, ...secondary, ...(adminNavEnabled.value ? [adminNavItem] : []),
+])
 
 function shortcut(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
@@ -167,6 +173,10 @@ function shortcut(event: KeyboardEvent) {
   }
 }
 onMounted(async() => {
+  try {
+    const currentUser = JSON.parse(localStorage.getItem('datacontrol_user') || '{}') as { role?: string }
+    adminNavEnabled.value = import.meta.env.DEV && String(currentUser.role || '').toUpperCase() === 'ADMIN'
+  } catch { adminNavEnabled.value = false }
   window.addEventListener('keydown', shortcut)
   try { const response=await fetch('/health');serviceAvailable.value=response.ok } catch {serviceAvailable.value=false}
 })

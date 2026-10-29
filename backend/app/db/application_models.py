@@ -60,6 +60,7 @@ class AgentTurn(Base):
     display_question: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
     result_json: Mapped[str | None] = mapped_column(Text)
+    debug_context_json: Mapped[str | None] = mapped_column(Text)
     error: Mapped[str | None] = mapped_column(String(240))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime)
@@ -74,4 +75,5 @@ class AgentToolEvent(Base):
     call_id: Mapped[str | None] = mapped_column(String(128))
     tool: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[str | None] = mapped_column(String(16))
+    payload_json: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

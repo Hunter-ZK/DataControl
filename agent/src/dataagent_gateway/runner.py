@@ -266,6 +266,7 @@ def parse_event_stream(stdout: str) -> dict[str, Any]:
                     "callId": call_id,
                     "tool": tool,
                     "status": event.get("status"),
+                    "output": result,
                 }
             )
 
@@ -575,6 +576,7 @@ class HeadlessHarnessRunner:
         """Collect complete JSONL for the existing parser while reporting safe live events."""
         lines: list[str] = []
         tool_labels: dict[str, str] = {}
+        debug_payloads_enabled = os.getenv("DATACONTROL_ADMIN_WORKBENCH_ENABLED") == "1"
         safe_native = {"todo_write", "goal", "subagent", "subagent_fork", "workflow"}
         while True:
             raw = await stream.readline()
@@ -589,8 +591,9 @@ class HeadlessHarnessRunner:
             if not isinstance(event, dict):
                 continue
             event_type = event.get("type")
-            # Never stream user questions, raw tool payloads, SQL, or hidden reasoning.
-            # Only known Agent3 tool identities and validated statuses are UI activity.
+            # Capture tool payloads for the authenticated Portal trace store only.
+            # The Portal strips inputs/outputs before forwarding events to normal browsers.
+            # Hidden reasoning events are deliberately never captured.
             if event_type == "tool_call":
                 tool_name = str(event.get("tool") or "")
                 suffix = _tool_suffix(tool_name)
@@ -599,18 +602,25 @@ class HeadlessHarnessRunner:
                 if isinstance(call_id, str):
                     tool_labels[call_id] = tool
                 LOGGER.info("[Agent:%s] TOOL_START %s", request_id, tool)
-                if on_activity and tool_name.startswith("mcp__agent3__") and suffix in MCP_TOOL_SUFFIXES:
+                if on_activity and ((tool_name.startswith("mcp__agent3__") and suffix in MCP_TOOL_SUFFIXES)
+                                    or suffix in safe_native):
                     if isinstance(call_id, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", call_id):
-                        on_activity({"type": "tool_call", "callId": call_id, "tool": suffix})
+                        activity: dict[str, Any] = {"type": "tool_call", "callId": call_id, "tool": suffix}
+                        if debug_payloads_enabled:
+                            activity["input"] = event.get("input") if isinstance(event.get("input"), dict) else {}
+                        on_activity(activity)
             elif event_type == "tool_result":
                 call_id = event.get("callId")
                 tool = tool_labels.get(call_id, "harness_tool") if isinstance(call_id, str) else "harness_tool"
                 raw_status = event.get("status")
                 status = raw_status if raw_status in {"completed", "error", "failed", "success"} else "unknown"
                 LOGGER.info("[Agent:%s] TOOL_END %s status=%s", request_id, tool, status)
-                if on_activity and tool in MCP_TOOL_SUFFIXES:
+                if on_activity and (tool in MCP_TOOL_SUFFIXES or tool in safe_native):
                     if isinstance(call_id, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", call_id):
-                        on_activity({"type": "tool_result", "callId": call_id, "tool": tool, "status": status})
+                        activity: dict[str, Any] = {"type": "tool_result", "callId": call_id, "tool": tool, "status": status}
+                        if debug_payloads_enabled:
+                            activity["output"] = _json_or_text(event.get("result"))
+                        on_activity(activity)
         return "".join(lines)
 
     async def run(

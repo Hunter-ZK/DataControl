@@ -1,4 +1,4 @@
-"""R1 streaming/cancellation contracts: no raw model data in activity updates."""
+"""R1 streaming/cancellation contracts: internal trace payloads stay off browser streams."""
 from __future__ import annotations
 
 import asyncio
@@ -9,7 +9,8 @@ from dataagent_gateway.app import ACTIVE_TURNS, cancel_query, query_stream, Quer
 from dataagent_gateway.runner import HeadlessHarnessRunner
 
 
-def test_live_activity_projects_only_allowlisted_tool_and_status():
+def test_live_activity_captures_tool_payloads_for_admin_trace_store(monkeypatch):
+    monkeypatch.setenv("DATACONTROL_ADMIN_WORKBENCH_ENABLED", "1")
     secret = "user-sensitive-SQL-secret"
     seen: list[dict] = []
 
@@ -34,10 +35,14 @@ def test_live_activity_projects_only_allowlisted_tool_and_status():
     raw = asyncio.run(collect())
     assert secret in raw  # raw stream is used only internally for final result parsing
     assert seen == [
-        {"type": "tool_call", "callId": "a1", "tool": "resolve_metric"},
-        {"type": "tool_result", "callId": "a1", "tool": "resolve_metric", "status": "completed"},
+        {"type": "tool_call", "callId": "a1", "tool": "resolve_metric",
+         "input": {"sql": secret}},
+        {"type": "tool_result", "callId": "a1", "tool": "resolve_metric",
+         "status": "completed", "output": {"answer": secret}},
     ]
-    assert secret not in json.dumps(seen)
+    # The Gateway-to-Portal hop retains the payload for authenticated admin tracing;
+    # the Portal is responsible for stripping it from ordinary browser responses.
+    assert secret in json.dumps(seen)
 
 
 def test_cancel_endpoint_cancels_server_task():
