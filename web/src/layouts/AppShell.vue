@@ -52,6 +52,7 @@
         </div>
       </header>
       <main><RouterView /></main>
+      <AssetAgentDrawer/>
     </div>
     <el-drawer v-model="mobileNavOpen" title="DataControl 导航" direction="ltr" size="min(300px,85vw)">
       <div class="mobile-links">
@@ -88,6 +89,7 @@ import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, BarChart3, BookOpenCheck, Boxes, CircleGauge, CircleHelp, Database, FileText, Hash, Layers3, Menu, PanelLeftClose, Search, Sparkles, UserRound } from 'lucide-vue-next'
 import { assetApi, type SearchSuggestion } from '@/api/client'
 import AssetIcon from '@/components/AssetIcon.vue'
+import AssetAgentDrawer from '@/components/AssetAgentDrawer.vue'
 
 const router = useRouter()
 const mobileNavOpen=ref(false)

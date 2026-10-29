@@ -39,6 +39,7 @@ import { Copy, Download, Ellipsis, Heart, Search, Sparkles } from 'lucide-vue-ne
 import { ElMessage } from 'element-plus'
 import { activityApi } from '@/api/client'
 import { activeAssetOperations, type AssetOperation } from '@/composables/assetOperations'
+import { openAssetAgent } from '@/composables/assetAgentDrawer'
 import { createCaseDraft, createDdlDraft, createSelectDraft, makeCsv, type ExportColumn } from '@/utils/assetExport'
 
 type Kind = 'TABLE' | 'COLUMN' | 'METRIC' | 'CODE_TABLE' | 'STANDARD' | 'WORD_ROOT' | 'STAT_SYSTEM'
@@ -60,10 +61,6 @@ const previewText = ref('')
 const noun: Record<Kind, string> = {
   TABLE:'这张表', COLUMN:'这个字段', METRIC:'这个指标',
   CODE_TABLE:'这个码表', STANDARD:'这个标准', WORD_ROOT:'这个词根', STAT_SYSTEM:'这个制度',
-}
-const assetKind: Record<Kind, string> = {
-  TABLE:'数据集', COLUMN:'字段', METRIC:'指标', CODE_TABLE:'码表',
-  STANDARD:'数据标准', WORD_ROOT:'词根', STAT_SYSTEM:'统计制度',
 }
 const askLabel = computed(() => '问' + noun[props.kind])
 const code = computed(() => String(props.asset.tableName || props.asset.columnName || props.asset.metricCode ||
@@ -127,13 +124,8 @@ function preview(title:string,content:string) {
   previewTitle.value=title;previewText.value=content;previewOpen.value=true
 }
 function ask(task:string) {
-  const context=assetKind[props.kind]+'“'+label.value+'”（asset_id='+id.value+'）'
-  const prompt=task==='sql'?'请基于'+context+'生成可信的查询 SQL，先核查字段和统计口径，不执行 SQL。'
-    : task==='explain'?'请根据可核验的内部元数据解释'+context+'，明确标记缺失证据。'
-      :'请根据内部元数据帮助我理解'+context+'。'
-  if (props.kind==='TABLE') {
-    void router.push({name:'agent',query:task==='ask'?{asset:id.value}:{asset:id.value,q:prompt}})
-  } else void router.push({name:'agent',query:{q:prompt}})
+  openAssetAgent({assetType:props.kind,assetId:id.value,name:label.value,
+    technicalName:code.value,task:task==='sql'?'sql':task==='explain'?'explain':'ask'})
 }
 async function toggleFavorite() {
   if(savingFavorite.value)return
