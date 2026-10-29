@@ -405,6 +405,8 @@ def get_effective_rules(
     files = [
         _file_record("系统提示词 / Profile", f"agent/dsh/profile/{overlay}",
                      agent_root / "dsh" / "profile" / overlay),
+        _file_record("Agent query preset / system instructions", "agent/dsh/presets/dataagent-query/agent.cordis.yml",
+                     agent_root / "dsh" / "presets" / "dataagent-query" / "agent.cordis.yml"),
         _file_record("Profile 基础配置", "agent/dsh/profile/cordis.patch.yml",
                      agent_root / "dsh" / "profile" / "cordis.patch.yml"),
         _file_record("运行时实际生成配置", f".local/profiles/{profile}/cordis.patch.yml",

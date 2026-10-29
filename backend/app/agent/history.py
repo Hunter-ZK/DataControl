@@ -81,6 +81,8 @@ def _capture_rule_snapshot(model_mode: str, task_tier: str) -> dict:
     dsh_home = Path(os.getenv("DSH_HOME", str(root / ".local" / "dsh-home-v0.2.1-rc.3"))).resolve()
     sources = [
         ("System Prompt / Profile", f"agent/dsh/profile/{overlay}", agent_root / "dsh" / "profile" / overlay),
+        ("Agent query preset / system instructions", "agent/dsh/presets/dataagent-query/agent.cordis.yml",
+         agent_root / "dsh" / "presets" / "dataagent-query" / "agent.cordis.yml"),
         ("Profile baseline", "agent/dsh/profile/cordis.patch.yml", agent_root / "dsh" / "profile" / "cordis.patch.yml"),
         ("Active runtime profile", f".local/profiles/{profile}/cordis.patch.yml", dsh_home / "profiles" / profile / "cordis.patch.yml"),
         ("MCP tool allowlist", "agent/tool-catalog.json", agent_root / "tool-catalog.json"),
