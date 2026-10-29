@@ -3,7 +3,7 @@
     <button class="dc-back" @click="router.back()"><ArrowLeft :size="16"/>返回资产列表</button>
     <section v-if="data" class="detail-head dc-card">
       <div class="head-main"><div class="head-tags"><AssetIcon type="TABLE" :size="18"/><span class="dc-chip">{{data.layerCode}}</span><span class="status"><CircleCheck v-if="data.status==='ONLINE'" :size="13"/><Clock3 v-else :size="13"/>{{data.status==='ONLINE'?'在用':data.status}}</span></div><h1>{{data.bizName}}</h1><code class="dc-tech">{{data.tableName}}</code><p>{{data.catalogCode}} · {{data.assetId}}</p></div>
-      <div class="head-actions"><el-button @click="copyName"><Copy :size="15"/>复制表名</el-button><el-button @click="tab='relations'"><GitFork :size="15"/>关系与血缘</el-button><el-button type="primary" @click="router.push({name:'agent',query:{asset:data.assetId}})"><Sparkles :size="15"/>问这张表</el-button></div>
+      <AssetOperationBar kind="TABLE" :asset="data" :columns="columns" :columns-complete="columnsComplete"/>
     </section>
 
     <section v-if="data" class="meta-strip dc-card">
@@ -72,11 +72,14 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowUpRight, CircleCheck, Clock3, Code2, Copy, GitFork, ListTree, PanelRightOpen, Sparkles, TriangleAlert, X } from 'lucide-vue-next'
 import AssetIcon from '@/components/AssetIcon.vue'
+import AssetOperationBar from '@/components/AssetOperationBar.vue'
 import api from '@/api/client'
 import { ElMessage } from 'element-plus'
 import DatasetRelationPanel from '@/components/DatasetRelationPanel.vue'
 import { activityApi, assetApi } from '@/api/client'
 const route=useRoute(); const router=useRouter(); const data=ref<any|null>(null); const columns=ref<any[]>([]); const tags=ref<any[]>([]); const sqlRows=ref<any[]>([]); const changes=ref<any[]>([]); const tab=ref(String(route.query.tab||'overview')); const columnKeyword=ref('')
+const columnsLoaded=ref(false)
+const columnsComplete=computed(()=>columnsLoaded.value && columns.value.length>0 && columns.value.length<500)
 const previewOpen=ref(false)
 const previewLoading=ref(false)
 const previewError=ref('')
@@ -112,13 +115,13 @@ function formatTime(v?:string){return v?String(v).replace('T',' ').slice(0,16):'
 async function copyName(){if(!data.value)return;await navigator.clipboard.writeText(data.value.tableName);ElMessage.success('已复制表名')}
 watch(()=>route.params.id,async(value)=>{
   const id=String(value)
-  data.value=null;columns.value=[];tags.value=[];sqlRows.value=[];changes.value=[];columnKeyword.value=''
+  data.value=null;columns.value=[];columnsLoaded.value=false;tags.value=[];sqlRows.value=[];changes.value=[];columnKeyword.value=''
   previewOpen.value=false;previewEpoch++
   const result=await assetApi.table(id)
   if(String(route.params.id)!==id)return
   data.value=result
   await Promise.allSettled([
-    assetApi.columns({dataset_id:id,limit:500}).then((v:any)=>{if(String(route.params.id)===id)columns.value=v}),
+    assetApi.columns({dataset_id:id,limit:500}).then((v:any)=>{if(String(route.params.id)===id){columns.value=v;columnsLoaded.value=true}}),
     assetApi.tags(id).then((v:any)=>{if(String(route.params.id)===id)tags.value=v}),
     assetApi.commonSql(id).then((v:any)=>{if(String(route.params.id)===id)sqlRows.value=v}),
     assetApi.changes(id).then((v:any)=>{if(String(route.params.id)===id)changes.value=v}),
