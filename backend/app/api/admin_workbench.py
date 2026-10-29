@@ -16,7 +16,7 @@ from backend.app.api.assets import get_db
 from backend.app.api.auth import get_current_user
 from backend.app.core.config import ROOT
 from backend.app.db.application_models import AgentConversation, AgentToolEvent, AgentTurn
-from backend.app.db.models import ChangeLog, Column, Dataset, User
+from backend.app.db.models import ChangeLog, Column, Dataset, Metric, User
 
 router = APIRouter(prefix="/api/v1/admin/workbench", tags=["admin-workbench"])
 
@@ -88,6 +88,29 @@ class ColumnMetadataPatch(BaseModel):
     unit: str | None = Field(default=None, max_length=32)
     code_table_no: str | None = Field(default=None, max_length=64)
     standard_no: str | None = Field(default=None, max_length=64)
+
+
+class MetricMetadataPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    metric_name: str | None = Field(default=None, max_length=128)
+    aliases: str | None = Field(default=None, max_length=500)
+    biz_definition: str | None = None
+    stat_system_code: str | None = Field(default=None, max_length=64)
+    aggregation: str | None = Field(default=None, max_length=16)
+    measure_column: str | None = Field(default=None, max_length=128)
+    time_field: str | None = Field(default=None, max_length=128)
+    time_additivity: str | None = Field(default=None, max_length=16)
+    caliber_desc: str | None = None
+    valid_dimensions: str | None = Field(default=None, max_length=500)
+    metric_kind: str | None = Field(default=None, max_length=16)
+    numerator_metric_code: str | None = Field(default=None, max_length=64)
+    denominator_metric_code: str | None = Field(default=None, max_length=64)
+    formula: str | None = None
+    time_grain: str | None = Field(default=None, max_length=16)
+    latest_strategy: str | None = Field(default=None, max_length=32)
+    mandatory_filters: str | None = None
+    semantic_notes: str | None = None
+    status: str | None = Field(default=None, max_length=16)
 
 
 @router.get("/metadata/datasets")
@@ -182,6 +205,77 @@ def update_metadata_column(
         db.commit()
         db.refresh(row)
     return {"code": "OK", "data": _column_payload(row)}
+
+
+def _metric_payload(row: Metric, source: Dataset | None = None) -> dict[str, Any]:
+    return {
+        "assetId": row.asset_id, "metricCode": row.metric_code, "metricName": row.metric_name,
+        "aliases": row.aliases, "bizDefinition": row.biz_definition,
+        "sourceDatasetId": row.source_dataset_id,
+        "sourceDatasetName": source.biz_name if source else row.source_dataset_id,
+        "sourceTableName": source.table_name if source else None,
+        "statSystemCode": row.stat_system_code, "aggregation": row.aggregation,
+        "measureColumn": row.measure_column, "timeField": row.time_field,
+        "timeAdditivity": row.time_additivity, "caliberDesc": row.caliber_desc,
+        "validDimensions": row.valid_dimensions, "metricKind": row.metric_kind,
+        "numeratorMetricCode": row.numerator_metric_code,
+        "denominatorMetricCode": row.denominator_metric_code, "formula": row.formula,
+        "timeGrain": row.time_grain, "latestStrategy": row.latest_strategy,
+        "mandatoryFilters": row.mandatory_filters, "semanticNotes": row.semantic_notes,
+        "status": row.status,
+    }
+
+
+@router.get("/metadata/metrics")
+def list_metadata_metrics(
+    keyword: str | None = None,
+    limit: int = Query(100, ge=1, le=300),
+    user: User = Depends(require_admin_dev),
+    db: Session = Depends(get_db),
+):
+    stmt = select(Metric, Dataset).join(Dataset, Dataset.asset_id == Metric.source_dataset_id)
+    count_stmt = select(func.count(Metric.asset_id)).join(
+        Dataset, Dataset.asset_id == Metric.source_dataset_id
+    )
+    if keyword and keyword.strip():
+        term = f"%{keyword.strip()}%"
+        predicate = or_(Metric.metric_code.ilike(term), Metric.metric_name.ilike(term),
+                        Metric.biz_definition.ilike(term), Dataset.table_name.ilike(term))
+        stmt = stmt.where(predicate)
+        count_stmt = count_stmt.where(predicate)
+    rows = db.execute(stmt.order_by(Metric.metric_name).limit(limit)).all()
+    total = db.scalar(count_stmt) or 0
+    return {"code": "OK", "data": {"items": [_metric_payload(metric, source) for metric, source in rows],
+                                    "total": total}}
+
+
+@router.patch("/metadata/metrics/{metric_code}")
+def update_metadata_metric(
+    metric_code: str,
+    body: MetricMetadataPatch,
+    user: User = Depends(require_admin_dev),
+    db: Session = Depends(get_db),
+):
+    row = db.execute(select(Metric).where(Metric.metric_code == metric_code)).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "Metric not found")
+    values = body.model_dump(exclude_unset=True)
+    if "metric_name" in values and (values["metric_name"] is None or not values["metric_name"].strip()):
+        raise HTTPException(422, "Metric name cannot be empty")
+    changes: dict[str, dict[str, Any]] = {}
+    for key, value in values.items():
+        old = getattr(row, key)
+        if old != value:
+            changes[key] = {"before": old, "after": value}
+            setattr(row, key, value)
+    if changes:
+        db.add(ChangeLog(dataset_id=row.source_dataset_id, change_type="METRIC_EDIT",
+                         content=_json({"entity": "metric", "metricCode": row.metric_code,
+                                        "changes": changes}), changed_by=user.username))
+        db.commit()
+        db.refresh(row)
+    source = db.get(Dataset, row.source_dataset_id)
+    return {"code": "OK", "data": _metric_payload(row, source)}
 
 
 @router.get("/runs")
@@ -305,12 +399,16 @@ def get_effective_rules(
         _file_record("运行时实际生成配置", f".local/profiles/{profile}/cordis.patch.yml",
                      dsh_home / "profiles" / profile / "cordis.patch.yml"),
         _file_record("可用 MCP 工具目录", "agent/tool-catalog.json", agent_root / "tool-catalog.json"),
+        _file_record("Guard 执行入口", "agent/guard-plugin/src/index.ts",
+                     agent_root / "guard-plugin" / "src" / "index.ts"),
         _file_record("Guard 硬规则", "agent/guard-plugin/src/policy.ts",
                      agent_root / "guard-plugin" / "src" / "policy.ts"),
         _file_record("MCP 工具参数定义", "agent/src/agent3/adapters/mcp/tools.py",
                      agent_root / "src" / "agent3" / "adapters" / "mcp" / "tools.py"),
         _file_record("确定性业务规则与 SQL 边界", "agent/src/agent3/services/core.py",
                      agent_root / "src" / "agent3" / "services" / "core.py"),
+        _file_record("数仓开发草案规则", "agent/src/agent3/services/development.py",
+                     agent_root / "src" / "agent3" / "services" / "development.py"),
         _file_record("Harness 调用与事件解析", "agent/src/dataagent_gateway/runner.py",
                      agent_root / "src" / "dataagent_gateway" / "runner.py"),
         _file_record("Portal 事件过滤与安全策略", "backend/app/agent/history.py",
@@ -321,5 +419,11 @@ def get_effective_rules(
     return {"code": "OK", "data": {
         "profile": profile, "modelMode": modelMode, "taskTier": taskTier,
         "files": files,
+        "precedence": [
+            "运行时生成的 cordis.patch.yml 是当前 Harness profile 的实际配置；",
+            "headless.patch.yml / headless-multi.patch.yml 是项目维护的 Profile 源配置，启动脚本负责同步；",
+            "tool-catalog.json 与 MCP tools.py 限定暴露的工具及参数；",
+            "Guard、Agent3 Core 和 Portal API 代码执行确定性拦截、业务验证与安全边界。",
+        ],
         "notice": "文件内容来自当前工作区。历史运行尚未保存完整配置快照；若配置已变更，当前内容不一定等于历史运行时版本。",
     }}
