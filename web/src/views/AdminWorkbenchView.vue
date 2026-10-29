@@ -180,6 +180,10 @@
         </main>
       </div>
       <div class="trace-limit-note"><Info :size="15" /><span>{{ rulesResult?.notice || '这里显示实际文件内容。当前尚未把每次运行时的规则文件完整快照写入历史，因此历史运行和当前配置可能不同。' }}</span></div>
+      <div v-if="rulesResult?.precedence?.length" class="precedence-note">
+        <b>规则生效与覆盖关系</b>
+        <ol><li v-for="item in rulesResult.precedence" :key="item">{{ item }}</li></ol>
+      </div>
       <div class="rule-legend">
         <div><span class="legend-dot prompt"></span><b>Prompt / Profile</b><p>告诉模型如何判断、规划和表达；本身不等于代码级阻断。</p></div>
         <div><span class="legend-dot tools"></span><b>工具目录 / Schema</b><p>决定模型实际能调用哪些工具、每个工具接受什么参数。</p></div>
@@ -189,10 +193,17 @@
 
     <section v-else class="panel metadata-panel">
       <div class="panel-heading">
-        <div><h2>数据集与字段元数据</h2><p>直接读取本地元数据数据库。保存后写入数据库并记录变更审计。</p></div>
-        <el-button :icon="RefreshCw" @click="loadDatasets" :loading="datasetsLoading">刷新元数据</el-button>
+        <div><h2>{{ metadataEntity === 'datasets' ? '数据集与字段元数据' : '业务指标语义' }}</h2><p>修改后直接写入本地元数据数据库，并记录变更审计。</p></div>
+        <div class="metadata-head-actions">
+          <div class="entity-switch">
+            <button :class="{ active: metadataEntity === 'datasets' }" @click="metadataEntity = 'datasets'">数据集 / 字段</button>
+            <button :class="{ active: metadataEntity === 'metrics' }" @click="metadataEntity = 'metrics'">指标语义</button>
+          </div>
+          <el-button v-if="metadataEntity === 'datasets'" :icon="RefreshCw" @click="loadDatasets" :loading="datasetsLoading">刷新元数据</el-button>
+          <el-button v-else :icon="RefreshCw" @click="loadMetrics" :loading="metricsLoading">刷新指标</el-button>
+        </div>
       </div>
-      <div class="metadata-layout">
+      <div v-if="metadataEntity === 'datasets'" class="metadata-layout">
         <aside class="dataset-list">
           <div class="filter-row dataset-filter">
             <el-input v-model="datasetKeyword" clearable placeholder="搜索数据集名称、表名" :prefix-icon="Search" @keydown.enter="loadDatasets" />
@@ -243,6 +254,55 @@
           <el-empty v-else description="选择一个数据集以查看和编辑元数据" :image-size="100" />
         </main>
       </div>
+      <div v-else class="metadata-layout metric-layout">
+        <aside class="dataset-list">
+          <div class="filter-row dataset-filter">
+            <el-input v-model="metricKeyword" clearable placeholder="搜索指标名称、编码或来源表" :prefix-icon="Search" @keydown.enter="loadMetrics" />
+            <el-button :icon="Search" @click="loadMetrics" />
+          </div>
+          <div class="list-caption">业务指标 <span>{{ metricRows.length }} / {{ metricTotal }}</span></div>
+          <button v-for="metric in metricRows" :key="metric.metricCode" class="dataset-item" :class="{ selected: selectedMetricCode === metric.metricCode }" @click="selectMetric(metric)">
+            <Activity :size="17" />
+            <span><b>{{ metric.metricName }}</b><small>{{ metric.metricCode }}</small><small>{{ metric.sourceTableName || metric.sourceDatasetName }}</small></span>
+          </button>
+          <el-empty v-if="!metricRows.length && !metricsLoading" description="没有找到业务指标" :image-size="70" />
+        </aside>
+        <main class="metadata-editor">
+          <template v-if="metricDraft">
+            <div class="detail-heading">
+              <div><div class="detail-kicker">METRIC SEMANTIC</div><h3>{{ metricDraft.metricName }}</h3><code>{{ metricDraft.metricCode }}</code></div>
+              <el-button type="primary" :icon="Save" :loading="savingMetric" @click="saveMetric">保存指标</el-button>
+            </div>
+            <div class="trace-limit-note"><Info :size="15" /><span>指标语义会直接影响 Agent 的指标解析、维度选择和 SQL 生成。修改聚合方式、度量字段、时间字段或强制过滤条件前，请确认业务口径。</span></div>
+            <div class="metadata-fields metric-fields">
+              <label>指标名称<el-input v-model="metricDraft.metricName" /></label>
+              <label>指标编码<el-input :model-value="metricDraft.metricCode" disabled /></label>
+              <label>来源数据表<el-input :model-value="metricDraft.sourceTableName || ''" disabled /></label>
+              <label>来源数据集 ID<el-input :model-value="metricDraft.sourceDatasetId" disabled /></label>
+              <label>业务定义<el-input v-model="metricDraft.bizDefinition" type="textarea" :rows="3" /></label>
+              <label>指标别名<el-input v-model="metricDraft.aliases" placeholder="多个别名以逗号分隔" /></label>
+              <label>聚合方式<el-input v-model="metricDraft.aggregation" /></label>
+              <label>度量字段<el-input v-model="metricDraft.measureColumn" /></label>
+              <label>时间字段<el-input v-model="metricDraft.timeField" /></label>
+              <label>时间可加性<el-input v-model="metricDraft.timeAdditivity" /></label>
+              <label>统计口径<el-input v-model="metricDraft.caliberDesc" type="textarea" :rows="2" /></label>
+              <label>有效维度<el-input v-model="metricDraft.validDimensions" placeholder="多个字段以逗号分隔" /></label>
+              <label>指标类型<el-input v-model="metricDraft.metricKind" /></label>
+              <label>分子指标编码<el-input v-model="metricDraft.numeratorMetricCode" /></label>
+              <label>分母指标编码<el-input v-model="metricDraft.denominatorMetricCode" /></label>
+              <label>计算公式<el-input v-model="metricDraft.formula" type="textarea" :rows="2" /></label>
+              <label>时间粒度<el-input v-model="metricDraft.timeGrain" /></label>
+              <label>最新值策略<el-input v-model="metricDraft.latestStrategy" /></label>
+              <label>强制过滤条件（JSON）<el-input v-model="metricDraft.mandatoryFilters" type="textarea" :rows="3" /></label>
+              <label>语义备注<el-input v-model="metricDraft.semanticNotes" type="textarea" :rows="3" /></label>
+              <label>统计制度编号<el-input v-model="metricDraft.statSystemCode" /></label>
+              <label>状态<el-input v-model="metricDraft.status" /></label>
+            </div>
+            <div class="metadata-foot"><span>来源数据集为只读关联，不允许在此处直接更换。</span><span>实际修改会写入变更日志。</span></div>
+          </template>
+          <el-empty v-else description="选择一个业务指标以查看和编辑语义" :image-size="100" />
+        </main>
+      </div>
     </section>
   </div>
 </template>
@@ -259,6 +319,7 @@ import {
   type AdminColumnRecord,
   type AdminDatasetRecord,
   type AdminDatasetSummary,
+  type AdminMetricRecord,
   type AdminRuleFile,
   type AdminRulesResult,
   type AdminRunDetail,
@@ -284,6 +345,15 @@ const ruleFiles = ref<AdminRuleFile[]>([])
 const selectedRulePath = ref('')
 const rulesLoading = ref(false)
 const selectedRule = computed(() => ruleFiles.value.find((item) => item.path === selectedRulePath.value) || null)
+
+const metadataEntity = ref<'datasets' | 'metrics'>('datasets')
+const metricKeyword = ref('')
+const metricRows = ref<AdminMetricRecord[]>([])
+const metricTotal = ref(0)
+const metricsLoading = ref(false)
+const selectedMetricCode = ref('')
+const metricDraft = ref<AdminMetricRecord | null>(null)
+const savingMetric = ref(false)
 
 const datasetKeyword = ref('')
 const datasetRows = ref<AdminDatasetSummary[]>([])
@@ -365,6 +435,46 @@ async function loadRules() {
   } catch (error) { ElMessage.error('读取 Agent 规则失败：' + messageOf(error)) }
   finally { rulesLoading.value = false }
 }
+async function loadMetrics() {
+  metricsLoading.value = true
+  try {
+    const result = await adminWorkbenchApi.metrics(metricKeyword.value, 200)
+    metricRows.value = result.items
+    metricTotal.value = result.total
+    if (!selectedMetricCode.value && metricRows.value.length) selectMetric(metricRows.value[0])
+    else if (selectedMetricCode.value && !metricRows.value.some((item) => item.metricCode === selectedMetricCode.value) && metricRows.value.length) {
+      selectMetric(metricRows.value[0])
+    }
+  } catch (error) { ElMessage.error('读取业务指标失败：' + messageOf(error)) }
+  finally { metricsLoading.value = false }
+}
+function selectMetric(metric: AdminMetricRecord) {
+  selectedMetricCode.value = metric.metricCode
+  metricDraft.value = { ...metric }
+}
+async function saveMetric() {
+  const draft = metricDraft.value
+  if (!draft || savingMetric.value) return
+  savingMetric.value = true
+  try {
+    const updated = await adminWorkbenchApi.updateMetric(draft.metricCode, {
+      metric_name: draft.metricName, aliases: draft.aliases ?? null,
+      biz_definition: draft.bizDefinition ?? null, stat_system_code: draft.statSystemCode ?? null,
+      aggregation: draft.aggregation, measure_column: draft.measureColumn, time_field: draft.timeField,
+      time_additivity: draft.timeAdditivity, caliber_desc: draft.caliberDesc ?? null,
+      valid_dimensions: draft.validDimensions ?? null, metric_kind: draft.metricKind,
+      numerator_metric_code: draft.numeratorMetricCode ?? null,
+      denominator_metric_code: draft.denominatorMetricCode ?? null, formula: draft.formula ?? null,
+      time_grain: draft.timeGrain ?? null, latest_strategy: draft.latestStrategy,
+      mandatory_filters: draft.mandatoryFilters ?? null, semantic_notes: draft.semanticNotes ?? null,
+      status: draft.status,
+    })
+    metricDraft.value = updated
+    await loadMetrics()
+    ElMessage.success('指标语义已保存，实际变更已写入审计日志。')
+  } catch (error) { ElMessage.error('保存指标语义失败：' + messageOf(error)) }
+  finally { savingMetric.value = false }
+}
 async function loadDatasets() {
   datasetsLoading.value = true
   try {
@@ -418,7 +528,7 @@ async function refreshSelectedRun() {
   }
 }
 onMounted(async () => {
-  await Promise.all([loadRuns(), loadRules(), loadDatasets()])
+  await Promise.all([loadRuns(), loadRules(), loadDatasets(), loadMetrics()])
   pollHandle = window.setInterval(async () => {
     if (activeTab.value === 'debug') {
       await loadRuns()
@@ -430,6 +540,14 @@ onBeforeUnmount(() => { if (pollHandle !== undefined) window.clearInterval(pollH
 </script>
 
 <style scoped>
+.metadata-head-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.entity-switch{display:flex;gap:3px;padding:4px;border:1px solid var(--dc-border);border-radius:9px;background:#f5f8fd}
+.entity-switch button{border:0;border-radius:6px;padding:7px 10px;background:transparent;color:var(--dc-text-2);font-size:12px;font-weight:650;cursor:pointer}
+.entity-switch button.active{background:#fff;color:var(--dc-primary);box-shadow:0 2px 7px #284f8b12}
+.precedence-note{padding:13px 20px;border-top:1px solid var(--dc-border);background:#fafcff;color:var(--dc-text-2);font-size:12px}
+.precedence-note b{font-size:12px}
+.precedence-note ol{margin:8px 0 0;padding-left:20px;display:grid;gap:5px;line-height:1.65;color:var(--dc-text-3)}
+.metric-fields label:nth-child(5),.metric-fields label:nth-child(11),.metric-fields label:nth-child(16),.metric-fields label:nth-child(19),.metric-fields label:nth-child(20){grid-column:span 2}
 .admin-workbench{max-width:1600px;margin:0 auto;padding:28px 30px 42px;color:var(--dc-text);display:grid;gap:18px}
 .page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
 .eyebrow{display:flex;align-items:center;gap:7px;color:var(--dc-primary);font-size:11px;font-weight:800;letter-spacing:.12em}
