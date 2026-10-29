@@ -70,11 +70,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ArrowUpRight, CircleCheck, Clock3, Code2, Copy, GitFork, ListTree, PanelRightOpen, Sparkles, TriangleAlert, X } from 'lucide-vue-next'
+import { ArrowLeft, ArrowUpRight, CircleCheck, Clock3, Code2, GitFork, ListTree, PanelRightOpen, TriangleAlert, X } from 'lucide-vue-next'
 import AssetIcon from '@/components/AssetIcon.vue'
 import AssetOperationBar from '@/components/AssetOperationBar.vue'
 import api from '@/api/client'
-import { ElMessage } from 'element-plus'
 import DatasetRelationPanel from '@/components/DatasetRelationPanel.vue'
 import { activityApi, assetApi } from '@/api/client'
 const route=useRoute(); const router=useRouter(); const data=ref<any|null>(null); const columns=ref<any[]>([]); const tags=ref<any[]>([]); const sqlRows=ref<any[]>([]); const changes=ref<any[]>([]); const tab=ref(String(route.query.tab||'overview')); const columnKeyword=ref('')
@@ -112,7 +111,6 @@ async function openPreview(kind:'STANDARD'|'CODE_TABLE',code:string){
 }
 const filteredColumns=computed(()=>{const k=columnKeyword.value.trim().toLowerCase();return k?columns.value.filter(x=>`${x.columnName} ${x.cnName||''} ${x.bizDefinition||''}`.toLowerCase().includes(k)):columns.value})
 function formatTime(v?:string){return v?String(v).replace('T',' ').slice(0,16):'—'}
-async function copyName(){if(!data.value)return;await navigator.clipboard.writeText(data.value.tableName);ElMessage.success('已复制表名')}
 watch(()=>route.params.id,async(value)=>{
   const id=String(value)
   data.value=null;columns.value=[];columnsLoaded.value=false;tags.value=[];sqlRows.value=[];changes.value=[];columnKeyword.value=''
