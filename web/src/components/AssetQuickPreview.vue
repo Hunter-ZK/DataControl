@@ -16,6 +16,9 @@
           <div v-for="fact in facts" :key="fact.label"><dt>{{fact.label}}</dt><dd>{{fact.value}}</dd></div>
         </dl>
         <div v-if="detailError" class="preview-muted">详细信息暂不可用，以上为搜索索引信息。</div>
+        <div v-if="tableColumns.length" class="preview-columns"><b>已登记字段（前 5 项，共 {{totalColumns}} 项）</b>
+          <span v-for="column in tableColumns" :key="column.columnName"><code>{{column.columnName}}</code><span>{{column.cnName||column.dataType||'—'}}</span></span>
+        </div>
         <div v-if="codeValues.length" class="preview-code-values">
           <b>码值预览（前 4 项）</b><span v-for="v in codeValues" :key="v.value"><code>{{v.value}}</code>{{v.name}}</span>
         </div>
@@ -33,6 +36,9 @@
         <div v-if="detailLoading" class="preview-muted">正在读取元数据…</div>
         <dl v-else-if="detail" class="preview-facts"><div v-for="fact in facts" :key="fact.label"><dt>{{fact.label}}</dt><dd>{{fact.value}}</dd></div></dl>
         <div v-if="detailError" class="preview-muted">详细信息暂不可用，保留搜索索引摘要。</div>
+        <div v-if="tableColumns.length" class="preview-columns"><b>已登记字段（前 5 项，共 {{totalColumns}} 项）</b>
+          <span v-for="column in tableColumns" :key="column.columnName"><code>{{column.columnName}}</code><span>{{column.cnName||column.dataType||'—'}}</span></span>
+        </div>
         <div v-if="codeValues.length" class="preview-code-values"><b>码值预览</b><span v-for="v in codeValues" :key="v.value"><code>{{v.value}}</code>{{v.name}}</span></div>
         <footer><button @click.stop="dialogOpen=false">关闭</button><button @click.stop="dialogOpen=false;emit('open',item)">打开资产详情 <ArrowRight :size="15"/></button></footer>
       </div>
@@ -57,6 +63,8 @@ const description=computed(()=>value('bizDefinition')||value('definition')||valu
 const facts=computed(()=>[
   {label:'业务名称',value:value('bizName')||value('cnName')||value('name')},
   {label:'数据类型',value:value('dataType')},
+  {label:'数据粒度',value:value('grain')},
+  {label:'统计口径',value:value('statCaliber')},
   {label:'所属数据集',value:value('datasetId')},
   {label:'数仓层级',value:value('layerCode')},
   {label:'统计时间字段',value: typeof detail.value?.time==='object' && detail.value.time ? String((detail.value.time as Record<string,unknown>).field||'') : ''},
@@ -64,6 +72,9 @@ const facts=computed(()=>[
   {label:'关联码表',value:value('codeTableNo')},
   {label:'负责人员',value:value('techOwner')},
 ].filter(x=>x.value).slice(0,6))
+const totalColumns=computed(()=>Array.isArray(detail.value?.columns)?detail.value.columns.length:0)
+const tableColumns=computed(()=>Array.isArray(detail.value?.columns)
+  ? (detail.value.columns as Array<{columnName:string;cnName?:string;dataType?:string}>).slice(0,5):[])
 const codeValues=computed(()=>Array.isArray(detail.value?.values)
   ? (detail.value.values as Array<{value:string;name:string}>).slice(0,4):[])
 let fetchedKey=''
@@ -108,4 +119,9 @@ function pin(){dialogOpen.value=true;loadDetail()}
 .preview-body footer button{display:flex;align-items:center;gap:6px;border:1px solid #c9dcf7;border-radius:8px;background:#fff;padding:9px 12px;color:#2f68c5;cursor:pointer;font-size:12px;font-weight:720}
 .preview-body footer button:last-child{background:#2c6deb;border-color:#2c6deb;color:white}
 @media(max-width:600px){.preview-facts{grid-template-columns:1fr}}
+ .preview-columns{display:grid;gap:6px;padding:10px 12px;background:#f4f8ff;border:1px solid #dbe8f9;border-radius:9px}
+.preview-columns>b{font-size:12px;color:#335a91}
+.preview-columns>span{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;font-size:12px;color:#617b9c;border-bottom:1px solid #e3ecf8;padding:5px 0}
+.preview-columns>span:last-child{border:0}
+.preview-columns code{font:12px var(--dc-mono);overflow-wrap:anywhere;color:#2566c6}
 </style>
