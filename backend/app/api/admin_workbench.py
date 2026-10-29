@@ -265,6 +265,7 @@ def get_agent_run(
         "status": turn.status, "createdAt": turn.created_at.isoformat() if turn.created_at else None,
         "finishedAt": turn.finished_at.isoformat() if turn.finished_at else None,
         "error": turn.error, "events": events, "result": result,
+        "toolEventCount": len(events), "durationMs": result.get("durationMs") if isinstance(result, dict) else None,
         "tracePayloadsAvailable": any(item["payload"] is not None for item in events),
         "tokenUsage": None, "tokenUsageNote": "当前 Harness 事件流未提供可靠的 token 统计。",
     }}

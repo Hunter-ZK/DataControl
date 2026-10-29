@@ -82,7 +82,7 @@ async def agent_query(body: AgentQuery, user: User = Depends(get_current_user)):
         )
     except AgentRuntimeError as exc:
         raise HTTPException(502, detail=str(exc)) from exc
-    return {"code": "OK", "data": history.public_answer(data)}
+    return {"code": "OK", "data": history.public_answer(history._safe_answer(data))}
 
 LOG = logging.getLogger("uvicorn.error")
 

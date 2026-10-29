@@ -405,8 +405,8 @@ export interface AdminRunEvent {
   sequence: number; type: string; callId?: string | null; tool: string; status?: string | null
   createdAt?: string | null; payload?: Record<string, unknown> | null
 }
-export interface AdminRunDetail extends AdminRunSummary {
-  contextAsset?: unknown; events: AdminRunEvent[]; result?: Record<string, unknown> | null
+export interface AdminRunDetail extends Omit<AdminRunSummary, 'toolEventCount'> {
+  toolEventCount?: number; contextAsset?: unknown; events: AdminRunEvent[]; result?: Record<string, unknown> | null
   tracePayloadsAvailable: boolean; tokenUsage?: unknown; tokenUsageNote: string
 }
 export interface AdminRuleFile {

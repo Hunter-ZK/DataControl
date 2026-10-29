@@ -590,8 +590,9 @@ class HeadlessHarnessRunner:
             if not isinstance(event, dict):
                 continue
             event_type = event.get("type")
-            # Never stream user questions, raw tool payloads, SQL, or hidden reasoning.
-            # Only known Agent3 tool identities and validated statuses are UI activity.
+            # Capture tool payloads for the authenticated Portal trace store only.
+            # The Portal strips inputs/outputs before forwarding events to normal browsers.
+            # Hidden reasoning events are deliberately never captured.
             if event_type == "tool_call":
                 tool_name = str(event.get("tool") or "")
                 suffix = _tool_suffix(tool_name)
