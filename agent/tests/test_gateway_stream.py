@@ -9,7 +9,8 @@ from dataagent_gateway.app import ACTIVE_TURNS, cancel_query, query_stream, Quer
 from dataagent_gateway.runner import HeadlessHarnessRunner
 
 
-def test_live_activity_captures_tool_payloads_for_admin_trace_store():
+def test_live_activity_captures_tool_payloads_for_admin_trace_store(monkeypatch):
+    monkeypatch.setenv("DATACONTROL_ADMIN_WORKBENCH_ENABLED", "1")
     secret = "user-sensitive-SQL-secret"
     seen: list[dict] = []
 

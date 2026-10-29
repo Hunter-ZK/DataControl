@@ -576,6 +576,7 @@ class HeadlessHarnessRunner:
         """Collect complete JSONL for the existing parser while reporting safe live events."""
         lines: list[str] = []
         tool_labels: dict[str, str] = {}
+        debug_payloads_enabled = os.getenv("DATACONTROL_ADMIN_WORKBENCH_ENABLED") == "1"
         safe_native = {"todo_write", "goal", "subagent", "subagent_fork", "workflow"}
         while True:
             raw = await stream.readline()
@@ -604,8 +605,10 @@ class HeadlessHarnessRunner:
                 if on_activity and ((tool_name.startswith("mcp__agent3__") and suffix in MCP_TOOL_SUFFIXES)
                                     or suffix in safe_native):
                     if isinstance(call_id, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", call_id):
-                        on_activity({"type": "tool_call", "callId": call_id, "tool": suffix,
-                                     "input": event.get("input") if isinstance(event.get("input"), dict) else {}})
+                        activity = {"type": "tool_call", "callId": call_id, "tool": suffix}
+                        if debug_payloads_enabled:
+                            activity["input"] = event.get("input") if isinstance(event.get("input"), dict) else {}
+                        on_activity(activity)
             elif event_type == "tool_result":
                 call_id = event.get("callId")
                 tool = tool_labels.get(call_id, "harness_tool") if isinstance(call_id, str) else "harness_tool"
@@ -614,8 +617,10 @@ class HeadlessHarnessRunner:
                 LOGGER.info("[Agent:%s] TOOL_END %s status=%s", request_id, tool, status)
                 if on_activity and (tool in MCP_TOOL_SUFFIXES or tool in safe_native):
                     if isinstance(call_id, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", call_id):
-                        on_activity({"type": "tool_result", "callId": call_id, "tool": tool,
-                                     "status": status, "output": _json_or_text(event.get("result"))})
+                        activity = {"type": "tool_result", "callId": call_id, "tool": tool, "status": status}
+                        if debug_payloads_enabled:
+                            activity["output"] = _json_or_text(event.get("result"))
+                        on_activity(activity)
         return "".join(lines)
 
     async def run(

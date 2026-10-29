@@ -222,7 +222,10 @@ def reserve(db: Session, user_id: int, conversation_id: str, run_id: str,
     turn = AgentTurn(
         id=run_id, conversation_id=conversation_id, model_mode=mode,
         question=question, display_question=display_question or question,
-        status="queued", debug_context_json=_json(_capture_rule_snapshot(mode, conv.task_tier)),
+        status="queued", debug_context_json=(
+            _json(_capture_rule_snapshot(mode, conv.task_tier))
+            if os.getenv("DATACONTROL_ADMIN_WORKBENCH_ENABLED") == "1" else None
+        ),
         created_at=datetime.utcnow()
     )
     db.add(turn)
@@ -290,7 +293,8 @@ def append_activity(run_id: str, activity: dict):
         db.add(AgentToolEvent(
             turn_id=run_id, sequence=sequence, event_type=e["type"],
             call_id=call_id, tool=e["tool"], status=status,
-            payload_json=_json(payload), created_at=datetime.utcnow(),
+            payload_json=(_json(payload) if os.getenv("DATACONTROL_ADMIN_WORKBENCH_ENABLED") == "1" else None),
+            created_at=datetime.utcnow(),
         ))
         db.commit()
 
