@@ -419,6 +419,29 @@ export const relationApi = {
     get<any>('/relations/path', { params: { source, target, max_depth: maxDepth } }),
 }
 
+export const namingApi = {
+  importFile: async (file: File): Promise<{headers:string[];items:Array<Record<string,string>>;count:number}> => {
+    const form=new FormData();form.append('file',file)
+    const token=localStorage.getItem('datacontrol_token')
+    const response=await fetch('/api/v1/workbench/naming/import',{
+      method:'POST',headers:token?{Authorization:'Bearer '+token}:{},body:form,
+    })
+    if(!response.ok)throw Error('import failed: HTTP '+response.status)
+    return (await response.json()).data
+  },
+  suggest: (names: string[], maxLength: number) => post<{items:import('@/utils/namingReview').NamingSuggestion[];engine:string;notice:string}>(
+    '/workbench/naming/suggest',{names,maxLength}),
+  exportExcel: async (payload: Record<string,unknown>): Promise<Blob> => {
+    const token=localStorage.getItem('datacontrol_token')
+    const response=await fetch('/api/v1/workbench/naming/export',{
+      method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},
+      body:JSON.stringify(payload),
+    })
+    if(!response.ok)throw Error('export failed: HTTP '+response.status)
+    return response.blob()
+  },
+}
+
 export const agentApi = {
   conversations: () => get<ServerAgentConversation[]>('/agent/conversations'),
   createConversation: (title: string, modelMode: AgentModelMode,

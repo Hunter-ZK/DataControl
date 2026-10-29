@@ -50,6 +50,10 @@
           <div class="hot"><span>试试搜索</span><button v-for="x in hot" :key="x" @click="quick(x)">{{x}}</button></div>
         </div>
       </section>
+      <section class="dc-card naming-home-entry">
+        <div><span class="dc-eyebrow">WORKBENCH</span><h2>字段规范化命名</h2><p>导入 Excel 或粘贴字段材料，按词根规则匹配、逐行复核并导出成果。</p></div>
+        <RouterLink :to="{name:'namingWorkbench'}">进入命名工作台 <ArrowUpRight :size="17"/></RouterLink>
+      </section>
       <section class="quick-capabilities" aria-label="核心功能">
         <RouterLink to="/catalog" class="capability">
           <span class="cap-icon cap-blue"><Database :size="27"/></span>
@@ -185,6 +189,8 @@ onMounted(async()=>{
 </script>
 
 <style scoped>
+.naming-home-entry{margin:16px 0;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:14px;background:linear-gradient(120deg,#fff,#f1f7ff)}.naming-home-entry h2{font-size:19px;margin:4px 0}.naming-home-entry p{font-size:13px;color:var(--dc-text-2);margin:4px 0}.naming-home-entry a{display:flex;gap:7px;align-items:center;color:var(--dc-primary);background:#fff;border:1px solid var(--dc-border);padding:10px 14px;border-radius:9px;font-weight:700;font-size:13px;white-space:nowrap}@media(max-width:720px){.naming-home-entry{align-items:flex-start;flex-direction:column}}
+
 .atlas-home{min-height:100%;padding-top:36px}
 .atlas-hero{padding:36px 42px 27px;background:linear-gradient(128deg,#fff 16%,#f4f8ff 100%);border:1px solid #dfebfa;border-radius:16px;box-shadow:0 12px 36px rgba(26,76,142,.035)}
 .hero-lead h1{margin:8px 0 6px;font-size:31px;line-height:1.35;letter-spacing:-.025em;font-weight:770;color:#172c4d}

@@ -144,6 +144,7 @@ const primary = [
   { to: '/word-roots', label: '词根索引', icon: Hash, assetType: 'WORD_ROOT' },
   { to: '/metrics', label: '业务指标', icon: BookOpenCheck, assetType: 'METRIC' },
   { to: '/agent', label: '智能问数', icon: Sparkles },
+  { to: '/workbench/naming', label: '字段规范化命名', icon: FileText },
   { to: '/standards', label: '数据标准', icon: BookOpenCheck, assetType: 'STANDARD' },
   { to: '/stat-systems', label: '统计制度', icon: FileText, assetType: 'STAT_SYSTEM' },
 ]
@@ -152,9 +153,9 @@ const secondary = [
   { to: '/profile', label: '个人中心', icon: UserRound },
 ]
 const navGroups = [
-  { title: '工作空间', items: [primary[0], primary[6]] },
+  { title: '工作空间', items: [primary[0], primary[6], primary[7]] },
   { title: '数据发现', items: [primary[2], primary[1]] },
-  { title: '数据理解', items: [primary[5], primary[8], primary[3], primary[7], primary[4]] },
+  { title: '数据理解', items: [primary[5], primary[9], primary[3], primary[8], primary[4]] },
   { title: '其他', items: secondary },
 ]
 

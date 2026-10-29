@@ -15,6 +15,7 @@ import ProfileView from '@/views/ProfileView.vue'
 import LoginView from '@/views/LoginView.vue'
 import RelationView from '@/views/RelationView.vue'
 import AgentView from '@/views/AgentView.vue'
+import NamingWorkbenchView from '@/views/NamingWorkbenchView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -28,6 +29,7 @@ const router = createRouter({
         { path: 'search', name: 'search', component: SearchView, meta: { title: '资产检索' } },
         { path: 'relations/:id?', name: 'relations', component: RelationView, meta: { title: '关系指引' } },
         { path: 'agent', name: 'agent', component: AgentView, meta: { title: '智能问数' } },
+        { path: 'workbench/naming', name: 'namingWorkbench', component: NamingWorkbenchView, meta: { title: '字段规范化命名' } },
         { path: 'datasets/:id', name: 'dataset', component: DatasetDetailView, meta: { title: '数据集详情' } },
         { path: 'fields/:id', name: 'field', component: FieldDetailView, meta: { title: '字段详情' } },
         { path: 'code-tables', name: 'codeTables', component: ReferenceListView, props: { kind: 'code-tables' }, meta: { title: '标准码值' } },

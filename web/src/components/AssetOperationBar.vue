@@ -76,7 +76,7 @@ const actions = computed<AssetOperation[]>(() => {
   switch (props.kind) {
     case 'TABLE': return [...common,action('copy','复制表名','常用'),action('favorite','收藏','常用'),
       action('ddl','预览建表 DDL 草案','导出'),action('dictionary','导出字段字典 CSV','导出'),
-      action('select','生成全字段查询模板','生成'),action('lineage','查看完整血缘','分析'),
+      action('select','生成全字段查询模板','生成'),action('naming','检查本表字段命名','生成'),action('lineage','查看完整血缘','分析'),
       action('explain','解释这张表','问 Agent'),action('sql','基于这张表生成 SQL','问 Agent')]
     case 'COLUMN': return [...common,action('copy','复制字段名','常用'),action('parent','查看所属数据集','常用'),
       action('lineage','查看字段血缘','分析'),action('sameName','搜索字段名','分析'),action('explain','解释这个字段','问 Agent')]
@@ -87,7 +87,7 @@ const actions = computed<AssetOperation[]>(() => {
     case 'STANDARD': return [...common,action('copy','复制标准编号','常用'),
       action('definitionCsv','导出标准定义 CSV','导出'),...(props.asset.codeTableNo ? [action('linkedCode','查看关联码表','分析')] : []),
       action('explain','解释适用规则','问 Agent')]
-    case 'WORD_ROOT': return [...common,action('copy','复制英文词根','常用'),action('copyCn','复制中文名称','生成'),
+    case 'WORD_ROOT': return [...common,action('naming','用于字段命名','常用'),action('copy','复制英文词根','生成'),action('copyCn','复制中文名称','生成'),
       action('explain','解释这个词根','问 Agent')]
     case 'STAT_SYSTEM': return [...common,action('copy','复制制度编码','常用'),action('definitionCsv','导出制度信息 CSV','导出'),
       action('explain','解释统计制度','问 Agent')]
@@ -151,6 +151,7 @@ function execute(operation:string) {
     if(operation==='copy'){void copyText(code.value);return}
     if(operation==='copyCn'){void copyText(String(props.asset.cnName||''));return}
     if(operation==='favorite'){void toggleFavorite();return}
+    if(operation==='naming'){void router.push({name:'namingWorkbench',query:props.kind==='TABLE'?{dataset:id.value}:{root:code.value}});return}
     if(operation==='parent'){
       const target=props.asset.datasetId||props.asset.source?.assetId
       if(!target)throw Error('未找到已登记的来源数据集')
