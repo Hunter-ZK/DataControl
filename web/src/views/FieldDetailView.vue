@@ -1,7 +1,7 @@
 <template>
   <div class="dc-page"><div class="dc-container">
     <button class="dc-back" @click="router.back()"><ArrowLeft :size="16"/>返回</button>
-    <section v-if="field" class="field-head dc-card"><div><span class="field-label"><AssetIcon type="COLUMN" :size="19"/>字段资产</span><h1>{{field.cnName||field.columnName}}</h1><code class="dc-tech">{{field.columnName}}</code><p>所属数据集：<RouterLink :to="`/datasets/${field.datasetId}`">{{field.datasetId}}</RouterLink></p></div><div class="head-actions"><RouterLink class="dataset-link" :to="`/datasets/${field.datasetId}`">查看所属数据集 <ArrowRight :size="16"/></RouterLink><RouterLink class="lineage-link" :to="{name:'relations',query:{mode:'field',field:field.assetId}}"><GitFork :size="16"/>查看字段血缘</RouterLink></div></section>
+    <section v-if="field" class="field-head dc-card"><div><span class="field-label"><AssetIcon type="COLUMN" :size="19"/>字段资产</span><h1>{{field.cnName||field.columnName}}</h1><code class="dc-tech">{{field.columnName}}</code><p>所属数据集：<RouterLink :to="`/datasets/${field.datasetId}`">{{field.datasetId}}</RouterLink></p></div><AssetOperationBar kind="COLUMN" :asset="field"/></section>
     <div v-if="field" class="field-grid"><section class="dc-card info"><span class="dc-eyebrow">FIELD DEFINITION</span><h2>字段定义</h2><p>{{field.bizDefinition||'暂无业务定义。'}}</p><div class="kv"><div><span>数据类型</span><b>{{field.dataType}}</b></div><div><span>字段序号</span><b>{{field.ordinalNo}}</b></div><div><span>单位</span><b>{{field.unit||'—'}}</b></div><div><span>稳定标识</span><code class="dc-tech">{{field.assetId}}</code></div></div><div class="lineage-callout"><GitFork :size="18"/><div><b>字段级血缘已接入</b><p>可查看该字段的上游来源、下游去向、转换表达式、任务名和关系证据。</p></div><RouterLink :to="{name:'relations',query:{mode:'field',field:field.assetId}}">打开图谱</RouterLink></div></section><aside class="dc-card side"><span class="dc-eyebrow">STANDARD</span><h3>标准关联</h3><div><span>数据标准</span><RouterLink v-if="field.standardNo" :to="`/standards/${field.standardNo}`">{{field.standardNo}} <ArrowRight :size="13"/></RouterLink><b v-else>未关联</b></div><div><span>码表</span><RouterLink v-if="field.codeTableNo" :to="`/code-tables/${field.codeTableNo}`">{{field.codeTableNo}} <ArrowRight :size="13"/></RouterLink><b v-else>未关联</b></div></aside></div>
     <div v-else class="dc-empty">正在加载字段详情…</div>
   </div></div>
@@ -12,6 +12,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight, GitFork } from 'lucide-vue-next'
 import api from '@/api/client'
 import AssetIcon from '@/components/AssetIcon.vue'
+import AssetOperationBar from '@/components/AssetOperationBar.vue'
 const route=useRoute(); const router=useRouter(); const field=ref<any|null>(null)
 watch(()=>route.params.id,async(value)=>{const id=String(value);field.value=null;const result=await api.get(`/columns/${id}`);if(String(route.params.id)===id)field.value=result},{immediate:true})
 </script>
