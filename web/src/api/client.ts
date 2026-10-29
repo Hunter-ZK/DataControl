@@ -22,6 +22,11 @@ async function post<T>(url: string, body?: unknown): Promise<T> {
   return response.data.data
 }
 
+async function patch<T>(url: string, body: unknown): Promise<T> {
+  const response = await http.patch<{ code: string; data: T }>(url, body)
+  return response.data.data
+}
+
 async function remove<T>(url: string): Promise<T> {
   const response = await http.delete<{ code: string; data: T }>(url)
   return response.data.data
@@ -375,7 +380,65 @@ export interface AgentResult {
   hiddenReasoningExposed: boolean
 }
 
-const api = { get, post, delete: remove }
+export interface AdminDatasetSummary {
+  assetId: string; tableName: string; bizName: string; workspaceCode: string; layerCode: string
+  catalogCode: string; status: string; isCommon: boolean; updatedAt?: string | null; columnCount: number
+}
+export interface AdminDatasetRecord extends AdminDatasetSummary {
+  bizDefinition?: string | null; statCaliber?: string | null; dataSourceDesc?: string | null
+  grain?: string | null; usageNotes?: string | null; techOwner?: string | null; bizOwner?: string | null
+  ownerDept?: string | null; updateFreq?: string | null; scheduleDesc?: string | null; scheduleNode?: string | null
+}
+export interface AdminColumnRecord {
+  assetId: string; datasetId: string; columnName: string; ordinalNo: number; cnName?: string | null
+  dataType: string; bizDefinition?: string | null; unit?: string | null
+  codeTableNo?: string | null; standardNo?: string | null
+}
+export interface AdminDatasetDetail { dataset: AdminDatasetRecord; columns: AdminColumnRecord[] }
+export interface AdminRunSummary {
+  runId: string; conversationId: string; conversationTitle: string; userId: number
+  modelMode: AgentModelMode; taskTier: 'standard' | 'multi'; question: string; displayQuestion: string
+  status: string; createdAt?: string | null; finishedAt?: string | null; error?: string | null
+  toolEventCount: number; durationMs?: number | null
+}
+export interface AdminRunEvent {
+  sequence: number; type: string; callId?: string | null; tool: string; status?: string | null
+  createdAt?: string | null; payload?: Record<string, unknown> | null
+}
+export interface AdminRunDetail extends AdminRunSummary {
+  contextAsset?: unknown; events: AdminRunEvent[]; result?: Record<string, unknown> | null
+  tracePayloadsAvailable: boolean; tokenUsage?: unknown; tokenUsageNote: string
+}
+export interface AdminRuleFile {
+  category: string; path: string; exists: boolean; sha256?: string | null; content: string
+}
+export interface AdminRulesResult {
+  profile: string; modelMode: AgentModelMode; taskTier: 'standard' | 'multi'
+  files: AdminRuleFile[]; notice: string
+}
+
+export const adminWorkbenchApi = {
+  datasets: (keyword = '', limit = 100) => get<{ items: AdminDatasetSummary[]; total: number }>(
+    '/admin/workbench/metadata/datasets', { params: { keyword: keyword || undefined, limit } },
+  ),
+  dataset: (assetId: string) => get<AdminDatasetDetail>(
+    '/admin/workbench/metadata/datasets/' + encodeURIComponent(assetId),
+  ),
+  updateDataset: (assetId: string, body: Record<string, unknown>) => patch<AdminDatasetRecord>(
+    '/admin/workbench/metadata/datasets/' + encodeURIComponent(assetId), body,
+  ),
+  updateColumn: (assetId: string, body: Record<string, unknown>) => patch<AdminColumnRecord>(
+    '/admin/workbench/metadata/columns/' + encodeURIComponent(assetId), body,
+  ),
+  runs: (keyword = '', status = 'all', limit = 100) => get<{ items: AdminRunSummary[]; total: number }>(
+    '/admin/workbench/runs', { params: { keyword: keyword || undefined, status, limit } },
+  ),
+  run: (runId: string) => get<AdminRunDetail>('/admin/workbench/runs/' + encodeURIComponent(runId)),
+  rules: (modelMode: AgentModelMode = 'deepseek', taskTier: 'standard' | 'multi' = 'standard') =>
+    get<AdminRulesResult>('/admin/workbench/rules', { params: { modelMode, taskTier } }),
+}
+
+const api = { get, post, patch, delete: remove }
 export default api
 
 export const assetApi = {
