@@ -86,10 +86,26 @@
       </div>
       <div class="notice" :class="{error:confirmedCount!==rows.length}"><TriangleAlert :size="16"/>已确认 {{confirmedCount}}/{{rows.length}} 条。未确认行允许导出，但会明确标记为“待确认”，不得直接作为正式标准入库。</div>
       <div class="step-footer"><button class="dc-outline" @click="step=2">继续复核</button>
-        <button class="dc-primary" :disabled="busy" @click="exportExcel"><Download :size="16"/>{{busy?'正在生成…':'下载 Excel 成果'}}</button>
+        <div class="export-actions">
+          <button class="dc-outline" :disabled="busy" @click="saveRun"><ShieldCheck :size="16"/>保存本次运行</button>
+          <button class="dc-primary" :disabled="busy" @click="exportExcel"><Download :size="16"/>{{busy?'正在生成…':'下载 Excel 成果'}}</button>
+        </div>
       </div>
     </section>
-    <p class="page-footnote">本工作台当前使用服务端规则引擎，真实命名规范、模型分词与持久化运行记录仍待后续接入。</p>
+    <section class="dc-card history-panel">
+      <div class="history-head"><div><span class="dc-eyebrow">RECENT RUNS</span><h2>历史命名成果</h2><p>仅展示当前登录账号保存的运行记录，可重新下载或删除。</p></div>
+        <button class="dc-outline" @click="loadRuns">刷新</button></div>
+      <div v-if="historyLoading" class="dc-empty">正在读取运行记录…</div>
+      <div v-else-if="savedRuns.length" class="history-list">
+        <div v-for="run in savedRuns" :key="run.id" class="history-item">
+          <div><b>{{run.title}}</b><small>{{run.count}} 条字段 · {{run.createdAt.replace('T',' ').slice(0,16)}}</small></div>
+          <button @click="redownload(run.id)"><Download :size="15"/>下载</button>
+          <button class="danger-outline" @click="deleteSaved(run.id)">删除</button>
+        </div>
+      </div>
+      <p v-else class="dc-empty">暂无保存记录。在导出页点击“保存本次运行”后可在这里重新下载。</p>
+    </section>
+    <p class="page-footnote">当前规则引擎以已登记词根及同名字段为依据，模型分词与正式命名规范仍需后续接入。</p>
   </div></div>
 </template>
 
@@ -97,7 +113,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { ArrowRight, BookOpenCheck, Check, CheckCircle2, Download, FileSpreadsheet, ShieldCheck, Sparkles, TriangleAlert } from 'lucide-vue-next'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { assetApi, namingApi } from '@/api/client'
 import { missingRoots, validateNamingRows, type NamingRow, type NamingSuggestion } from '@/utils/namingReview'
 
@@ -115,6 +131,8 @@ const sourceRows=ref<Array<Record<string,string>>>([])
 const sourceDataset=ref('')
 const maxLength=ref(64)
 const rows=ref<NamingRow[]>([])
+const savedRuns=ref<Array<{id:string;title:string;count:number;createdAt:string}>>([])
+const historyLoading=ref(false)
 const filter=ref('all')
 const validation=computed(()=>validateNamingRows(rows.value,maxLength.value))
 const confirmedCount=computed(()=>rows.value.filter(x=>x.confirmed&&!validation.value.get(x.key)?.length).length)
@@ -162,29 +180,68 @@ function confirmReady(){
   for(const row of rows.value){if(!rowIssues(row).length&&!row.issues.length){row.confirmed=true;count++}}
   ElMessage.info('已确认 '+count+' 行；其他行仍需逐项核对。')
 }
+function payload(){
+  return {
+    originalHeaders:headers.value,
+    entries:rows.value.map(x=>({
+      original:x.original,cnName:x.cnName,suggestedName:x.finalName,
+      segments:x.segments.map(s=>s.cn+' → '+(s.root||'待补')).join(' / '),
+      source:x.finalName!==x.suggestedName?'人工修改':x.source,
+      issues:[...new Set([...x.issues,...rowIssues(x)])].join('；'),
+      status:x.confirmed?'已确认':'待确认',note:x.note,
+    })),
+    rootSuggestions:rootSuggestions.value,
+  }
+}
+function downloadBlob(blob:Blob){
+  const url=URL.createObjectURL(blob)
+  const link=document.createElement('a');link.href=url;link.download='datacontrol_naming_results.xlsx'
+  document.body.appendChild(link);link.click();link.remove()
+  window.setTimeout(()=>URL.revokeObjectURL(url),0)
+}
 async function exportExcel(){
   busy.value=true;error.value=''
-  try{
-    const blob=await namingApi.exportExcel({
-      originalHeaders:headers.value,
-      entries:rows.value.map(x=>({
-        original:x.original,cnName:x.cnName,suggestedName:x.finalName,
-        segments:x.segments.map(s=>s.cn+' → '+(s.root||'待补')).join(' / '),
-        source:x.finalName!==x.suggestedName?'人工修改':x.source,
-        issues:[...new Set([...x.issues,...rowIssues(x)])].join('；'),
-        status:x.confirmed?'已确认':'待确认',note:x.note,
-      })),
-      rootSuggestions:rootSuggestions.value,
-    })
-    const url=URL.createObjectURL(blob)
-    const link=document.createElement('a');link.href=url;link.download='datacontrol_naming_results.xlsx'
-    document.body.appendChild(link);link.click();link.remove()
-    window.setTimeout(()=>URL.revokeObjectURL(url),0)
-    ElMessage.success('已生成 Excel 文件')
-  }catch{error.value='导出失败，请检查文件内容和服务连接。'}
+  try{downloadBlob(await namingApi.exportExcel(payload()));ElMessage.success('已生成 Excel 文件')}
+  catch{error.value='导出失败，请检查文件内容和服务连接。'}
   finally{busy.value=false}
 }
+async function loadRuns(){
+  historyLoading.value=true
+  try{savedRuns.value=await namingApi.listRuns()}
+  catch{savedRuns.value=[]}
+  finally{historyLoading.value=false}
+}
+async function saveRun(){
+  if(!rows.value.length)return
+  try{
+    const answer=await ElMessageBox.prompt('保存的运行名称','保存本次命名复核',{
+      inputValue:'字段命名复核 '+new Date().toLocaleDateString('zh-CN'),
+      inputPlaceholder:'输入运行名称',inputValidator:(text)=>Boolean(String(text||'').trim())||'请填写名称',
+      confirmButtonText:'保存',cancelButtonText:'取消',
+    })
+    busy.value=true
+    await namingApi.saveRun(String(answer.value).trim(),payload())
+    ElMessage.success('运行成果已保存到当前账号')
+    await loadRuns()
+  }catch{/* 用户取消或网络错误，保留当前内容；未确认保存成功 */}
+  finally{busy.value=false}
+}
+async function redownload(id:string){
+  try{downloadBlob(await namingApi.savedExcel(id));ElMessage.success('历史成果已下载')}
+  catch{ElMessage.error('历史文件下载失败')}
+}
+async function deleteSaved(id:string){
+  try{
+    await ElMessageBox.confirm('删除这份运行记录？删除后无法恢复。','确认删除',{
+      confirmButtonText:'删除',cancelButtonText:'取消',type:'warning',
+    })
+    await namingApi.deleteRun(id)
+    await loadRuns()
+    ElMessage.success('运行记录已删除')
+  }catch{/* Cancel or failure: never claim deletion */}
+}
 onMounted(async()=>{
+  void loadRuns()
   const dataset=typeof route.query.dataset==='string'?route.query.dataset:''
   if(dataset){
     busy.value=true
@@ -209,5 +266,6 @@ onMounted(async()=>{
 .dc-primary{border:1px solid var(--dc-primary);border-radius:10px;padding:10px 16px;background:var(--dc-primary);color:#fff;display:inline-flex;gap:8px;align-items:center;justify-content:center;cursor:pointer;font-size:13px;font-weight:720}
 button:disabled{opacity:.48;cursor:not-allowed}.steps{display:grid;grid-template-columns:repeat(4,1fr);margin-bottom:18px;padding:10px;gap:8px}.steps button{display:flex;align-items:center;gap:10px;border:0;border-radius:9px;background:transparent;color:var(--dc-text-3);padding:14px 18px;cursor:pointer;text-align:left}.steps button.active{background:var(--dc-primary-soft);color:var(--dc-primary)}.steps button.done{color:var(--dc-success)}.steps button>span{border-radius:50%;width:26px;height:26px;display:grid;place-items:center;border:1px solid var(--dc-border-strong)}.steps button.active>span{background:var(--dc-primary);color:#fff}
 .step-content{padding:28px}.pane-heading,.step-footer{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap}.pane-heading{margin-bottom:22px}.pane-heading h2{font-size:23px;margin:5px 0}.pane-heading p{font-size:14px;color:var(--dc-text-2);margin:5px 0}.soft-flag,.source-chip{padding:7px 11px;border-radius:9px;background:var(--dc-primary-soft);color:var(--dc-primary);font-size:12px}
-.input-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.file-zone,.paste-zone{background:#f8fbff;border:1px solid var(--dc-border);border-radius:12px;min-height:255px;padding:24px;display:flex;flex-direction:column;gap:10px}.file-zone{align-items:center;justify-content:center;border-style:dashed;text-align:center;color:var(--dc-primary)}.file-zone p,.paste-zone p{color:var(--dc-text-2);font-size:13px;margin:0}.file-zone input{max-width:100%;font-size:12px}.file-zone small{color:var(--dc-text-2)}.paste-zone label{font-weight:720}.paste-zone textarea{resize:vertical;border:1px solid var(--dc-border-strong);border-radius:9px;background:#fff;padding:12px;color:var(--dc-text);flex:1;min-height:140px}.paste-zone button{align-self:flex-end}.source-summary{background:var(--dc-primary-soft);display:flex;align-items:center;gap:18px;padding:14px;border-radius:10px;margin-top:20px;flex-wrap:wrap;font-size:13px}.source-summary>span{display:flex;align-items:center;gap:8px}.source-summary label{margin-left:auto;display:flex;gap:9px;align-items:center}.source-summary select,.rule-grid input,.review-controls select{padding:7px;border:1px solid var(--dc-border-strong);background:#fff;border-radius:8px;max-width:200px}.step-footer{margin-top:24px;padding-top:20px;border-top:1px solid var(--dc-border)}.step-footer>span{font-size:13px;color:var(--dc-text-2)}.rule-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.rule-grid>div{padding:21px;background:#f8fbff;border:1px solid var(--dc-border);border-radius:11px;display:grid;gap:9px}.rule-grid span,.rule-grid label{font-size:13px;color:var(--dc-text-2)}.rule-grid b{font-size:15px}.rule-grid small{color:var(--dc-text-3)}.rule-grid input{width:115px}.notice{border-radius:10px;border:1px solid var(--dc-border);background:var(--dc-primary-soft);color:var(--dc-text-2);font-size:13px;display:flex;gap:10px;align-items:center;padding:14px;margin:16px 0}.notice.error{background:#fff8ec;color:#8c5b17;border-color:#efd5a3}.review-stats{display:flex;gap:14px;color:var(--dc-text-2);font-size:13px}.review-stats b{color:var(--dc-primary)}.review-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.review-controls label{font-size:13px;color:var(--dc-text-2);display:flex;align-items:center;gap:9px}.naming-table{min-width:1050px}.naming-table td{vertical-align:top}.naming-table tbody tr:nth-child(even) td{background:#f8fbff}.naming-table tbody tr.pending td:first-child{border-left:3px solid #edbd6e}.name-edit{min-width:195px;width:100%;border:1px solid var(--dc-border-strong);border-radius:8px;padding:9px;color:var(--dc-text);background:#fff;font-family:var(--dc-mono);font-size:13px}.naming-table small{display:block;color:var(--dc-text-3);margin-top:5px;font-size:12px}.source-label{font-size:12px;color:var(--dc-primary);font-weight:700}.segment-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.segment-list span{background:#eef5ff;border:1px solid #dbe8f8;padding:3px 7px;border-radius:6px;font-size:12px}.segment-list span.missing{color:#996417;background:#fff7e8;border-color:#f1ddbc}.issues{display:grid;gap:3px;color:#9a6217;font-size:12px}.valid{color:var(--dc-success);font-size:12px}.confirm-btn{background:#fff;border:1px solid var(--dc-border-strong);color:var(--dc-primary);border-radius:8px;padding:7px 10px;cursor:pointer}.export-tiles{display:grid;grid-template-columns:1fr 1fr;gap:16px}.export-tiles>div{background:#f8fbff;border:1px solid var(--dc-border);border-radius:12px;padding:24px;color:var(--dc-primary)}.export-tiles h3{color:var(--dc-text);margin:12px 0 0}.export-tiles strong{display:block;font-size:27px;margin:4px 0}.export-tiles p{color:var(--dc-text-2);font-size:13px}.page-footnote{font-size:12px;color:var(--dc-text-3);margin:16px 0}@media(max-width:800px){.input-grid,.rule-grid,.export-tiles{grid-template-columns:1fr}.step-content{padding:17px}.steps button{padding:10px;justify-content:center}.steps button b{display:none}.source-summary label{margin-left:0}.review-stats{flex-wrap:wrap}}
+.input-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.file-zone,.paste-zone{background:#f8fbff;border:1px solid var(--dc-border);border-radius:12px;min-height:255px;padding:24px;display:flex;flex-direction:column;gap:10px}.file-zone{align-items:center;justify-content:center;border-style:dashed;text-align:center;color:var(--dc-primary)}.file-zone p,.paste-zone p{color:var(--dc-text-2);font-size:13px;margin:0}.file-zone input{max-width:100%;font-size:12px}.file-zone small{color:var(--dc-text-2)}.paste-zone label{font-weight:720}.paste-zone textarea{resize:vertical;border:1px solid var(--dc-border-strong);border-radius:9px;background:#fff;padding:12px;color:var(--dc-text);flex:1;min-height:140px}.paste-zone button{align-self:flex-end}.source-summary{background:var(--dc-primary-soft);display:flex;align-items:center;gap:18px;padding:14px;border-radius:10px;margin-top:20px;flex-wrap:wrap;font-size:13px}.source-summary>span{display:flex;align-items:center;gap:8px}.source-summary label{margin-left:auto;display:flex;gap:9px;align-items:center}.source-summary select,.rule-grid input,.review-controls select{padding:7px;border:1px solid var(--dc-border-strong);background:#fff;border-radius:8px;max-width:200px}.step-footer{margin-top:24px;padding-top:20px;border-top:1px solid var(--dc-border)}.step-footer>span{font-size:13px;color:var(--dc-text-2)}.rule-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.rule-grid>div{padding:21px;background:#f8fbff;border:1px solid var(--dc-border);border-radius:11px;display:grid;gap:9px}.rule-grid span,.rule-grid label{font-size:13px;color:var(--dc-text-2)}.rule-grid b{font-size:15px}.rule-grid small{color:var(--dc-text-3)}.rule-grid input{width:115px}.notice{border-radius:10px;border:1px solid var(--dc-border);background:var(--dc-primary-soft);color:var(--dc-text-2);font-size:13px;display:flex;gap:10px;align-items:center;padding:14px;margin:16px 0}.notice.error{background:#fff8ec;color:#8c5b17;border-color:#efd5a3}.review-stats{display:flex;gap:14px;color:var(--dc-text-2);font-size:13px}.review-stats b{color:var(--dc-primary)}.review-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.review-controls label{font-size:13px;color:var(--dc-text-2);display:flex;align-items:center;gap:9px}.naming-table{min-width:1050px}.naming-table td{vertical-align:top}.naming-table tbody tr:nth-child(even) td{background:#f8fbff}.naming-table tbody tr.pending td:first-child{border-left:3px solid #edbd6e}.name-edit{min-width:195px;width:100%;border:1px solid var(--dc-border-strong);border-radius:8px;padding:9px;color:var(--dc-text);background:#fff;font-family:var(--dc-mono);font-size:13px}.naming-table small{display:block;color:var(--dc-text-3);margin-top:5px;font-size:12px}.source-label{font-size:12px;color:var(--dc-primary);font-weight:700}.segment-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.segment-list span{background:#eef5ff;border:1px solid #dbe8f8;padding:3px 7px;border-radius:6px;font-size:12px}.segment-list span.missing{color:#996417;background:#fff7e8;border-color:#f1ddbc}.issues{display:grid;gap:3px;color:#9a6217;font-size:12px}.valid{color:var(--dc-success);font-size:12px}.confirm-btn{background:#fff;border:1px solid var(--dc-border-strong);color:var(--dc-primary);border-radius:8px;padding:7px 10px;cursor:pointer}.export-tiles{display:grid;grid-template-columns:1fr 1fr;gap:16px}.export-tiles>div{background:#f8fbff;border:1px solid var(--dc-border);border-radius:12px;padding:24px;color:var(--dc-primary)}.export-tiles h3{color:var(--dc-text);margin:12px 0 0}.export-tiles strong{display:block;font-size:27px;margin:4px 0}.export-tiles p{color:var(--dc-text-2);font-size:13px} .export-actions{display:flex;gap:10px;flex-wrap:wrap}.history-panel{margin-top:17px;padding:23px}.history-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.history-head h2{font-size:19px;margin:4px 0}.history-head p{font-size:13px;margin:4px 0;color:var(--dc-text-2)}.history-list{margin-top:15px;border:1px solid var(--dc-border);border-radius:10px;overflow:hidden}.history-item{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--dc-border);padding:13px 14px}.history-item:nth-child(even){background:#f7faff}.history-item:last-child{border:0}.history-item div{display:grid;gap:4px;flex:1;min-width:0}.history-item b{font-size:14px}.history-item small{font-size:12px;color:var(--dc-text-3)}.history-item button{display:flex;align-items:center;gap:6px;border:1px solid var(--dc-border);border-radius:8px;padding:8px 10px;background:#fff;color:var(--dc-primary);cursor:pointer;font-size:12px}.history-item button.danger-outline{color:var(--dc-danger)}
+.page-footnote{font-size:12px;color:var(--dc-text-3);margin:16px 0}@media(max-width:800px){.input-grid,.rule-grid,.export-tiles{grid-template-columns:1fr}.step-content{padding:17px}.steps button{padding:10px;justify-content:center}.steps button b{display:none}.source-summary label{margin-left:0}.review-stats{flex-wrap:wrap}}
 </style>

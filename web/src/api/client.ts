@@ -431,6 +431,17 @@ export const namingApi = {
   },
   suggest: (names: string[], maxLength: number) => post<{items:import('@/utils/namingReview').NamingSuggestion[];engine:string;notice:string}>(
     '/workbench/naming/suggest',{names,maxLength}),
+  listRuns: () => get<Array<{id:string;title:string;count:number;createdAt:string}>>('/workbench/naming/runs'),
+  saveRun: (title:string,payload:Record<string,unknown>) => post<{id:string;title:string;count:number}>('/workbench/naming/runs',{title,payload}),
+  deleteRun: (id:string) => remove('/workbench/naming/runs/'+encodeURIComponent(id)),
+  savedExcel: async (id:string):Promise<Blob> => {
+    const token=localStorage.getItem('datacontrol_token')
+    const response=await fetch('/api/v1/workbench/naming/runs/'+encodeURIComponent(id)+'/download',{
+      headers:token?{Authorization:'Bearer '+token}:{},
+    })
+    if(!response.ok)throw Error('download failed')
+    return response.blob()
+  },
   exportExcel: async (payload: Record<string,unknown>): Promise<Blob> => {
     const token=localStorage.getItem('datacontrol_token')
     const response=await fetch('/api/v1/workbench/naming/export',{
