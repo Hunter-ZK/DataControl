@@ -16,6 +16,7 @@ import LoginView from '@/views/LoginView.vue'
 import RelationView from '@/views/RelationView.vue'
 import AgentView from '@/views/AgentView.vue'
 import NamingWorkbenchView from '@/views/NamingWorkbenchView.vue'
+import AdminWorkbenchView from '@/views/AdminWorkbenchView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -43,12 +44,20 @@ const router = createRouter({
         { path: 'stat-systems', name: 'statSystems', component: ReferenceListView, props: { kind: 'stat-systems' }, meta: { title: '统计制度' } },
         { path: 'stat-systems/:code', name: 'statSystem', component: ReferenceDetailView, props: { kind: 'stat-systems' }, meta: { title: '统计制度详情' } },
         { path: 'profile', name: 'profile', component: ProfileView, meta: { title: '个人中心' } },
+        { path: 'admin', name: 'admin', component: AdminWorkbenchView, meta: { title: '管理员工作台', adminOnly: true } },
       ],
     },
   ],
 })
 
 router.beforeEach((to) => {
+  if (to.meta.adminOnly) {
+    const token = localStorage.getItem('datacontrol_token')
+    let role = ''
+    try { role = String((JSON.parse(localStorage.getItem('datacontrol_user') || '{}') as { role?: string }).role || '').toUpperCase() } catch {}
+    if (!token) return { name: 'login', query: { redirect: to.fullPath } }
+    if (!['ADMIN', 'DEVELOPER'].includes(role)) return { name: 'home' }
+  }
   if (to.name === 'search' && to.query.mode === 'ai') return { name: 'agent' }
   if (to.name === 'search' && to.query.mode === 'relation') return { name: 'relations' }
 })

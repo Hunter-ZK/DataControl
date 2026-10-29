@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -29,6 +30,18 @@ MCP_TOOL_SUFFIXES = frozenset(json.loads(
 _LOOPBACK_NO_PROXY = ("127.0.0.1", "localhost", "::1")
 _SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 
+
+
+def _debug_capture_enabled() -> bool:
+    return os.getenv("DATACONTROL_AGENT_DEBUG_CAPTURE", "1").strip().lower() not in {"0", "false", "off", "no"}
+
+
+def _redact_config_text(text: str) -> str:
+    text = re.sub(
+        r"(?im)^(\s*(?:api[_-]?key|password|secret|credential|access[_-]?token|authorization|token|refresh[_-]?token)\s*:\s*).+$",
+        r"\1[REDACTED]", text,
+    )
+    return re.sub(r"(?i)(Bearer\s+)[A-Za-z0-9._~+/-]+=*", r"\1[REDACTED]", text)
 
 def _with_loopback_no_proxy(env: dict[str, str]) -> dict[str, str]:
     """Preserve external proxy settings while guaranteeing local MCP bypass."""
@@ -544,6 +557,91 @@ class HeadlessHarnessRunner:
             "reason": "; ".join(blockers) if blockers else None,
         }
 
+    def debug_config(self) -> dict[str, Any]:
+        """Expose effective development configuration without revealing secret values."""
+        root = self.repo_root
+        specs: list[tuple[str, str, str, bool]] = [
+            ("agent/dsh/profile/headless.patch.yml", "profile-source", "标准任务 Profile 源配置", self.task_tier == "standard"),
+            ("agent/dsh/profile/headless-multi.patch.yml", "profile-source", "多步任务 Profile 源配置", self.task_tier == "multi"),
+            ("agent/dsh/profile/cordis.patch.yml", "profile-template", "仓库内 Profile 模板", False),
+            ("agent/dsh/profile/pinned-plugin-ids.json", "plugin-lock", "固定插件清单", True),
+            ("agent/tool-catalog.json", "tool-catalog", "Agent3 MCP 工具白名单", True),
+            ("agent/guard-plugin/src/policy.ts", "guard-policy", "Guard 确定性策略源码", True),
+            ("agent/guard-plugin/src/index.ts", "guard-integration", "Guard 插件接入源码", True),
+            ("agent/guard-plugin/dist/index.js", "guard-runtime", "Guard 实际加载的构建产物", True),
+            ("agent/src/agent3/services/core.py", "hard-policy", "Agent3 服务端确定性约束", True),
+            ("agent/src/agent3/services/development.py", "hard-policy", "DDL/ETL 草案与人工审查约束", True),
+            ("agent/src/agent3/semantic/validator.py", "hard-policy", "语义计划校验实现", True),
+            ("agent/src/agent3/sql/validation/validator.py", "hard-policy", "SQL 校验与风险规则", True),
+            ("agent/src/agent3/policy/row_filter.py", "hard-policy", "数据访问过滤策略", True),
+            ("backend/app/api/agent.py", "hard-policy", "Portal 结果安全与执行边界", True),
+        ]
+        active_overlay = self.profile_dir / "cordis.patch.yml"
+        active_package = self.profile_dir / "package.json"
+        for label, path in (
+            ("当前实际加载的 Profile 配置", active_overlay),
+            ("当前 Profile 安装包清单", active_package),
+        ):
+            specs.append((str(path), "active-runtime", label, True))
+        skill_root = root / "agent" / ".dsh" / "skills"
+        if skill_root.exists():
+            for path in sorted(skill_root.glob("*/SKILL.md")):
+                specs.append((str(path), "skill", "Skill: " + path.parent.name, True))
+
+        files: list[dict[str, Any]] = []
+        for raw_path, kind, label, active in specs:
+            path = Path(raw_path)
+            if not path.is_absolute():
+                path = root / path
+            try:
+                raw = path.read_bytes()
+                text = raw.decode("utf-8", errors="replace")
+                files.append({
+                    "id": label + ":" + raw_path,
+                    "label": label,
+                    "kind": kind,
+                    "path": raw_path if not Path(raw_path).is_absolute() else "DSH_HOME/profiles/" + self.profile + "/" + path.name,
+                    "exists": True,
+                    "activeForRequest": active and (kind != "active-runtime" or path.exists()),
+                    "sha256": hashlib.sha256(raw).hexdigest(),
+                    "bytes": len(raw),
+                    "content": _redact_config_text(text)[:500_000],
+                    "truncated": len(text) > 500_000,
+                })
+            except OSError:
+                files.append({
+                    "id": label + ":" + raw_path,
+                    "label": label,
+                    "kind": kind,
+                    "path": raw_path,
+                    "exists": False,
+                    "activeForRequest": False,
+                    "sha256": None,
+                    "bytes": 0,
+                    "content": "",
+                    "truncated": False,
+                })
+
+        return {
+            "captureEnabled": _debug_capture_enabled(),
+            "modelMode": "free-test" if self.free_test else "deepseek",
+            "taskTier": self.task_tier,
+            "profile": self.profile,
+            "profileDir": "DSH_HOME/profiles/" + self.profile,
+            "provider": "our-free-model" if self.free_test else "deepseek-official",
+            "model": "kilo-auto/free" if self.free_test else "deepseek-flash",
+            "timeoutSeconds": self.timeout_seconds,
+            "apiKeyPresent": bool(os.getenv("DEEPSEEK_API_KEY")),
+            "sqlExecutionEnabled": False,
+            "hiddenReasoningCaptured": False,
+            "files": files,
+            "limitations": [
+                "仅展示 Harness 实际输出的 JSONL 事件；未由 Harness 输出的底层 HTTP 请求体、Token 用量等不会被伪造。",
+                "隐藏思维链不采集；可审计的工具调用、工具结果、状态、最终答复与配置原文会尽可能保留。",
+                "源配置与实际加载的 DSH_HOME Profile 分开显示，文件哈希用于识别版本差异。",
+            ],
+        }
+
     def _command(self, session_id: str | None) -> list[str]:
         if os.name == "nt":
             # Launch the actual pinned JS entrypoint, not npm's .cmd wrapper.
@@ -574,6 +672,7 @@ class HeadlessHarnessRunner:
     ) -> str:
         """Collect complete JSONL for the existing parser while reporting safe live events."""
         lines: list[str] = []
+        trace_started = time.monotonic()
         tool_labels: dict[str, str] = {}
         safe_native = {"todo_write", "goal", "subagent", "subagent_fork", "workflow"}
         while True:
@@ -585,10 +684,43 @@ class HeadlessHarnessRunner:
             try:
                 event = json.loads(line)
             except json.JSONDecodeError:
+                if on_activity and _debug_capture_enabled() and line.strip():
+                    on_activity({
+                        "type": "debug_event", "source": "dsh_stdout",
+                        "eventType": "unparsed_stdout",
+                        "payload": {"elapsedMs": int((time.monotonic() - trace_started) * 1000),
+                                    "text": line.rstrip("\r\n")},
+                    })
                 continue
             if not isinstance(event, dict):
                 continue
             event_type = event.get("type")
+            if on_activity and _debug_capture_enabled():
+                private_types = {"thinking", "reasoning", "chain_of_thought", "cot", "analysis"}
+                channel = str(event.get("channel") or event.get("kind") or "").lower()
+                role = str(event.get("role") or "").lower()
+                is_private = str(event_type or "").lower() in private_types or channel in private_types
+                is_intermediate_assistant_text = (
+                    role == "assistant"
+                    and str(event_type or "").lower() in {"message", "assistant_message", "model_output", "text_delta"}
+                    and channel not in {"final", "answer"}
+                )
+                if is_private or is_intermediate_assistant_text:
+                    payload = {
+                        "type": event_type, "channel": channel or None, "role": role or None,
+                        "contentCaptured": False,
+                        "note": "private reasoning or intermediate assistant text is not captured",
+                    }
+                elif event_type == "session":
+                    payload = {"type": "session", "sessionId": "[SERVER-OWNED]"}
+                else:
+                    payload = event
+                on_activity({
+                    "type": "debug_event", "source": "dsh_jsonl",
+                    "eventType": str(event_type or "unknown"),
+                    "payload": {"elapsedMs": int((time.monotonic() - trace_started) * 1000),
+                                "event": payload},
+                })
             # Never stream user questions, raw tool payloads, SQL, or hidden reasoning.
             # Only known Agent3 tool identities and validated statuses are UI activity.
             if event_type == "tool_call":
@@ -629,6 +761,36 @@ class HeadlessHarnessRunner:
         env["DSH_TELEMETRY_MODE"] = "DISABLED"
         request_id = uuid.uuid4().hex[:8]
         started = time.monotonic()
+        if on_activity and _debug_capture_enabled():
+            current_config = self.debug_config()
+            snapshot_files = [
+                {
+                    key: item[key]
+                    for key in ("label", "kind", "path", "exists", "activeForRequest", "sha256", "content", "truncated")
+                    if key in item
+                }
+                for item in current_config["files"]
+                if item.get("activeForRequest") or item.get("kind") in {"guard-policy", "guard-integration", "tool-catalog", "skill"}
+            ]
+            on_activity({
+                "type": "debug_event", "source": "gateway", "eventType": "run_start",
+                "payload": {
+                    "requestId": request_id, "modelMode": "free-test" if self.free_test else "deepseek",
+                    "taskTier": self.task_tier, "profile": self.profile,
+                    "provider": "our-free-model" if self.free_test else "deepseek-official",
+                    "model": "kilo-auto/free" if self.free_test else "deepseek-flash",
+                    "timeoutSeconds": self.timeout_seconds, "sessionResumed": bool(session_id),
+                    "questionSentToHarness": question,
+                    "effectiveConfigSnapshot": {
+                        "profile": current_config["profile"],
+                        "provider": current_config["provider"],
+                        "model": current_config["model"],
+                        "captureEnabled": current_config["captureEnabled"],
+                        "files": snapshot_files,
+                    },
+                    "note": "该问题文本通过 stdin 发送给 dsh；底层 Provider HTTP 请求体由 Harness 管理。",
+                },
+            })
         LOGGER.info("[Agent:%s] START session=%s", request_id, "resume" if session_id else "new")
         if self.free_test:
             if session_id and not session_id.startswith("free-test:"):
@@ -672,6 +834,11 @@ class HeadlessHarnessRunner:
             ) from exc
 
         stderr_text = stderr.decode("utf-8", errors="replace")
+        if on_activity and _debug_capture_enabled() and stderr_text.strip():
+            on_activity({
+                "type": "debug_event", "source": "dsh_stderr", "eventType": "stderr",
+                "payload": {"text": stderr_text[-64_000:]},
+            })
         if process.returncode != 0:
             LOGGER.error("[Agent:%s] ERROR exit_code=%d elapsed=%.1fs", request_id, process.returncode, time.monotonic() - started)
             detail = stderr_text.strip()[-1600:] or "dsh exited without diagnostics"

@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from backend.app.agent import history
 from backend.app.api.auth import get_current_user
-from backend.app.db.application_models import AgentConversation, AgentToolEvent, AgentTurn
+from backend.app.db.application_models import AgentConversation, AgentDebugEvent, AgentToolEvent, AgentTurn
 from backend.app.db.models import User
 from backend.app.db.session import SessionLocal
 
@@ -124,6 +124,7 @@ def delete_conversation(conversation_id: UUID, user: User = Depends(get_current_
             AgentTurn.conversation_id == conv.id
         )).scalars().all()
         if turns:
+            db.query(AgentDebugEvent).filter(AgentDebugEvent.turn_id.in_(turns)).delete(synchronize_session=False)
             db.query(AgentToolEvent).filter(AgentToolEvent.turn_id.in_(turns)).delete(synchronize_session=False)
             db.query(AgentTurn).filter(AgentTurn.id.in_(turns)).delete(synchronize_session=False)
         db.delete(conv)

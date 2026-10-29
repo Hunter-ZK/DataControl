@@ -154,11 +154,16 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
                     if persisted:
                         history.transition(run_id, "running")
                 elif event_type == "activity":
+                    item = event.get("event")
+                    if isinstance(item, dict) and item.get("type") == "debug_event":
+                        if persisted:
+                            history.append_debug_event(run_id, item)
+                        # Detailed traces are persisted for the admin workbench and
+                        # are deliberately not forwarded into the ordinary chat UI.
+                        continue
                     if persisted:
                         history.append_activity(run_id, event)
-                    # The Gateway uses a strict allowlist; the Portal does not
-                    # forward arbitrary third-party event payloads.
-                    item = event.get("event")
+                    # The ordinary chat stream only receives allowlisted tool metadata.
                     if (not isinstance(item, dict) or item.get("type") not in ("tool_call", "tool_result")
                         or item.get("tool") not in history.TOOL_NAMES):
                         continue

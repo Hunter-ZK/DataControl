@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend.app.agent import history
-from backend.app.db.application_models import AgentToolEvent, AgentTurn
+from backend.app.db.application_models import AgentDebugEvent, AgentToolEvent, AgentTurn
 from backend.app.db.models import Base, User
 
 
@@ -66,6 +66,29 @@ def test_run_idempotency_and_one_active_turn(store):
     assert history.serialize(store, conv)["sessionId"] is None
     store.refresh(conv)
     assert conv.session_id == "session-test"
+
+
+def test_debug_trace_keeps_runtime_payload_but_redacts_secrets(store):
+    conv = history.create(store, 1, "Agent Trace", "deepseek")
+    run_id = str(uuid4())
+    history.reserve(store, 1, conv.id, run_id, "synthetic question", "deepseek")
+    history.append_debug_event(run_id, {
+        "type": "debug_event",
+        "eventType": "tool_call",
+        "source": "dsh_jsonl",
+        "payload": {
+            "event": {"type": "tool_call", "tool": "resolve_metric",
+                      "input": {"metric_id": "loan_balance", "apiKey": "test-secret-value"}},
+            "reasoning": "secret internal thoughts",
+        },
+    })
+    store.expire_all()
+    row = store.execute(select(AgentDebugEvent).where(AgentDebugEvent.turn_id == run_id)).scalar_one()
+    assert "loan_balance" in row.payload_json
+    assert "test-secret-value" not in row.payload_json
+    assert "[REDACTED]" in row.payload_json
+    assert "secret internal thoughts" not in row.payload_json
+    assert "[NOT CAPTURED: private model reasoning]" in row.payload_json
 
 
 def test_result_and_events_never_persist_raw_tool_input(store):

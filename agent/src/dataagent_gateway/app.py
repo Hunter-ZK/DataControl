@@ -3,10 +3,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from ipaddress import ip_address
 from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -42,6 +43,27 @@ async def health(modelMode: Literal["deepseek", "free-test"] | None = None,
         "hiddenReasoningExposed": False,
         **status,
     }
+
+
+@app.get("/v1/debug/config")
+async def debug_config(
+    request: Request,
+    modelMode: Literal["deepseek", "free-test"] = "deepseek",
+    taskTier: Literal["standard", "multi"] = "standard",
+):
+    """Loopback-only config inventory for the authenticated Portal admin workbench."""
+    host = request.client.host if request.client else ""
+    try:
+        is_loopback = ip_address(host).is_loopback
+    except ValueError:
+        is_loopback = host == "testclient"
+    if not is_loopback:
+        raise HTTPException(403, "Debug configuration is available only over loopback")
+    runner = HeadlessHarnessRunner(
+        model_mode=modelMode,
+        **({"task_tier": "multi"} if taskTier == "multi" else {}),
+    )
+    return runner.debug_config()
 
 
 @app.post("/v1/query")
