@@ -78,7 +78,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight, Database, ShieldCheck, Sparkles } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-vue-next'
 import { semanticApi, type SemanticMetric } from '@/api/client'
 import AssetOperationBar from '@/components/AssetOperationBar.vue'
 
@@ -119,7 +119,6 @@ const modelPreview = computed(() => {
 function kindLabel(value: string) { return { BASE: '基础指标', RATIO: '比率指标', DERIVED: '派生指标' }[value] || value }
 function additivityLabel(value: string) { return value === 'NON_ADDITIVE' ? '时间不可加' : '可加' }
 function filterText(filter: Record<string, unknown>) { return `${String(filter.field || '')} ${String(filter.op || '=')} ${String(filter.label || filter.value || '')}`.trim() }
-function askMetric() { if (!metric.value) return; router.push({ name: 'agent', query: { q: `请基于受治理指标“${metric.value.name}”（metric_id=${metric.value.metricCode}）回答我的问题，并严格遵守其时间、维度和必选过滤口径。` } }) }
 
 watch(() => route.params.code, async (value) => {
   const code = String(value)
