@@ -79,3 +79,40 @@ test('word-root dictionary retains searchable rows without card layout', async (
   await expect(page.locator('.dictionary-table tbody tr')).toHaveCount(1)
   await expect(page.getByRole('link', { name: 'BAL' })).toBeVisible()
 })
+
+test('asset quick preview opens lightweight hover and a pinnable dialog without navigation', async ({ page }) => {
+  await page.route('**/api/v1/catalogs', async route=>route.fulfill({json:{code:'OK',data:[]}}))
+  await page.route('**/api/v1/tables/DS000004', async route=>route.fulfill({json:{code:'OK',data:{
+    assetId:'DS000004',bizName:'贷款余额汇总',tableName:'stat_prod.dws_loan_region_month',
+    layerCode:'DWS',description:'按月汇总的模拟贷款余额数据集'
+  }}}))
+  await page.route('**/api/v1/search**', async route=>route.fulfill({json:route.request().url().includes('/suggest')
+    ? {code:'OK',data:[]} : queryData}))
+  await page.goto('/search?q=贷款余额')
+  const button=page.getByRole('button',{name:'快捷预览资产'})
+  await button.hover()
+  await expect(page.locator('.dc-asset-preview-popper')).toContainText('贷款余额汇总')
+  await button.click()
+  const dialog=page.getByRole('dialog',{name:'资产快捷预览'})
+  await expect(dialog).toBeVisible()
+  await expect(dialog).toContainText('贷款余额汇总')
+  await expect(page).toHaveURL(/\/search\?q=/)
+})
+
+test('search presets can be named, restored and deleted in this browser', async ({ page }) => {
+  await page.route('**/api/v1/catalogs', async route=>route.fulfill({json:{code:'OK',data:[]}}))
+  await page.route('**/api/v1/search**', async route=>route.fulfill({json:route.request().url().includes('/suggest')
+    ? {code:'OK',data:[]} : queryData}))
+  await page.goto('/search?q=贷款余额')
+  await page.getByRole('button',{name:'保存筛选',exact:true}).click()
+  await page.locator('.el-message-box input').fill('贷款常用查询')
+  await page.getByRole('button',{name:'确定'}).click()
+  await expect(page.getByRole('button',{name:'应用：贷款常用查询'})).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('button',{name:'应用：贷款常用查询'})).toBeVisible()
+  await page.getByRole('button',{name:'应用：贷款常用查询'}).click()
+  await expect(page.getByRole('heading',{name:'贷款余额汇总'})).toBeVisible()
+  await page.getByRole('button',{name:'删除筛选：贷款常用查询'}).click()
+  await page.getByRole('button',{name:'删除',exact:true}).click()
+  await expect(page.getByRole('button',{name:'应用：贷款常用查询'})).toHaveCount(0)
+})

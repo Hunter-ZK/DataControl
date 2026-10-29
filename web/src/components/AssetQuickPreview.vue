@@ -81,7 +81,7 @@ async function loadDetail(){
     else if(item.assetType==='METRIC') detail.value=await semanticApi.metric(item.technicalName) as unknown as Record<string,unknown>
     else if(item.assetType==='CODE_TABLE') detail.value=await api.get('/code-tables/'+name)
     // Reference types without a single-asset detail API keep the trustworthy search summary.
-  }catch{detailError.value=true}
+  }catch{detailError.value=true;fetchedKey=''}
   finally{detailLoading.value=false}
 }
 function pin(){dialogOpen.value=true;loadDetail()}
