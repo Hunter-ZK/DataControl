@@ -157,7 +157,7 @@ const secondary = [
 const navGroups = [
   { title: '工作空间', items: [primary[0], primary[6], primary[7]] },
   { title: '数据发现', items: [primary[2], primary[1]] },
-  { title: '数据理解', items: [primary[5], primary[9], primary[3], primary[8], primary[4]] },
+  { title: '数据理解', items: [primary[5], primary[8], primary[3], primary[9], primary[4]] },
   { title: '其他', items: secondary },
 ]
 
