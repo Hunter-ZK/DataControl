@@ -199,6 +199,9 @@ def update_metadata_column(
             changes[key] = {"before": old, "after": value}
             setattr(row, key, value)
     if changes:
+        parent_dataset = db.get(Dataset, row.dataset_id)
+        if parent_dataset is not None:
+            parent_dataset.updated_at = datetime.utcnow()
         db.add(ChangeLog(dataset_id=row.dataset_id, change_type="COLUMN_EDIT",
                          content=_json({"entity": "column", "assetId": row.asset_id,
                                         "columnName": row.column_name, "changes": changes}),
@@ -261,6 +264,11 @@ def update_metadata_metric(
     if row is None:
         raise HTTPException(404, "Metric not found")
     values = body.model_dump(exclude_unset=True)
+    if values.get("mandatory_filters"):
+        try:
+            json.loads(values["mandatory_filters"])
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(422, "Mandatory filters must be valid JSON") from exc
     if "metric_name" in values and (values["metric_name"] is None or not values["metric_name"].strip()):
         raise HTTPException(422, "Metric name cannot be empty")
     changes: dict[str, dict[str, Any]] = {}

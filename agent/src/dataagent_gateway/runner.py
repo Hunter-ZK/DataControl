@@ -605,7 +605,7 @@ class HeadlessHarnessRunner:
                 if on_activity and ((tool_name.startswith("mcp__agent3__") and suffix in MCP_TOOL_SUFFIXES)
                                     or suffix in safe_native):
                     if isinstance(call_id, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", call_id):
-                        activity = {"type": "tool_call", "callId": call_id, "tool": suffix}
+                        activity: dict[str, Any] = {"type": "tool_call", "callId": call_id, "tool": suffix}
                         if debug_payloads_enabled:
                             activity["input"] = event.get("input") if isinstance(event.get("input"), dict) else {}
                         on_activity(activity)
@@ -617,7 +617,7 @@ class HeadlessHarnessRunner:
                 LOGGER.info("[Agent:%s] TOOL_END %s status=%s", request_id, tool, status)
                 if on_activity and (tool in MCP_TOOL_SUFFIXES or tool in safe_native):
                     if isinstance(call_id, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", call_id):
-                        activity = {"type": "tool_result", "callId": call_id, "tool": tool, "status": status}
+                        activity: dict[str, Any] = {"type": "tool_result", "callId": call_id, "tool": tool, "status": status}
                         if debug_payloads_enabled:
                             activity["output"] = _json_or_text(event.get("result"))
                         on_activity(activity)
