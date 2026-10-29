@@ -47,11 +47,22 @@
         <FilterGroup title="资产类型" :items="typeFacetItems" :selected="type" @select="selectType"/>
         <FilterGroup title="数仓层级" :items="layerFacetItems" :selected="layer" @select="selectLayer"/>
         <FilterGroup title="状态" :items="statusFacetItems" :selected="status" @select="selectStatus"/>
+        <section class="saved-search-panel">
+          <header><div><Bookmark :size="18"/><b>常用筛选</b></div><button @click="savePreset"><BookmarkPlus :size="16"/> 保存当前</button></header>
+          <p>保存在当前浏览器中，可一键恢复搜索词、类型、数仓层级和业务目录。</p>
+          <div v-if="presets.length" class="preset-list">
+            <div v-for="preset in presets" :key="preset.id" class="preset-row">
+              <button class="preset-apply" @click="applyPreset(preset)" :title="'应用：'+preset.name"><Bookmark :size="15"/><span>{{preset.name}}</span></button>
+              <button class="preset-delete" @click="deletePreset(preset)" :aria-label="'删除筛选：'+preset.name"><X :size="15"/></button>
+            </div>
+          </div>
+          <div v-else class="preset-empty">尚无保存的筛选方案</div>
+        </section>
         <p class="facet-note">目录层级由系统中的真实父子关系生成。筛选仅约束当前目录，不自动合并下级目录结果。</p>
       </aside>
       <main class="search-main">
         <div class="results-head"><div><span class="dc-eyebrow">SEARCH RESULTS</span><h2>搜索结果 <em>{{total}}</em></h2></div>
-          <div class="results-tools"><span>查看方式</span>
+          <div class="results-tools"><button class="save-preset-action" @click="savePreset"><BookmarkPlus :size="16"/> 保存筛选</button><span>查看方式</span>
             <div class="density-switch" role="group" aria-label="结果展示密度">
               <button :class="{active:!compactResults}" :aria-pressed="!compactResults" @click="compactResults=false">详细</button>
               <button :class="{active:compactResults}" :aria-pressed="compactResults" @click="compactResults=true">精简</button>
@@ -109,7 +120,9 @@
 <script setup lang="ts">
 import { computed, defineComponent, h, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowRight, ChevronRight, Database, Filter, FolderTree, Search, Sparkles, WandSparkles } from 'lucide-vue-next'
+import { ArrowRight, Bookmark, BookmarkPlus, ChevronRight, Database, Filter, FolderTree, Search, Sparkles, WandSparkles, X } from 'lucide-vue-next'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useSavedSearchPresets, type SearchPreset } from '@/composables/useSavedSearchPresets'
 import AssetIcon from '@/components/AssetIcon.vue'
 import AssetQuickPreview from '@/components/AssetQuickPreview.vue'
 import { buildCatalogTree, flattenCatalogs, type CatalogEntry, type CatalogNode } from '@/utils/catalogTree'
@@ -119,6 +132,41 @@ interface FacetItem { key: string; label: string; count: number }
 
 const filtersOpen = ref(false)
 const compactResults = ref(false)
+const { presets, save: saveSearchPreset, remove: removeSearchPreset } = useSavedSearchPresets()
+function currentPresetValues() {
+  return {q:q.value,type:type.value,layer:layer.value,catalog:catalog.value,status:status.value}
+}
+async function savePreset(){
+  const values=currentPresetValues()
+  if(!Object.values(values).some(Boolean)){ElMessage.info('请先输入检索词或选择筛选条件');return}
+  try{
+    const answer=await ElMessageBox.prompt('为当前检索词和筛选条件命名。方案仅保存在当前浏览器。','保存常用筛选',{
+      inputPlaceholder:'例如：贷款 DWS 数据集',inputValue:[values.q,values.layer,values.type].filter(Boolean).join(' · ').slice(0,36),
+      inputValidator:(value)=>!!String(value||'').trim()&&String(value).trim().length<=36 || '名称不能为空且不超过 36 字'
+    })
+    const name=String(answer.value||'').trim()
+    if(presets.value.some(x=>x.name===name)){
+      await ElMessageBox.confirm('已有同名筛选方案，是否覆盖其条件？','覆盖确认',{confirmButtonText:'覆盖',cancelButtonText:'取消',type:'warning'})
+    }
+    saveSearchPreset(name,values)
+    ElMessage.success('筛选方案已保存至当前浏览器')
+  }catch(error){if(error instanceof Error && !['cancel','close'].includes(error.message))ElMessage.warning(error.message)}
+}
+function applyPreset(preset:SearchPreset){
+  q.value=preset.q;type.value=preset.type;layer.value=preset.layer;catalog.value=preset.catalog;status.value=preset.status
+  filtersOpen.value=false
+  offset.value=0
+  if(q.value.trim())runSearch(true)
+  else{rows.value=[];total.value=0;router.replace({query:{
+    ...(type.value?{type:type.value}:{}),...(layer.value?{layer:layer.value}:{}),
+    ...(catalog.value?{catalog:catalog.value}:{}),...(status.value?{status:status.value}:{})}})}
+  ElMessage.success('已应用：'+preset.name)
+}
+async function deletePreset(preset:SearchPreset){
+  try{await ElMessageBox.confirm('删除“'+preset.name+'”？不会改变当前检索结果。','删除常用筛选',{
+    confirmButtonText:'删除',cancelButtonText:'取消',type:'warning'
+  });removeSearchPreset(preset.id);ElMessage.success('已删除筛选方案')}catch{/* dismissed */}
+}
 const catalogEntries=ref<CatalogEntry[]>([])
 const catalogTree=computed(()=>buildCatalogTree(catalogEntries.value))
 const catalogName=computed(()=>flattenCatalogs(catalogTree.value).find(x=>x.code===catalog.value)?.name||catalog.value)
@@ -353,4 +401,21 @@ onMounted(async() => {try{catalogEntries.value=await assetApi.catalogs() as Cata
 .asset-footer :deep(.preview-control){display:flex;align-items:center;margin-left:auto}
 .asset-footer button:not(.preview-trigger){margin-left:0}
 @media(max-width:680px){.asset-footer :deep(.preview-control){margin-left:0}.asset-footer .detail-link{margin-left:auto}}
+
+.saved-search-panel{border:1px solid #c6dcf9;border-radius:12px;background:linear-gradient(135deg,#f1f7ff,#fff);padding:14px 12px;margin:10px 0 12px}
+.saved-search-panel header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.saved-search-panel header>div{display:flex;align-items:center;gap:8px;color:#2e5f9d;font-size:14px}
+.saved-search-panel header button{display:flex;align-items:center;gap:5px;border:1px solid #afcbf2;border-radius:7px;background:#fff;padding:7px 9px;color:#2b68d1;font-size:12px;cursor:pointer}
+.saved-search-panel>p{color:#7b90ae;font-size:12px;line-height:1.6;margin:10px 0}
+.preset-list{display:grid;gap:6px;max-height:250px;overflow:auto}
+.preset-row{display:flex;align-items:center;gap:5px;padding:3px;background:#fff;border:1px solid #e0eafa;border-radius:8px}
+.preset-apply{min-width:0;display:flex;align-items:center;gap:8px;flex:1;background:transparent;border:0;color:#405f8e;font-size:12px;text-align:left;padding:7px;cursor:pointer}
+.preset-apply span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.preset-apply:hover{color:#2769db}
+.preset-delete{border:0;background:transparent;color:#8ea1bb;padding:6px;cursor:pointer;border-radius:6px}
+.preset-delete:hover{background:#fff1f1;color:#c14343}
+.preset-empty{font-size:12px;color:#94a4ba;padding:11px 4px}
+.save-preset-action{display:flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid #b9d4f7;border-radius:8px;background:#f1f7ff;color:#2769ce;cursor:pointer;font-size:12px;font-weight:730}
+.save-preset-action:hover{background:#e5f0ff}
+@media(max-width:680px){.results-tools .save-preset-action{margin-right:auto}.saved-search-panel{padding:12px}}
 </style>
