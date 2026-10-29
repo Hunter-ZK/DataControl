@@ -23,7 +23,7 @@
     <nav class="workbench-tabs">
       <button :class="{ active: activeTab === 'debug' }" @click="activeTab = 'debug'"><Activity :size="17" /> Agent 运行调试 <span>{{ runTotal }}</span></button>
       <button :class="{ active: activeTab === 'rules' }" @click="activeTab = 'rules'"><ShieldCheck :size="17" /> 规则与配置 <span>{{ ruleFiles.length }}</span></button>
-      <button :class="{ active: activeTab === 'metadata' }" @click="activeTab = 'metadata'"><Database :size="17" /> 元数据管理 <span>{{ datasetTotal }}</span></button>
+      <button :class="{ active: activeTab === 'metadata' }" @click="activeTab = 'metadata'"><Database :size="17" /> 元数据管理 <span>{{ datasetTotal + metricTotal }}</span></button>
     </nav>
 
     <section v-if="activeTab === 'debug'" class="panel debug-panel">
@@ -136,6 +136,28 @@
               <div class="block-title"><FileText :size="16" /> 最终结果与状态</div>
               <div v-if="runDetail.error" class="error-box"><AlertTriangle :size="16" /> {{ runDetail.error }}</div>
               <pre class="json-view">{{ formatJson(runDetail.result) }}</pre>
+            </section>
+            <section class="detail-block">
+              <div class="block-title"><ShieldCheck :size="16" /> 本次运行时的规则快照 <span class="muted">{{ runDetail.debugContext?.files.length || 0 }} 个文件</span></div>
+              <template v-if="runDetail.debugContext">
+                <div class="trace-limit-note"><Info :size="15" /><span>快照时间：{{ formatDate(runDetail.debugContext.capturedAt) }}。这些文件内容在本轮任务预留时读取，便于比较调优前后的规则变化。</span></div>
+                <div class="event-list">
+                  <article v-for="file in runDetail.debugContext.files" :key="file.path" class="event-card">
+                    <button class="event-head" @click="toggleSnapshotFile(file.path)">
+                      <span class="event-index"><FileCode2 :size="14" /></span>
+                      <span class="event-kind" :class="{ tool_result: file.exists }">{{ file.exists ? 'SNAPSHOT' : 'MISSING' }}</span>
+                      <b>{{ file.category }}</b>
+                      <span class="event-time">{{ file.path }}</span>
+                      <ChevronDown :size="16" :class="{ rotated: expandedSnapshotFiles[file.path] }" />
+                    </button>
+                    <div v-if="expandedSnapshotFiles[file.path]" class="event-body">
+                      <div v-if="file.sha256" class="hash-line"><span>SHA-256</span><code>{{ file.sha256 }}</code></div>
+                      <pre class="code-view">{{ file.content || '本轮运行时未找到该文件。' }}</pre>
+                    </div>
+                  </article>
+                </div>
+              </template>
+              <div v-else class="old-event">该运行记录早于规则快照功能，无法还原历史运行时的配置文件；请在“规则与配置”查看当前版本。</div>
             </section>
           </template>
           <el-empty v-else description="从左侧选择一条运行记录，查看执行细节" :image-size="100" />
@@ -337,6 +359,7 @@ const runsLoading = ref(false)
 const selectedRunId = ref('')
 const runDetail = ref<AdminRunDetail | null>(null)
 const expandedEvents = ref<Record<number, boolean>>({})
+const expandedSnapshotFiles = ref<Record<string, boolean>>({})
 
 const ruleModelMode = ref<'deepseek' | 'free-test'>('deepseek')
 const ruleTaskTier = ref<'standard' | 'multi'>('standard')
@@ -406,8 +429,12 @@ async function loadRuns() {
     const result = await adminWorkbenchApi.runs(runKeyword.value, runStatus.value, 100)
     runs.value = result.items
     runTotal.value = result.total
-    if (!selectedRunId.value && runs.value.length) await selectRun(runs.value[0])
-    else if (selectedRunId.value && !runs.value.some((item) => item.runId === selectedRunId.value) && runs.value.length) await selectRun(runs.value[0])
+    if (!runs.value.length) {
+      selectedRunId.value = ''
+      runDetail.value = null
+    } else if (!selectedRunId.value || !runs.value.some((item) => item.runId === selectedRunId.value)) {
+      await selectRun(runs.value[0])
+    }
   } catch (error) { ElMessage.error('读取 Agent 运行记录失败：' + messageOf(error)) }
   finally { runsLoading.value = false }
 }
@@ -418,6 +445,9 @@ async function selectRun(run: AdminRunSummary) {
 }
 function toggleEvent(sequence: number) {
   expandedEvents.value = { ...expandedEvents.value, [sequence]: !expandedEvents.value[sequence] }
+}
+function toggleSnapshotFile(path: string) {
+  expandedSnapshotFiles.value = { ...expandedSnapshotFiles.value, [path]: !expandedSnapshotFiles.value[path] }
 }
 async function refreshDebug() {
   await loadRuns()
@@ -523,9 +553,8 @@ async function saveMetadata() {
 async function refreshSelectedRun() {
   if (!selectedRunId.value) return
   const current = runs.value.find((item) => item.runId === selectedRunId.value)
-  if (current && ['queued', 'running', 'cancel_requested'].includes(current.status)) {
-    await selectRun(current)
-  }
+  if (current && (['queued', 'running', 'cancel_requested'].includes(current.status)
+      || runDetail.value?.status !== current.status)) await selectRun(current)
 }
 onMounted(async () => {
   await Promise.all([loadRuns(), loadRules(), loadDatasets(), loadMetrics()])

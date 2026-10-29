@@ -416,6 +416,7 @@ export interface AdminRunEvent {
 }
 export interface AdminRunDetail extends Omit<AdminRunSummary, 'toolEventCount'> {
   toolEventCount?: number; contextAsset?: unknown; events: AdminRunEvent[]; result?: Record<string, unknown> | null
+  debugContext?: AdminRulesResult | null
   tracePayloadsAvailable: boolean; tokenUsage?: unknown; tokenUsageNote: string
 }
 export interface AdminRuleFile {
@@ -423,7 +424,7 @@ export interface AdminRuleFile {
 }
 export interface AdminRulesResult {
   profile: string; modelMode: AgentModelMode; taskTier: 'standard' | 'multi'
-  files: AdminRuleFile[]; notice: string; precedence?: string[]
+  capturedAt?: string; files: AdminRuleFile[]; notice: string; precedence?: string[]
 }
 
 export const adminWorkbenchApi = {
