@@ -117,20 +117,20 @@
           <div><small>运行超时</small><b>{{ config.timeoutSeconds }} 秒</b><span>DEEPSEEK_API_KEY：{{ config.apiKeyPresent ? '已配置（值不展示）' : '未配置' }}</span></div>
           <div><small>安全边界</small><b>{{ config.sqlExecutionEnabled ? 'SQL 执行开启' : '不执行生产 SQL' }}</b><span>{{ config.hiddenReasoningCaptured ? '推理字段已捕获' : '隐藏思维链不采集' }}</span></div>
         </div>
-        <div class="notice-banner"><Info :size="16" /><div><b>先区分规则的作用层级</b><p>Prompt 是给模型的行为指引；tool-catalog 限制可用 MCP 工具；Guard 与服务端校验属于代码执行约束。标记“本次配置”的文件是 Gateway 按当前模式识别的生效候选；请同时核对实际 Profile 内容和 SHA-256，不能只凭源文件推断运行时一定加载成功。</p></div></div>
+        <div class="notice-banner"><Info :size="16" /><div><b>先区分规则的作用层级</b><p>Prompt 是给模型的行为指引；tool-catalog 限制可用 MCP 工具；Guard 与服务端校验属于代码执行约束。标记“运行候选”的文件是 Gateway 按当前模式识别的生效候选；请同时核对实际 Profile 内容和 SHA-256，不能只凭源文件推断运行时一定加载成功。</p></div></div>
         <div class="config-layout">
           <div class="file-list panel-card">
             <div class="list-head"><b>配置与规则文件</b><span>{{ config.files.length }} 个</span></div>
             <button v-for="file in config.files" :key="file.id" class="file-row" :class="{ selected: selectedFileId === file.id }" @click="selectedFileId = file.id">
               <span class="file-icon"><ShieldCheck v-if="file.kind.includes('guard')" :size="16" /><BookOpen v-else-if="file.kind === 'skill'" :size="16" /><FileText v-else :size="16" /></span>
               <span class="file-copy"><b>{{ file.label }}</b><small>{{ file.path }}</small><code>{{ file.sha256 ? file.sha256.slice(0, 16) + '…' : '文件不存在' }}</code></span>
-              <span v-if="file.activeForRequest" class="active-file">本次配置</span>
+              <span v-if="file.activeForRequest" class="active-file">运行候选</span>
             </button>
           </div>
           <div class="file-detail panel-card">
             <template v-if="selectedFile">
               <div class="detail-heading"><div><h3>{{ selectedFile.label }}</h3><p>{{ selectedFile.path }} · {{ selectedFile.bytes }} bytes</p></div><button class="secondary-button" @click="copyText(selectedFile.content)"><Copy :size="14" />复制内容</button></div>
-              <div class="file-tags"><span>{{ ruleLayer(selectedFile) }}</span><span>{{ selectedFile.kind }}</span><span :class="{ 'trace-present': selectedFile.activeForRequest }">{{ selectedFile.activeForRequest ? '标记为本次配置' : '参考/未选中配置' }}</span><span v-if="selectedFile.truncated">内容已截断</span></div>
+              <div class="file-tags"><span>{{ ruleLayer(selectedFile) }}</span><span>{{ selectedFile.kind }}</span><span :class="{ 'trace-present': selectedFile.activeForRequest }">{{ selectedFile.activeForRequest ? '标记为运行候选' : '参考/未选中配置' }}</span><span v-if="selectedFile.truncated">内容已截断</span></div>
               <pre class="source-code">{{ selectedFile.content || '文件不存在或没有内容。' }}</pre>
               <div class="hash-line">SHA-256：{{ selectedFile.sha256 || '不可用' }}</div>
             </template>
