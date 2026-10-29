@@ -23,7 +23,7 @@
       <aside class="dc-card panel side"><span class="dc-eyebrow">IDENTITY</span><h3>资产身份</h3><div><span>稳定标识</span><code class="dc-tech">{{data.assetId||'—'}}</code></div><div><span>状态</span><b>{{data.status||'VALID'}}</b></div></aside>
     </div>
     <AssetReferencePanel v-if="data && kind==='stat-systems'" kind="STAT_SYSTEM" :asset-id="data.assetId" title="统计制度下属指标"/>
-    <div v-else-if="loading" class="dc-empty">正在加载资产详情…</div><div v-else class="dc-empty">未找到该资产。</div>
+    <div v-if="!data && loading" class="dc-empty">正在加载资产详情…</div><div v-if="!data && !loading" class="dc-empty">未找到该资产。</div>
   </div></div>
 </template>
 <script setup lang="ts">
