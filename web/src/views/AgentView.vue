@@ -12,7 +12,7 @@
         </div>
       </header>
 
-      <section class="agent-workspace dc-card" :class="{ 'mobile-history-open': mobileHistoryOpen, 'inspector-visible': inspectorOpen }">
+      <section class="agent-workspace dc-card" :class="{ 'mobile-history-open': mobileHistoryOpen, 'inspector-visible': inspectorOpen, 'deliverables-visible': workspaceOpen }">
         <AgentConversationSidebar
           :groups="conversationGroups"
           :count="conversations.length"
@@ -43,7 +43,10 @@
               <button type="button" :class="{active:taskTier==='multi'}" :disabled="loading"
                 @click="chooseTier('multi')">多步任务</button>
             </div>
-            <button class="inspector-toggle" :class="{active:inspectorOpen}" @click="inspectorOpen=!inspectorOpen">
+            <button class="deliverables-toggle" :class="{active:workspaceOpen}" @click="toggleWorkspace">
+              <PanelsTopLeft :size="19"/> {{workspaceOpen?'收起成果':'成果工作区'}} <span v-if="deliverableCount">{{deliverableCount}}</span>
+            </button>
+            <button class="inspector-toggle" :class="{active:inspectorOpen}" @click="toggleInspector">
               <PanelRight :size="18"/>{{ inspectorOpen ? '收起工作面板' : '展开工作面板' }}
             </button>
           </div>
@@ -96,6 +99,7 @@
               @clarify="submitClarification(index, $event)"
             />
             <div v-if="latestAnswer && !loading && (latestAnswer.sql || latestAnswer.evidence || latestAnswer.events?.length)" class="result-shortcuts">
+              <button class="result-workspace-entry" @click="openWorkspace"><PanelsTopLeft :size="17"/>打开独立成果工作区 <ArrowUpRight :size="15"/></button>
               <span><PanelsTopLeft :size="17"/> 结果工作区</span>
               <button v-if="latestAnswer.sql" @click="openInspector('sql')"><Code2 :size="16"/>查看生成的 SQL <ArrowUpRight :size="14"/></button>
               <button v-if="latestAnswer.evidence" @click="openInspector('evidence')"><Database :size="16"/>查看数据依据 <ArrowUpRight :size="14"/></button>
@@ -141,6 +145,7 @@
             <div class="composer-hint"><span>Enter 发送 · Shift+Enter 换行</span><span><ShieldCheck :size="16" />资产依据 · SQL 静态校验 · 不执行查询</span></div>
           </div>
         </section>
+        <AgentDeliverableWorkspace v-if="workspaceOpen" :messages="messages" :tier="taskTier" :running="loading" @close="workspaceOpen=false"/>
         <aside v-if="inspectorOpen" class="agent-inspector" aria-label="依据与 SQL 检查器">
           <header><div><b>工作面板</b><small>证据、SQL 和工具活动</small></div><button @click="inspectorOpen=false" title="收起面板" aria-label="收起面板"><X :size="17"/></button></header>
           <nav class="inspector-tabs" aria-label="检查器页面">
@@ -187,6 +192,7 @@ import AgentTaskJourney from '@/components/agent/AgentTaskJourney.vue'
 import AgentEvidence from '@/components/agent/AgentEvidence.vue'
 import AgentSqlCard from '@/components/agent/AgentSqlCard.vue'
 import AgentValidationPanel from '@/components/agent/AgentValidationPanel.vue'
+import AgentDeliverableWorkspace from '@/components/agent/AgentDeliverableWorkspace.vue'
 import type { AgentConversation, AgentMessage, ContextAsset } from '@/components/agent/types'
 import { useAgentConversations } from '@/composables/useAgentConversations'
 
@@ -236,9 +242,21 @@ const agentUnavailableReason = computed(() => {
 })
 const mobileHistoryOpen = ref(false)
 const inspectorOpen = ref(false)
+const workspaceOpen = ref(false)
+const deliverableCount = computed(() => messages.value.filter(x=>x.role==='assistant' && (x.text||x.sql)).length)
+function toggleInspector(){
+  if(!inspectorOpen.value)workspaceOpen.value=false
+  inspectorOpen.value=!inspectorOpen.value
+}
+function toggleWorkspace(){
+  if(!workspaceOpen.value)inspectorOpen.value=false
+  workspaceOpen.value=!workspaceOpen.value
+}
+function openWorkspace(){workspaceOpen.value=true;inspectorOpen.value=false}
 const inspectorTab = ref<'evidence' | 'sql' | 'steps'>('evidence')
 function openInspector(tab: 'evidence' | 'sql' | 'steps') {
   inspectorTab.value = tab
+  workspaceOpen.value = false
   inspectorOpen.value = true
 }
 const question = ref('')
@@ -328,6 +346,7 @@ function restoreConversation(conversation: AgentConversation) {
 async function selectConversation(conversation: AgentConversation) {
   if (loading.value) return
   mobileHistoryOpen.value = false
+  workspaceOpen.value=false
   if (route.query.asset || route.query.q) await router.replace({ name: 'agent' })
   const selected = activateConversation(conversation.id)
   if (selected) {
@@ -359,7 +378,7 @@ async function toggleConversationPin(conversation: AgentConversation) {
     togglePin(conversation.id)
   } catch { ElMessage.error('置顶操作未保存，原状态已保留。') }
 }
-function resetConversationState() { sessionId.value = null; messages.value = []; contextAsset.value = null; question.value = ''; nextTick(resizeComposer) }
+function resetConversationState() { sessionId.value = null; messages.value = []; contextAsset.value = null; question.value = ''; workspaceOpen.value = false; inspectorOpen.value=false; nextTick(resizeComposer) }
 
 async function newSession() {
   if (loading.value) return
@@ -703,6 +722,20 @@ onMounted(async () => {
 @media(max-width:1180px){.agent-workspace{grid-template-columns:220px minmax(0,1fr)}.agent-inspector{display:none}}
 @media(max-width:760px){.chat-model-bar{padding:9px 12px;gap:7px;flex-wrap:wrap}.model-context{display:none}.model-options button{padding:7px 9px}.agent-screen{min-height:640px;padding:12px 0}.agent-head{align-items:flex-start;flex-direction:column;gap:10px;padding-bottom:12px}.agent-head h1{font-size:31px}.agent-workspace{grid-template-columns:1fr}.agent-workspace :deep(.history-pane){display:none}.messages{padding:21px 15px}.prompt-grid{grid-template-columns:1fr}.composer-wrap{padding:10px 12px 11px}.composer-hint span:first-child{display:none}.composer-hint{justify-content:flex-end}}
 .mode-pulse.offline{animation:none;background:#c48f49;box-shadow:0 0 0 3px #fbf0dd}
+
+/* Dual-mode long-task deliverable workspace, mutually exclusive with inspector. */
+.deliverables-toggle{display:flex;align-items:center;gap:7px;padding:9px 12px;border:1px solid #abc9f2;background:linear-gradient(110deg,#eaf3ff,#fff);color:#285fd1;border-radius:9px;font-size:13px;font-weight:770;cursor:pointer;white-space:nowrap}
+.deliverables-toggle:hover,.deliverables-toggle.active{border-color:#6da5ed;background:#dbeaff;box-shadow:0 3px 10px #2b62b526}
+.deliverables-toggle span{background:#2d6fde;color:white;border-radius:999px;font-size:11px;padding:2px 7px}
+.agent-workspace.deliverables-visible{grid-template-columns:222px minmax(330px,.82fr) minmax(440px,1.18fr)!important}
+.agent-workspace.deliverables-visible .chat-shell{min-width:0}
+.result-shortcuts .result-workspace-entry{border-color:#2d6ad9;background:linear-gradient(100deg,#326fe5,#5395ef);color:white;font-weight:800}
+.result-shortcuts .result-workspace-entry:hover{background:#1e58c8}
+@media(max-width:1450px){.agent-workspace.deliverables-visible{grid-template-columns:205px minmax(250px,.75fr) minmax(390px,1.25fr)!important}}
+@media(max-width:1180px){.agent-workspace.deliverables-visible{grid-template-columns:205px minmax(0,1fr)!important;position:relative}
+.agent-workspace.deliverables-visible .deliverable-workspace{position:absolute;right:0;top:0;bottom:0;width:min(720px,85vw);z-index:28;box-shadow:-15px 0 44px #224a8740}}
+@media(max-width:760px){.deliverables-toggle{font-size:12px;padding:8px}.agent-workspace.deliverables-visible{grid-template-columns:1fr!important}
+.agent-workspace.deliverables-visible .deliverable-workspace{width:100%;left:0;right:0}.result-shortcuts .result-workspace-entry{width:100%;justify-content:center}}
 </style>
 
 <style scoped>
