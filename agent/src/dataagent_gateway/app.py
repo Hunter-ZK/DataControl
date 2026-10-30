@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from ipaddress import ip_address
 from typing import Any, Literal
 from uuid import UUID
@@ -12,7 +13,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from dataagent_gateway.runner import HarnessRunError, HeadlessHarnessRunner, _debug_capture_enabled
-from dataagent_gateway.quick import LocalQuickRunner
+from dataagent_gateway.quick import LocalQuickFailure, LocalQuickRunner
 
 app = FastAPI(title="DataControl Embedded DataAgent Gateway", version="0.3.0-p3")
 
@@ -165,6 +166,8 @@ async def query_stream(body: QueryRequest):
     task.add_done_callback(forget_done)
 
     async def stream():
+        started = time.monotonic()
+        last_heartbeat = started
         try:
             yield _json_line({"type": "started", "runId": run_id})
             while not task.done() or not events.empty():
@@ -172,16 +175,32 @@ async def query_stream(body: QueryRequest):
                     update = await asyncio.wait_for(events.get(), timeout=0.25)
                     yield _json_line(update)
                 except TimeoutError:
+                    now = time.monotonic()
+                    if now - last_heartbeat >= 10:
+                        yield _json_line({
+                            "type": "heartbeat", "runId": run_id,
+                            "elapsedMs": int((now - started) * 1000),
+                        })
+                        last_heartbeat = now
                     continue
             try:
                 answer = await task
                 yield _json_line({"type": "result", "result": answer})
             except asyncio.CancelledError:
                 yield _json_line({"type": "cancelled"})
+            except LocalQuickFailure as exc:
+                LOG.warning("[AgentStream:%s] local quick failure: %s", run_id[:8], exc.code)
+                yield _json_line({
+                    "type": "error", "reason": "timeout" if exc.code == "LOCAL_TIMEOUT" else "failed",
+                    "code": exc.code, "message": exc.user_message,
+                })
             except HarnessRunError as exc:
                 LOG.exception("[AgentStream:%s] task failed", run_id[:8])
                 reason = "timeout" if "exceeded" in str(exc).lower() or "timeout" in str(exc).lower() else "failed"
-                yield _json_line({"type": "error", "reason": reason, "message": "Agent 处理失败，请查看服务端日志。"})
+                yield _json_line({
+                    "type": "error", "reason": reason, "code": "HARNESS_FAILURE",
+                    "message": "完整 Agent 执行失败，请查看管理员工作台 Trace 或 Gateway 日志。",
+                })
             except Exception:
                 LOG.exception("[AgentStream:%s] unexpected failure", run_id[:8])
                 yield _json_line({"type": "error", "message": "Agent 处理异常，请查看服务端日志。"})
