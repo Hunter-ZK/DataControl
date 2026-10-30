@@ -69,7 +69,7 @@
           </div>
           <div v-if="modelMode==='free-test'" class="runtime-warning"><TriangleAlert :size="18"/><span>免费模型使用第三方公共网关，可能记录问题及工具信息。仅测试模拟数据；不得输入真实业务、内部 SQL、账号或个人信息。</span></div>
           <div v-if="modelMode==='local-deepseek' && taskTier!=='quick'" class="runtime-warning"><Cpu :size="18"/><span>调用本机 llama.cpp（127.0.0.1:9931）。7B CPU 推理可能较慢；完整任务仍使用 MCP 与静态 SQL 校验，不执行生产 SQL。</span></div>
-          <div v-if="modelMode==='local-deepseek' && taskTier==='quick'" class="runtime-warning"><Zap :size="18"/><span>极速模式：仅调用本地模型一次，尝试关闭深度思考。不会调用 Agent 工具、查询元数据或校验 SQL；如需可信数仓结果，请切换标准问数。</span></div>
+          <div v-if="modelMode==='local-deepseek' && taskTier==='quick'" class="runtime-warning"><Zap :size="18"/><span>极速模式：仅参考本次问题，单次调用本地模型并尝试关闭深度思考；不读取历史对话、不查询元数据、不调用 Agent 工具或校验 SQL。可信问数请切换标准模式。</span></div>
           <div v-if="contextAsset" class="context-strip">
             <Database :size="17" />
             <div><span>当前数据资产</span><b>{{ contextAsset.bizName || contextAsset.tableName }}</b><code>{{ contextAsset.tableName }}</code></div>
@@ -101,7 +101,7 @@
                   <span>{{ item }}</span><ArrowUpRight :size="17" />
                 </button>
               </div>
-              <p class="welcome-note"><ShieldCheck :size="16"/>只生成与校验 SQL，不执行生产查询</p>
+              <p class="welcome-note"><ShieldCheck :size="16"/>{{taskTier==='quick'?'极速模式仅回答一般问题，不查询元数据或验证 SQL':'只生成与校验 SQL，不执行生产查询'}}</p>
             </div>
 
             <AgentMessageView
@@ -329,14 +329,21 @@ const {
   declineUnscopedLegacy,
 } = useAgentConversations()
 
-const quickPrompts = [
+const quickPrompts = computed(() => taskTier.value === 'quick' ? [
+  '解释 ODS、DWD、DWS 的区别',
+  '帮我把这段需求表述得更简洁',
+  '简要说明数仓开发的主要流程',
+  'SQL 中 GROUP BY 有什么作用？',
+  '给我几个规范的字段命名建议',
+  '如何写好业务需求说明？',
+] : [
   '今年贷款增长怎么样？',
   '本期各地区贷款余额是多少？',
   '各地区不良贷款率是多少？',
   '贷款余额最高的前 10 个地区',
   '广东省人民币贷款余额怎么统计？',
   '贷款余额使用哪张数据表？',
-]
+])
 
 async function refreshStatus() {
   const serial = ++statusRequestSerial
