@@ -6,6 +6,7 @@ skipping tool orchestration, requesting zero reasoning tokens and bounding outpu
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import time
 from collections.abc import Callable
@@ -16,7 +17,18 @@ import httpx
 from dataagent_gateway.local_provider import LocalModelError, discover_local_model
 from dataagent_gateway.runner import HarnessRunError, _debug_capture_enabled
 
+LOGGER = logging.getLogger("uvicorn.error")
 QUICK_TOKEN_LIMITS = (128, 256, 512)
+
+
+class LocalQuickFailure(HarnessRunError):
+    """Safe, categorized diagnostic; never contains raw model reasoning."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+        self.user_message = message
+
 QUICK_TIMEOUT_SECONDS = 240.0
 QUICK_NOTICE = "**极速回答（未检索元数据、未校验 SQL）**"
 QUICK_SYSTEM = (
@@ -124,18 +136,58 @@ class LocalQuickRunner:
                 response.raise_for_status()
                 data = response.json()
         except httpx.TimeoutException as exc:
-            raise HarnessRunError(f"Local quick response exceeded {QUICK_TIMEOUT_SECONDS:g}s timeout") from exc
+            raise LocalQuickFailure(
+                "LOCAL_TIMEOUT", "本地模型推理超时（240 秒）。请检查 llama.cpp 输出速度和进程状态。"
+            ) from exc
+        except httpx.HTTPStatusError as exc:
+            LOGGER.warning("Local quick llama.cpp HTTP status=%d", exc.response.status_code)
+            raise LocalQuickFailure(
+                "LOCAL_HTTP_ERROR",
+                f"本地模型接口返回 HTTP {exc.response.status_code}；检查 llama.cpp 聊天接口和参数兼容性。",
+            ) from exc
         except (httpx.HTTPError, ValueError) as exc:
-            raise HarnessRunError(f"Local quick model request failed ({type(exc).__name__}); check llama.cpp logs") from exc
+            LOGGER.warning("Local quick request error: %s", type(exc).__name__)
+            raise LocalQuickFailure(
+                "LOCAL_TRANSPORT_ERROR", "本地模型请求失败；检查 llama.cpp 进程、端口和模型加载状态。"
+            ) from exc
         choices = data.get("choices") if isinstance(data, dict) else None
         if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
-            raise HarnessRunError("Local quick model returned no completion choice")
-        message = choices[0].get("message")
+            raise LocalQuickFailure(
+                "LOCAL_MALFORMED_RESPONSE", "本地模型返回的数据格式不符合 Chat Completions 协议。"
+            )
+        choice = choices[0]
+        message = choice.get("message")
         answer = _clean_answer(str(message.get("content") or "")) if isinstance(message, dict) else ""
         if not answer:
-            raise HarnessRunError(
-                "Local model returned only reasoning or an empty response. "
-                "Check llama.cpp reasoning support and try 256/512 output tokens."
+            usage = data.get("usage") if isinstance(data, dict) else None
+            usage = usage if isinstance(usage, dict) else {}
+            finish = str(choice.get("finish_reason") or "unknown")[:40]
+            thinking_only = bool(isinstance(message, dict) and message.get("reasoning_content"))
+            elapsed = int((time.monotonic() - started) * 1000)
+            LOGGER.warning(
+                "LOCAL_QUICK_EMPTY_ANSWER model=%s finish=%s completion_tokens=%s "
+                "reasoning_only=%s duration_ms=%d",
+                model.identity, finish, str(usage.get("completion_tokens", "unknown"))[:20],
+                thinking_only, elapsed,
+            )
+            if on_activity and _debug_capture_enabled():
+                on_activity({
+                    "type": "debug_event", "source": "local-quick",
+                    "eventType": "run_failed",
+                    "payload": {
+                        "code": "LOCAL_EMPTY_ANSWER", "finishReason": finish,
+                        "completionTokens": usage.get("completion_tokens"),
+                        "reasoningContentPresent": thinking_only, "maxTokens": self.max_tokens,
+                        "durationMs": elapsed,
+                    },
+                })
+            suffix = (
+                "模型只输出了思考内容，没有最终回答。"
+                if thinking_only else "模型未返回有效回答文本。"
+            )
+            raise LocalQuickFailure(
+                "LOCAL_EMPTY_ANSWER",
+                suffix + f"结束原因：{finish}。请检查 llama.cpp 是否支持关闭思考、聊天模板是否匹配，并尝试 256/512 tokens。",
             )
         elapsed = int((time.monotonic() - started) * 1000)
         if on_activity and _debug_capture_enabled():
