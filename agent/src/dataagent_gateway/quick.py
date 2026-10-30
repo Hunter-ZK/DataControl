@@ -6,7 +6,6 @@ skipping tool orchestration, requesting zero reasoning tokens and bounding outpu
 from __future__ import annotations
 
 import asyncio
-import os
 import re
 import time
 from collections.abc import Callable
