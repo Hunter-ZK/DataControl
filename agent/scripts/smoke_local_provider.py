@@ -6,7 +6,6 @@ not need a running llama.cpp service or external credentials.
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -23,6 +22,7 @@ def main() -> int:
         env = os.environ.copy()
         env["DSH_HOME"] = tmp
         env["DSH_TELEMETRY_MODE"] = "DISABLED"
+        env["PYTHONIOENCODING"] = "utf-8"
         env["DATACONTROL_LOCAL_MODEL_API_KEY"] = "local-no-key-required"
         env["PATH"] = str(bins) + os.pathsep + env.get("PATH", "")
         for tier in ("standard", "multi"):
@@ -30,7 +30,7 @@ def main() -> int:
             command = ["node", str(entry), "--profile", name]
             boot = subprocess.run(
                 command + ["--from-default-profile", "headless", "--dump-config"],
-                env=env, cwd=ROOT, capture_output=True, text=True, timeout=150,
+                env=env, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=150,
             )
             if boot.returncode:
                 raise RuntimeError("local profile bootstrap failed: " + boot.stderr[-3000:])
@@ -44,7 +44,7 @@ def main() -> int:
             )
             check = subprocess.run(
                 command + ["--dump-config"], cwd=ROOT, env=env,
-                capture_output=True, text=True, timeout=150,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=150,
             )
             if check.returncode:
                 raise RuntimeError("local dsh config invalid: " + check.stderr[-3000:])
