@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 from dataagent_gateway.local_provider import LocalModel
-from dataagent_gateway.quick import LocalQuickFailure, LocalQuickRunner
+from dataagent_gateway.quick import LocalQuickFailure, LocalQuickRunner, _clean_answer
 from dataagent_gateway.runner import HarnessRunError
 
 
@@ -54,6 +54,51 @@ def test_quick_returns_bounded_text_without_tools(monkeypatch):
     assert result["sessionId"] is None
     assert result["sqlExecuted"] is False
     assert any(a.get("eventType") == "run_start" for a in activities)
+
+
+
+
+@pytest.mark.parametrize(
+    ("model_content", "expected"),
+    [
+        ("\n</think>\n\n你好！", "你好！"),  # Actual Windows llama.cpp response.
+        ("<think>private reasoning</think>\n可以先这样处理。", "可以先这样处理。"),
+        ("<think>private reasoning</think>\n</think>\n最终结果", "最终结果"),
+        ("没有思考标签的普通回答", "没有思考标签的普通回答"),
+        ("<think>unfinished private reasoning", ""),
+        ("<think>private reasoning</think>", ""),
+        ("</think>", ""),
+        ("</think>完成后又开启<think>private unfinished reasoning", ""),
+    ],
+)
+def test_clean_answer_handles_orphan_deepseek_delimiter(model_content, expected):
+    assert _clean_answer(model_content) == expected
+
+
+def test_quick_accepts_exact_llamacpp_orphan_think_response(monkeypatch):
+    original_client = httpx.AsyncClient
+
+    def client(*args, **kwargs):
+        transport = httpx.MockTransport(lambda _: httpx.Response(
+            200, json={
+                "choices": [{
+                    "finish_reason": "stop",
+                    "message": {"content": "\n</think>\n\n你好！"},
+                }],
+                "usage": {"completion_tokens": 8},
+            },
+        ))
+        return original_client(*args, transport=transport, **kwargs)
+
+    monkeypatch.setattr("dataagent_gateway.quick.httpx.AsyncClient", client)
+    monkeypatch.setattr(
+        "dataagent_gateway.quick.discover_local_model",
+        lambda **_: LocalModel("exact-model", "http://127.0.0.1:9931/v1"),
+    )
+    result = asyncio.run(LocalQuickRunner(128).run("只回答两个字：你好。"))
+    assert result["answer"] == "**极速回答（未检索元数据、未校验 SQL）**\n\n你好！"
+    assert result["stopReason"] == "stop"
+    assert result["toolCallCount"] == 0
 
 
 def test_quick_rejects_provider_session_and_invalid_output_limit():
