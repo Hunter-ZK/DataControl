@@ -13,6 +13,10 @@ from typing import Any, Callable
 
 import httpx
 
+from dataagent_gateway.local_provider import (
+    LocalModelError, discover_local_model, expected_overlay, profile_name,
+)
+
 
 class HarnessRunError(RuntimeError):
     pass
@@ -457,11 +461,21 @@ class HeadlessHarnessRunner:
         if task_tier not in ("standard", "multi"):
             raise ValueError("Unknown Agent task tier")
         self.task_tier = task_tier
-        self.timeout_seconds = timeout_seconds or float(
-            os.getenv("DATACONTROL_AGENT_RUN_TIMEOUT_MULTI" if task_tier == "multi"
-                      else "DATACONTROL_AGENT_RUN_TIMEOUT",
-                      "600" if task_tier == "multi" else "120")
+        selected_mode = model_mode if model_mode is not None else os.getenv(
+            "DATACONTROL_AGENT_MODEL_MODE", "deepseek"
         )
+        if selected_mode not in ("deepseek", "free-test", "local-deepseek"):
+            raise ValueError("Unsupported DataAgent model mode")
+        self.model_mode = selected_mode
+        self.free_test = self.model_mode == "free-test"
+        self.local_model = self.model_mode == "local-deepseek"
+        timeout_variable = ("DATACONTROL_AGENT_RUN_TIMEOUT_LOCAL" if self.local_model
+                            else "DATACONTROL_AGENT_RUN_TIMEOUT_MULTI" if task_tier == "multi"
+                            else "DATACONTROL_AGENT_RUN_TIMEOUT")
+        default_timeout = ("1200" if task_tier == "multi" else "900") if self.local_model else (
+            "600" if task_tier == "multi" else "120"
+        )
+        self.timeout_seconds = timeout_seconds or float(os.getenv(timeout_variable, default_timeout))
         self.dsh_home = Path(
             os.getenv("DSH_HOME", str(self.repo_root / ".local" / "dsh-home-v0.2.1-rc.3"))
         ).resolve()
@@ -470,15 +484,9 @@ class HeadlessHarnessRunner:
         self.dsh_js_entry = (
             self.agent_root / "dsh" / "node_modules" / "@deepseek-ai" / "dsh" / "lib" / "bin.js"
         )
-        # An explicit request choice always wins over legacy process-level settings.
-        self.model_mode = model_mode if model_mode is not None else os.getenv(
-            "DATACONTROL_AGENT_MODEL_MODE", "deepseek"
-        )
-        if self.model_mode not in ("deepseek", "free-test"):
-            raise ValueError("Unsupported DataAgent model mode")
-        self.free_test = self.model_mode == "free-test"
         self.profile = (
-            "dataagent-headless-free" if self.free_test
+            profile_name(task_tier) if self.local_model
+            else "dataagent-headless-free" if self.free_test
             else ("dataagent-headless-multi" if task_tier == "multi"
                   else os.getenv("DATACONTROL_DSH_PROFILE", "dataagent-headless"))
         )
@@ -502,10 +510,20 @@ class HeadlessHarnessRunner:
                           ("headless-multi.patch.yml" if self.task_tier == "multi"
                            else "headless.patch.yml"))
         active_overlay = self.profile_dir / "cordis.patch.yml"
-        provider = "our-free-model" if self.free_test else "deepseek-official"
-        model = "kilo-auto/free" if self.free_test else "deepseek-flash"
+        provider = "local-llama" if self.local_model else "our-free-model" if self.free_test else "deepseek-official"
+        model = "unknown" if self.local_model else "kilo-auto/free" if self.free_test else "deepseek-flash"
+        local = None
+        local_error = None
+        if self.local_model:
+            try:
+                local = await asyncio.to_thread(discover_local_model)
+                model = local.id
+            except LocalModelError as exc:
+                local_error = str(exc)
         try:
             expected = source_overlay.read_bytes()
+            if self.local_model and local:
+                expected = expected_overlay(self.task_tier, local).encode("utf-8")
             if self.free_test:
                 expected = expected.replace(
                     b"provider: deepseek-official\n    model: deepseek-flash",
@@ -531,19 +549,24 @@ class HeadlessHarnessRunner:
                 plugin_ok = False
         profile_ready = profile_package_ready and patch_ok and plugin_ok
         api_key_present = bool(os.getenv("DEEPSEEK_API_KEY"))
-        # Public gateway consent belongs to each request, not the server process.
-        # This health check reports whether the optional profile is installed.
-        key_ready = self.free_test or api_key_present
+        # Neither public-test nor local llama.cpp requires a DeepSeek API key.
+        key_ready = self.free_test or self.local_model or api_key_present
         mcp_reachable = await self._mcp_reachable()
-        ready = dsh_installed and profile_ready and key_ready and mcp_reachable
+        ready = dsh_installed and profile_ready and key_ready and mcp_reachable and (
+            not self.local_model or local is not None
+        )
         blockers: list[str] = []
         if not dsh_installed:
             blockers.append("DeepSeek Harness is not installed")
         if not profile_ready:
             blockers.append(
+                "Local dsh profile missing or stale; run .\\scripts\\setup-local-model.ps1"
+                if self.local_model else
                 "Free model test profile missing; run the optional scripts/setup-free-model-test installer"
                 if self.free_test else "DataAgent profile is missing/outdated: rerun setup-agent"
             )
+        if local_error:
+            blockers.append(local_error)
         if not key_ready:
             blockers.append("DEEPSEEK_API_KEY is not set")
         if not mcp_reachable:
@@ -551,8 +574,8 @@ class HeadlessHarnessRunner:
         return {
             "ready": ready, "dshInstalled": dsh_installed,
             "profileReady": profile_ready, "apiKeyPresent": api_key_present,
-            "apiKeyRequired": not self.free_test, "mcpReachable": mcp_reachable,
-            "profile": self.profile, "modelMode": "free-test" if self.free_test else "deepseek",
+            "apiKeyRequired": not (self.free_test or self.local_model), "mcpReachable": mcp_reachable,
+            "profile": self.profile, "modelMode": self.model_mode,
             "provider": provider, "model": model,
             "reason": "; ".join(blockers) if blockers else None,
         }
@@ -563,6 +586,7 @@ class HeadlessHarnessRunner:
         specs: list[tuple[str, str, str, bool]] = [
             ("agent/dsh/profile/headless.patch.yml", "profile-source", "标准任务 Profile 源配置", self.task_tier == "standard"),
             ("agent/dsh/profile/headless-multi.patch.yml", "profile-source", "多步任务 Profile 源配置", self.task_tier == "multi"),
+            ("agent/src/dataagent_gateway/local_provider.py", "provider-source", "本地模型发现和 Profile 配置", self.local_model),
             ("agent/dsh/profile/cordis.patch.yml", "profile-template", "仓库内 Profile 模板", False),
             ("agent/dsh/profile/pinned-plugin-ids.json", "plugin-lock", "固定插件清单", True),
             ("agent/tool-catalog.json", "tool-catalog", "Agent3 MCP 工具白名单", True),
@@ -622,14 +646,20 @@ class HeadlessHarnessRunner:
                     "truncated": False,
                 })
 
+        local_id = None
+        if self.local_model:
+            try:
+                local_id = discover_local_model(timeout=2.0).id
+            except LocalModelError:
+                local_id = "unavailable"
         return {
             "captureEnabled": _debug_capture_enabled(),
-            "modelMode": "free-test" if self.free_test else "deepseek",
+            "modelMode": self.model_mode,
             "taskTier": self.task_tier,
             "profile": self.profile,
             "profileDir": "DSH_HOME/profiles/" + self.profile,
-            "provider": "our-free-model" if self.free_test else "deepseek-official",
-            "model": "kilo-auto/free" if self.free_test else "deepseek-flash",
+            "provider": "local-llama" if self.local_model else "our-free-model" if self.free_test else "deepseek-official",
+            "model": local_id if self.local_model else "kilo-auto/free" if self.free_test else "deepseek-flash",
             "timeoutSeconds": self.timeout_seconds,
             "apiKeyPresent": bool(os.getenv("DEEPSEEK_API_KEY")),
             "sqlExecutionEnabled": False,
@@ -759,6 +789,8 @@ class HeadlessHarnessRunner:
         env = _with_loopback_no_proxy(os.environ.copy())
         env["DSH_HOME"] = str(self.dsh_home)
         env["DSH_TELEMETRY_MODE"] = "DISABLED"
+        if self.local_model:
+            env["DATACONTROL_LOCAL_MODEL_API_KEY"] = "local-no-key-required"
         request_id = uuid.uuid4().hex[:8]
         started = time.monotonic()
         if on_activity and _debug_capture_enabled():
@@ -775,10 +807,10 @@ class HeadlessHarnessRunner:
             on_activity({
                 "type": "debug_event", "source": "gateway", "eventType": "run_start",
                 "payload": {
-                    "requestId": request_id, "modelMode": "free-test" if self.free_test else "deepseek",
+                    "requestId": request_id, "modelMode": self.model_mode,
                     "taskTier": self.task_tier, "profile": self.profile,
-                    "provider": "our-free-model" if self.free_test else "deepseek-official",
-                    "model": "kilo-auto/free" if self.free_test else "deepseek-flash",
+                    "provider": current_config["provider"],
+                    "model": current_config["model"],
                     "timeoutSeconds": self.timeout_seconds, "sessionResumed": bool(session_id),
                     "questionSentToHarness": question,
                     "effectiveConfigSnapshot": {
@@ -792,12 +824,22 @@ class HeadlessHarnessRunner:
                 },
             })
         LOGGER.info("[Agent:%s] START session=%s", request_id, "resume" if session_id else "new")
-        if self.free_test:
+        local_identity = None
+        if self.local_model:
+            try:
+                local_identity = discover_local_model(timeout=4.0).identity
+            except LocalModelError as exc:
+                raise HarnessRunError(str(exc)) from exc
+            prefix = "local-deepseek:" + local_identity + ":"
+            if session_id and not session_id.startswith(prefix):
+                raise HarnessRunError("Local model changed; start a new conversation")
+            native_session_id = session_id[len(prefix):] if session_id else None
+        elif self.free_test:
             if session_id and not session_id.startswith("free-test:"):
                 raise HarnessRunError("Start a new conversation for public free-test mode")
             native_session_id = session_id[len("free-test:"):] if session_id else None
         else:
-            if session_id and session_id.startswith("free-test:"):
+            if session_id and (session_id.startswith("free-test:") or session_id.startswith("local-deepseek:")):
                 raise HarnessRunError("Start a new conversation for the official DeepSeek model")
             native_session_id = session_id
         process = await self._spawn(self._command(native_session_id), env)
@@ -858,6 +900,8 @@ class HeadlessHarnessRunner:
         )
         if self.free_test and result.get("sessionId"):
             result["sessionId"] = "free-test:" + result["sessionId"]
+        if self.local_model and result.get("sessionId"):
+            result["sessionId"] = "local-deepseek:" + str(local_identity) + ":" + result["sessionId"]
         result["durationMs"] = int((time.monotonic() - started) * 1000)
         result["toolCallCount"] = sum(
             1 for event in result["events"] if event["type"] == "tool_call"
