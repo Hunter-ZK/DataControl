@@ -140,7 +140,7 @@
               <p v-if="taskTier==='quick'">正在等待本地模型完成单次快速生成，不调用 MCP 工具；实际耗时取决于 CPU 推理速度。</p>
               <template v-else>
                 <p>{{ liveEvents.length ? '以下步骤来自真实 Agent3 工具调用，完成后将展示证据与最终答案。' : '已开始处理，等待 Agent3 返回实际工具步骤。' }}</p>
-                <AgentTaskJourney :events="liveEvents" :tier="taskTier==='quick'?'standard':taskTier" :running="true"/>
+                <AgentTaskJourney :events="liveEvents" :tier="taskTier" :running="true"/>
               </template>
             </article>
           </div>
