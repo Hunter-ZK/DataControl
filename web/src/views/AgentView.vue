@@ -137,7 +137,7 @@
                 <b>{{ stopRequested ? '正在停止任务' : 'DataAgent 正在分析' }}</b>
                 <button class="stop-turn" :disabled="stopRequested" @click="stopAgentTurn"><Square :size="12" />停止</button>
               </div>
-              <p v-if="taskTier==='quick'">正在等待本地模型完成单次快速生成，不调用 MCP 工具；实际耗时取决于 CPU 推理速度。</p>
+              <p v-if="taskTier==='quick'">本地 CPU 模型单次生成中{{liveElapsedMs>0?'，已运行 '+Math.floor(liveElapsedMs/1000)+' 秒':''}}；不调用 MCP 工具。服务器每 10 秒发送一次保活信号。</p>
               <template v-else>
                 <p>{{ liveEvents.length ? '以下步骤来自真实 Agent3 工具调用，完成后将展示证据与最终答案。' : '已开始处理，等待 Agent3 返回实际工具步骤。' }}</p>
                 <AgentTaskJourney :events="liveEvents" :tier="taskTier" :running="true"/>
@@ -200,7 +200,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowUp, ArrowUpRight, ChartNoAxesCombined, Code2, Copy, Cpu, Database, FlaskConical, History, LoaderCircle, PanelRight, PanelsTopLeft, RotateCcw, ShieldCheck, Sparkles, Square, ThumbsDown, ThumbsUp, TriangleAlert, Workflow, X, Zap } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { agentApi, assetApi, type AgentActivity, type AgentModelMode, type AgentResult, type AgentStatus, type AgentStreamEvent, AgentTurnCancelledError } from '@/api/client'
+import { agentApi, assetApi, type AgentActivity, type AgentModelMode, type AgentResult, type AgentStatus, type AgentStreamEvent, AgentTurnCancelledError, AgentStreamFailureError } from '@/api/client'
 import AgentConversationSidebar from '@/components/agent/AgentConversationSidebar.vue'
 import AgentMessageView from '@/components/agent/AgentMessage.vue'
 import AgentTrace from '@/components/agent/AgentTrace.vue'
@@ -289,6 +289,7 @@ const question = ref('')
 const loading = ref(false)
 const liveEvents = ref<AgentActivity[]>([])
 const stopRequested = ref(false)
+const liveElapsedMs = ref(0)
 let activeRunId: string | null = null
 let activeController: AbortController | null = null
 const messages = ref<AgentMessage[]>([])
@@ -474,6 +475,12 @@ function reportAgentDevtools(result: AgentResult) {
 }
 
 function onAgentStreamEvent(update: AgentStreamEvent) {
+  if (update.type === 'heartbeat') {
+    if (Number.isFinite(update.elapsedMs) && update.elapsedMs >= 0) {
+      liveElapsedMs.value = Math.max(liveElapsedMs.value, update.elapsedMs)
+    }
+    return
+  }
   if (update.type !== 'activity') return
   if (update.event.type !== 'tool_call' && update.event.type !== 'tool_result') return
   liveEvents.value = [...liveEvents.value, update.event].slice(-40)
@@ -559,6 +566,7 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
   }
   stopRequested.value = false
   liveEvents.value = []
+  liveElapsedMs.value = 0
   activeRunId = crypto.randomUUID()
   activeController = new AbortController()
   await scrollBottom()
@@ -580,11 +588,25 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
       syncActive(messages.value, sessionId.value, contextAsset.value, modelMode.value)
     } else {
       console.error('DataAgent query failed', error)
-      // The dsh session may already contain an incomplete model turn.
-      // Do not resume it after a broken stream or unknown server outcome.
+      // Never reuse an interrupted or failed Harness session.
       sessionId.value = null
-      messages.value.push({ role: 'assistant', text: '本轮请求未完成，服务端最终状态暂时无法确认。为避免沿用不完整上下文，已重置模型会话。' })
-      ElMessage.error('智能问数本次未完成，请检查 Agent 服务与运行日志。')
+      let explanation: string
+      if (error instanceof AgentStreamFailureError) {
+        explanation = `本轮运行失败 [${error.code}]：${error.message}`
+      } else {
+        let serverStatus: string | null = null
+        if (activeRunId) {
+          try { serverStatus = (await agentApi.runStatus(activeRunId)).status }
+          catch { /* The status endpoint may also be unavailable. */ }
+        }
+        explanation = serverStatus === 'completed'
+          ? '浏览器结果连接中断，但服务端记录显示任务已完成。请刷新当前会话查看结果，不要重复提交。'
+          : serverStatus === 'failed' || serverStatus === 'timeout'
+            ? `本轮在服务端的实际状态为 ${serverStatus}；请在管理员工作台查看对应 Run 的错误信息。`
+            : 'Agent 连接中断，尚未确认服务端最终结果；请在管理员工作台查看该运行记录。'
+      }
+      messages.value.push({ role: 'assistant', text: explanation })
+      ElMessage.error('本轮请求未成功，请查看聊天中的具体原因。')
       await refreshStatus()
       syncActive(messages.value, sessionId.value, contextAsset.value, modelMode.value)
     }
