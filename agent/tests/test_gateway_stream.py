@@ -325,3 +325,32 @@ def test_quick_failure_exposes_safe_code_and_not_reasoning(monkeypatch):
         assert "reasoning_content" not in json.dumps(events)
 
     asyncio.run(scenario())
+
+
+
+def test_harness_without_final_answer_has_actionable_error_code(monkeypatch):
+    from uuid import UUID
+    import dataagent_gateway.app as gateway_app
+    from dataagent_gateway.runner import HarnessRunError
+
+    class NoFinalRunner:
+        def __init__(self, **_):
+            pass
+
+        async def run(self, question, *, session_id=None, on_activity=None):
+            raise HarnessRunError("dsh completed without a final assistant answer")
+
+    monkeypatch.setattr(gateway_app, "HeadlessHarnessRunner", NoFinalRunner)
+
+    async def scenario():
+        response = await gateway_app.query_stream(gateway_app.QueryRequest(
+            question="synthetic local question",
+            runId=UUID("a2114722-952b-48e0-bd09-88497178dace"),
+            modelMode="local-deepseek", taskTier="standard",
+        ))
+        events = [json.loads(chunk) async for chunk in response.body_iterator]
+        assert events[-1]["code"] == "HARNESS_NO_FINAL_ANSWER"
+        assert "最终回答" in events[-1]["message"]
+        assert events[-1]["reason"] == "failed"
+
+    asyncio.run(scenario())
