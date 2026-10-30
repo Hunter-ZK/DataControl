@@ -178,7 +178,7 @@ export interface ServerAgentConversation {
   title: string
   sessionId: string | null
   modelMode: AgentModelMode
-  taskTier?: 'standard' | 'multi'
+  taskTier?: 'standard' | 'multi' | 'quick'
   pinned: boolean
   createdAt: number
   updatedAt: number
@@ -230,8 +230,9 @@ export async function streamAgentTurn(
   modelMode: AgentModelMode = 'deepseek',
   conversationId: string | null = null,
   displayQuestion: string | null = null,
-  taskTier: 'standard' | 'multi' = 'standard',
+  taskTier: 'standard' | 'multi' | 'quick' = 'standard',
   publicGatewayConsent = false,
+  quickMaxTokens: 128 | 256 | 512 = 256,
 ): Promise<AgentResult> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   const token = localStorage.getItem('datacontrol_token')
@@ -243,7 +244,7 @@ export async function streamAgentTurn(
       question, runId, modelMode,
       conversationId: conversationId || undefined,
       displayQuestion: displayQuestion || undefined, taskTier,
-      publicGatewayConsent,
+      publicGatewayConsent, quickMaxTokens,
     }),
     signal,
   })
@@ -456,7 +457,7 @@ export const namingApi = {
 export const agentApi = {
   conversations: () => get<ServerAgentConversation[]>('/agent/conversations'),
   createConversation: (title: string, modelMode: AgentModelMode,
-    contextAsset?: Record<string, unknown> | null, taskTier: 'standard' | 'multi' = 'standard') =>
+    contextAsset?: Record<string, unknown> | null, taskTier: 'standard' | 'multi' | 'quick' = 'standard') =>
     post<ServerAgentConversation>('/agent/conversations', { title, modelMode, contextAsset, taskTier }),
   importConversations: (conversations: Array<Record<string, unknown>>) =>
     post<ServerAgentConversation[]>('/agent/conversations/import', { conversations }),
@@ -465,7 +466,7 @@ export const agentApi = {
   deleteConversation: (id: string) => remove<{ deleted: boolean }>(`/agent/conversations/${id}`),
   runStatus: (runId: string) => get<{ status: string; runId: string; modelMode: AgentModelMode }>(`/agent/runs/${runId}`),
   status: (modelMode: AgentModelMode = 'deepseek',
-    taskTier: 'standard' | 'multi' = 'standard') =>
+    taskTier: 'standard' | 'multi' | 'quick' = 'standard') =>
     get<AgentStatus>('/agent/status', { params: { modelMode, taskTier } }),
   query: (question: string, sessionId?: string | null, modelMode: AgentModelMode = 'deepseek') =>
     post<AgentResult>('/agent/query', {
@@ -484,7 +485,7 @@ export interface AdminAgentRun {
   displayQuestion: string
   status: string
   modelMode: AgentModelMode
-  taskTier: 'standard' | 'multi'
+  taskTier: 'standard' | 'multi' | 'quick'
   createdAt: string | null
   finishedAt: string | null
   durationMs: number | null
@@ -512,7 +513,7 @@ export interface AdminAgentRunDetail {
     promptSentToHarness: string
     status: string
     modelMode: AgentModelMode
-    taskTier: 'standard' | 'multi'
+    taskTier: 'standard' | 'multi' | 'quick'
     createdAt: string | null
     finishedAt: string | null
     durationMs: number | null
@@ -541,7 +542,7 @@ export interface AdminAgentConfigFile {
 export interface AdminAgentConfig {
   captureEnabled: boolean
   modelMode: AgentModelMode
-  taskTier: 'standard' | 'multi'
+  taskTier: 'standard' | 'multi' | 'quick'
   profile: string
   profileDir: string
   provider: string
@@ -563,7 +564,7 @@ export const adminApi = {
   metadataOverview: () => get<AdminMetadataOverview>('/admin/metadata/overview'),
   runs: (params?: Record<string, unknown>) => get<AdminAgentRun[]>('/admin/agent/runs', { params }),
   run: (id: string) => get<AdminAgentRunDetail>('/admin/agent/runs/' + encodeURIComponent(id)),
-  config: (modelMode: AgentModelMode = 'deepseek', taskTier: 'standard' | 'multi' = 'standard') =>
+  config: (modelMode: AgentModelMode = 'deepseek', taskTier: 'standard' | 'multi' | 'quick' = 'standard') =>
     get<AdminAgentConfig>('/admin/agent/config', { params: { modelMode, taskTier } }),
 }
 
