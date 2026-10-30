@@ -208,10 +208,23 @@ export interface AgentStatus {
 
 export type AgentStreamEvent =
   | { type: 'started'; runId: string }
+  | { type: 'heartbeat'; runId: string; elapsedMs: number }
   | { type: 'activity'; event: AgentActivity }
   | { type: 'result'; result: AgentResult }
   | { type: 'cancelled' }
-  | { type: 'error'; message: string }
+  | { type: 'error'; message: string; code?: string; reason?: string }
+
+export class AgentStreamFailureError extends Error {
+  readonly code: string
+  readonly reason: string
+
+  constructor(message: string, code = 'GATEWAY_FAILURE', reason = 'failed') {
+    super(message)
+    this.name = 'AgentStreamFailureError'
+    this.code = code
+    this.reason = reason
+  }
+}
 
 export class AgentTurnCancelledError extends Error {
   constructor() {
@@ -257,7 +270,9 @@ export async function streamAgentTurn(
   const parseLine = (line: string) => {
     if (!line.trim()) return
     const event = JSON.parse(line) as AgentStreamEvent
-    if (event.type === 'error') throw new Error(event.message)
+    if (event.type === 'error') {
+      throw new AgentStreamFailureError(event.message, event.code, event.reason)
+    }
     if (event.type === 'cancelled') throw new AgentTurnCancelledError()
     if (event.type === 'result') result = event.result
     onEvent(event)
