@@ -47,7 +47,7 @@ def _clean_answer(value: str) -> str:
     before an otherwise valid final answer, even with zero thinking budget.
     Never return text inside an unclosed <think> block.
     """
-    closing = list(re.finditer(r"</think\\s*>", value, flags=re.IGNORECASE))
+    closing = list(re.finditer(r"</think\s*>", value, flags=re.IGNORECASE))
     if closing:
         # Both paired and orphan closing markers are valid final-text boundaries.
         final_text = value[closing[-1].end():].strip()
@@ -56,7 +56,7 @@ def _clean_answer(value: str) -> str:
 
     # Refuse unclosed reasoning blocks (or any unexpected remaining marker).
     # Removing the markers alone would risk displaying private reasoning text.
-    if re.search(r"</?think\\s*>", final_text, flags=re.IGNORECASE):
+    if re.search(r"</?think\s*>", final_text, flags=re.IGNORECASE):
         return ""
     return final_text
 
