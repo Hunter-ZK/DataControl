@@ -52,3 +52,11 @@ Vue Agent → Portal :8000 → Gateway :8910 → dsh dataagent-headless-local �
 模型 ID 变化后需重新生成 Profile；本地会话使用 local-deepseek:<hash>:<sessionId> 前缀，禁止跨 Provider 续接。Gateway 限制同一时刻最多一项本地 CPU 模型任务。
 模型离线、Profile 旧版本或 dsh 适配不兼容时，查看 /health 的 reason、.local/local-model-profile.stderr.log 和管理员运行 Trace。
 无鉴权的 9931 必须只监听本机，不要对局域网或公网开放。不要执行生产 SQL/DDL，也不要将本地模式改写成不经 MCP/Guard 的裸模型请求。
+
+## 本地工具调用单独诊断
+
+在 llama.cpp 已启动且模型加载完成时，可运行：
+
+    .\.venv\Scripts\python.exe -m dataagent_gateway.local_provider tool-probe
+
+脚本向本机 /v1/chat/completions 发送合成的工具调用示例（无真实业务数据），检测返回中是否包含结构化 tool_calls。若 toolCallingObserved=false，说明接口能回答不代表 Agent 具备可靠的工具调用能力。测试可能在 CPU 上耗时较久，单次成功也不保证复杂任务稳定。按 llama.cpp 官方 Function Calling 指南，确认启动了 --jinja，并为 DeepSeek R1 Distill Qwen 7B 使用正确的工具调用模板（可能需要 --chat-template-file）。

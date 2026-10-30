@@ -118,6 +118,49 @@ def render_local_overlay(source: str, model: LocalModel) -> str:
     )
 
 
+
+def probe_tool_call(model: LocalModel, *, timeout: float = 240.0) -> bool:
+    """Optional synthetic function-calling diagnostic; never run at startup."""
+    request = {
+        "model": model.id,
+        "stream": False,
+        "temperature": 0,
+        "max_tokens": 384,
+        "messages": [
+            {"role": "system", "content": "Call the supplied lookup_code tool; do not answer before calling it."},
+            {"role": "user", "content": "Look up synthetic code TEST-123 using lookup_code."},
+        ],
+        "tools": [{
+            "type": "function",
+            "function": {
+                "name": "lookup_code",
+                "description": "Look up a synthetic demonstration code.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"code": {"type": "string"}},
+                    "required": ["code"],
+                },
+            },
+        }],
+        "tool_choice": "auto",
+    }
+    try:
+        with httpx.Client(trust_env=False, timeout=timeout) as client:
+            response = client.post(model.base_url + "/chat/completions", json=request)
+            response.raise_for_status()
+            payload = response.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise LocalModelError(f"Local tool-call diagnostic failed: {type(exc).__name__}") from exc
+    choices = payload.get("choices") if isinstance(payload, dict) else None
+    message = choices[0].get("message") if isinstance(choices, list) and choices and isinstance(choices[0], dict) else {}
+    calls = message.get("tool_calls") if isinstance(message, dict) else None
+    return bool(isinstance(calls, list) and any(
+        isinstance(item, dict) and isinstance(item.get("function"), dict)
+        and item["function"].get("name") == "lookup_code"
+        for item in calls
+    ))
+
+
 def source_profile(task_tier: str) -> Path:
     if task_tier not in {"standard", "multi"}:
         raise LocalModelError("Unknown task tier")
@@ -144,7 +187,7 @@ def profile_is_current(profile_dir: Path, task_tier: str, model: LocalModel) -> 
 
 def main() -> int:
     cli = argparse.ArgumentParser(description="Configure the loopback llama.cpp provider")
-    cli.add_argument("action", choices=["probe", "write-profile", "check-profile"])
+    cli.add_argument("action", choices=["probe", "write-profile", "check-profile", "tool-probe"])
     cli.add_argument("--profile-dir", type=Path)
     cli.add_argument("--task-tier", choices=["standard", "multi"], default="standard")
     args = cli.parse_args()
@@ -152,6 +195,12 @@ def main() -> int:
         model = discover_local_model()
         if args.action == "probe":
             print(json.dumps({"ready": True, "model": model.id, "baseURL": model.base_url}, ensure_ascii=False))
+        elif args.action == "tool-probe":
+            passed = probe_tool_call(model)
+            print(json.dumps({"model": model.id, "toolCallingObserved": passed}, ensure_ascii=False))
+            if not passed:
+                print("MODEL_TOOL_CALL_UNVERIFIED: llama.cpp returned no structured tool_calls; verify --jinja and chat-template-file", file=sys.stderr)
+                return 2
         elif args.action == "write-profile":
             if not args.profile_dir or not (args.profile_dir / "package.json").exists():
                 raise LocalModelError("Create a dsh headless profile before writing the overlay")
