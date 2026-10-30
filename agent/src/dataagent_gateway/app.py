@@ -12,6 +12,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from dataagent_gateway.runner import HarnessRunError, HeadlessHarnessRunner
+from dataagent_gateway.quick import LocalQuickRunner
 
 app = FastAPI(title="DataControl Embedded DataAgent Gateway", version="0.3.0-p3")
 
@@ -21,8 +22,9 @@ class QueryRequest(BaseModel):
     sessionId: str | None = Field(default=None, max_length=200)
     runId: UUID | None = None
     modelMode: Literal["deepseek", "free-test", "local-deepseek"] = "deepseek"
-    taskTier: Literal["standard", "multi"] = "standard"
+    taskTier: Literal["standard", "multi", "quick"] = "standard"
     publicGatewayConsent: bool = False
+    quickMaxTokens: Literal[128, 256, 512] = 256
 
 
 def allow_public_test(mode: str, consent: bool = False) -> None:
@@ -34,8 +36,13 @@ def allow_public_test(mode: str, consent: bool = False) -> None:
 
 @app.get("/health")
 async def health(modelMode: Literal["deepseek", "free-test", "local-deepseek"] | None = None,
-                 taskTier: Literal["standard", "multi"] = "standard"):
-    status = await HeadlessHarnessRunner(model_mode=modelMode, task_tier=taskTier).health()
+                 taskTier: Literal["standard", "multi", "quick"] = "standard"):
+    if taskTier == "quick":
+        if modelMode != "local-deepseek":
+            raise HTTPException(422, "Quick mode only supports local DeepSeek")
+        status = await LocalQuickRunner().health()
+    else:
+        status = await HeadlessHarnessRunner(model_mode=modelMode, task_tier=taskTier).health()
     return {
         "status": "ok" if status["ready"] else "degraded",
         "component": "embedded-dataagent-gateway",
@@ -49,7 +56,7 @@ async def health(modelMode: Literal["deepseek", "free-test", "local-deepseek"] |
 async def debug_config(
     request: Request,
     modelMode: Literal["deepseek", "free-test", "local-deepseek"] = "deepseek",
-    taskTier: Literal["standard", "multi"] = "standard",
+    taskTier: Literal["standard", "multi", "quick"] = "standard",
 ):
     """Loopback-only config inventory for the authenticated Portal admin workbench."""
     host = request.client.host if request.client else ""
@@ -59,6 +66,22 @@ async def debug_config(
         is_loopback = host == "testclient"
     if not is_loopback:
         raise HTTPException(403, "Debug configuration is available only over loopback")
+    if taskTier == "quick":
+        if modelMode != "local-deepseek":
+            raise HTTPException(422, "Quick mode only supports local DeepSeek")
+        status = await LocalQuickRunner().health()
+        return {
+            "captureEnabled": True,
+            "modelMode": modelMode, "taskTier": "quick",
+            "provider": status["provider"], "model": status["model"],
+            "profile": "local-quick-direct", "profileDir": None,
+            "timeoutSeconds": 240, "sqlExecutionEnabled": False,
+            "hiddenReasoningCaptured": False, "files": [],
+            "limitations": [
+                "极速回答仅调用本地模型一次，不调用 dsh/MCP，不查询真实元数据或校验 SQL。",
+                "请求尝试将思考预算设为零，是否生效取决于 llama.cpp 版本及聊天模板。",
+            ],
+        }
     runner = HeadlessHarnessRunner(
         model_mode=modelMode,
         **({"task_tier": "multi"} if taskTier == "multi" else {}),
@@ -69,9 +92,14 @@ async def debug_config(
 @app.post("/v1/query")
 async def query(body: QueryRequest):
     allow_public_test(body.modelMode, body.publicGatewayConsent)
-    runner = HeadlessHarnessRunner(model_mode=body.modelMode, **(
-        {"task_tier": "multi"} if body.taskTier == "multi" else {}
-    ))
+    if body.taskTier == "quick" and body.modelMode != "local-deepseek":
+        raise HTTPException(422, "Quick mode only supports local DeepSeek")
+    runner = (
+        LocalQuickRunner(body.quickMaxTokens) if body.taskTier == "quick"
+        else HeadlessHarnessRunner(model_mode=body.modelMode, **(
+            {"task_tier": "multi"} if body.taskTier == "multi" else {}
+        ))
+    )
     try:
         result = await runner.run(body.question.strip(), session_id=body.sessionId)
     except HarnessRunError as exc:
@@ -106,9 +134,14 @@ async def query_stream(body: QueryRequest):
         for local_id in ACTIVE_LOCAL_TURNS if local_id in ACTIVE_TURNS
     ):
         raise HTTPException(429, detail="Local CPU model allows one active Agent task; stop or finish the previous run")
-    runner = HeadlessHarnessRunner(model_mode=body.modelMode, **(
-        {"task_tier": "multi"} if body.taskTier == "multi" else {}
-    ))
+    if body.taskTier == "quick" and body.modelMode != "local-deepseek":
+        raise HTTPException(422, "Quick mode only supports local DeepSeek")
+    runner = (
+        LocalQuickRunner(body.quickMaxTokens) if body.taskTier == "quick"
+        else HeadlessHarnessRunner(model_mode=body.modelMode, **(
+            {"task_tier": "multi"} if body.taskTier == "multi" else {}
+        ))
+    )
     events: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
 
     def on_activity(activity: dict[str, Any]) -> None:
