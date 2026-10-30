@@ -205,7 +205,7 @@ def main() -> int:
             if not args.profile_dir or not (args.profile_dir / "package.json").exists():
                 raise LocalModelError("Create a dsh headless profile before writing the overlay")
             patch = args.profile_dir / "cordis.patch.yml"
-            patch.write_text(expected_overlay(args.task_tier, model), encoding="utf-8")
+            patch.write_text(expected_overlay(args.task_tier, model), encoding="utf-8", newline="\n")
             print(f"Local {args.task_tier} profile configured for model {model.id}")
         else:
             if not args.profile_dir or not profile_is_current(args.profile_dir, args.task_tier, model):
