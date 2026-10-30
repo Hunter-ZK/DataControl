@@ -533,7 +533,7 @@ class HeadlessHarnessRunner:
                     b"provider: our-free-model\r\n    model: kilo-auto/free",
                 )
             patch_ok = active_overlay.is_file() and active_overlay.read_bytes() == expected
-        except OSError:
+        except (OSError, LocalModelError):
             patch_ok = False
         plugin_ok = True
         if self.free_test:

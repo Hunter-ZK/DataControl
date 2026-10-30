@@ -48,7 +48,7 @@ foreach ($entry in @(
   }
   & $python -m dataagent_gateway.local_provider write-profile --profile-dir $dir --task-tier $tier
   if ($LASTEXITCODE -ne 0) { throw "Cannot render local profile $name" }
-  $configured = Invoke-Profile @("--profile", $name, "--dump-config")
+  $configured = Invoke-Profile -CliArguments @("--profile", $name, "--dump-config")
   foreach ($marker in @("local-llama", "llm-pi-ai", "mcp-agent3", "agent3-guard", "DataControl DataAgent")) {
     if ($configured -notmatch [regex]::Escape($marker)) {
       throw "Local profile $name is missing required component '$marker' in actual dsh configuration."

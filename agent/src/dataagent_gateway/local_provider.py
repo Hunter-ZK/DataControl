@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import json
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -163,7 +164,7 @@ def main() -> int:
             print("Local model profile matches the running llama.cpp model")
         return 0
     except (LocalModelError, OSError) as exc:
-        print("LOCAL_MODEL: " + str(exc), file=__import__("sys").stderr)
+        print("LOCAL_MODEL: " + str(exc), file=sys.stderr)
         return 1
 
 
