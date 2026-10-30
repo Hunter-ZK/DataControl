@@ -175,6 +175,15 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
                     event = {"type": "activity", "event": {
                         key: item[key] for key in ("type", "callId", "tool", "status") if key in item
                     }}
+                elif event_type == "heartbeat":
+                    # Keep long CPU model requests alive end-to-end, without persisting
+                    # a fake tool event or exposing any sensitive model content.
+                    elapsed_ms = event.get("elapsedMs")
+                    event = {
+                        "type": "heartbeat", "runId": run_id,
+                        "elapsedMs": int(elapsed_ms) if isinstance(elapsed_ms, int)
+                        and 0 <= elapsed_ms < 86_400_000 else 0,
+                    }
                 elif event_type == "result":
                     result = event.get("result")
                     if not isinstance(result, dict) or result.get("sqlExecuted") is True or result.get("hiddenReasoningExposed") is True:
@@ -189,13 +198,24 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
                         history.transition(run_id, "cancelled")
                     terminal = True
                 elif event_type == "error":
+                    reason = "timeout" if event.get("reason") == "timeout" else "failed"
+                    code = str(event.get("code") or "GATEWAY_FAILURE")
+                    if code not in {
+                        "LOCAL_TIMEOUT", "LOCAL_HTTP_ERROR", "LOCAL_TRANSPORT_ERROR",
+                        "LOCAL_MALFORMED_RESPONSE", "LOCAL_EMPTY_ANSWER",
+                        "HARNESS_FAILURE", "GATEWAY_FAILURE",
+                    }:
+                        code = "GATEWAY_FAILURE"
                     if persisted:
                         history.transition(
-                            run_id, "timeout" if event.get("reason") == "timeout" else "failed",
-                            error="Gateway reported an Agent error",
+                            run_id, reason,
+                            error=f"{code}: {str(event.get('message') or 'Gateway error')[:190]}",
                         )
                     terminal = True
-                    event = {"type": "error", "message": str(event.get("message", "Agent failed"))[:240]}
+                    event = {
+                        "type": "error", "reason": reason, "code": code,
+                        "message": str(event.get("message") or "Agent failed")[:240],
+                    }
                 else:
                     continue
                 yield (json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
