@@ -41,12 +41,24 @@ QUICK_SYSTEM = (
 
 
 def _clean_answer(value: str) -> str:
-    # Many reasoning-model templates separate reasoning_content, while some may
-    # emit thinking tags in content. Never expose those tags to normal chat.
-    cleaned = re.sub(r"<think>.*?</think>", "", value, flags=re.DOTALL | re.IGNORECASE).strip()
-    if re.search(r"</?think>", cleaned, flags=re.IGNORECASE):
+    """Extract the final assistant text after the last completed thinking block.
+
+    Some llama.cpp/DeepSeek chat templates emit an orphan </think> delimiter
+    before an otherwise valid final answer, even with zero thinking budget.
+    Never return text inside an unclosed <think> block.
+    """
+    closing = list(re.finditer(r"</think\\s*>", value, flags=re.IGNORECASE))
+    if closing:
+        # Both paired and orphan closing markers are valid final-text boundaries.
+        final_text = value[closing[-1].end():].strip()
+    else:
+        final_text = value.strip()
+
+    # Refuse unclosed reasoning blocks (or any unexpected remaining marker).
+    # Removing the markers alone would risk displaying private reasoning text.
+    if re.search(r"</?think\\s*>", final_text, flags=re.IGNORECASE):
         return ""
-    return cleaned
+    return final_text
 
 
 class LocalQuickRunner:
