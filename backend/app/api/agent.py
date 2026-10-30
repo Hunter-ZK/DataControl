@@ -203,7 +203,8 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
                     if code not in {
                         "LOCAL_TIMEOUT", "LOCAL_HTTP_ERROR", "LOCAL_TRANSPORT_ERROR",
                         "LOCAL_MALFORMED_RESPONSE", "LOCAL_EMPTY_ANSWER",
-                        "HARNESS_FAILURE", "GATEWAY_FAILURE",
+                        "HARNESS_FAILURE", "HARNESS_TIMEOUT", "HARNESS_NO_FINAL_ANSWER",
+                        "HARNESS_EXIT_ERROR", "GATEWAY_FAILURE",
                     }:
                         code = "GATEWAY_FAILURE"
                     if persisted:
