@@ -98,10 +98,18 @@ if(-not $SkipAgent){
   & $python -c "import agent3, dataagent_gateway"
   if($LASTEXITCODE -ne 0){throw "Embedded DataAgent package is unavailable after setup."}
   # The local model is optional; never block official DeepSeek when it is offline.
-  & $python -m dataagent_gateway.local_provider probe >$null 2>$null
-  if($LASTEXITCODE -eq 0){
+  $localModelDetected=$false
+  try {
+    & $python -m dataagent_gateway.local_provider probe >$null 2>$null
+    $localModelDetected=($LASTEXITCODE -eq 0)
+  } catch { $localModelDetected=$false }
+  if($localModelDetected){
     Write-Host "[DataControl] Local llama.cpp detected; syncing separate local dsh profiles..."
-    & (Join-Path $root "scripts\setup-local-model.ps1")
+    try {
+      & (Join-Path $root "scripts\setup-local-model.ps1")
+    } catch {
+      Write-Warning "Local dsh model profile setup failed: $($_.Exception.Message). Official Agent remains available."
+    }
   } else {
     Write-Host "[DataControl] Local llama.cpp unavailable at 127.0.0.1:9931; local mode disabled until the model starts."
   }

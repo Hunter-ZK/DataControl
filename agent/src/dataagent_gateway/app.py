@@ -83,6 +83,7 @@ async def query(body: QueryRequest):
 # Local, in-process cancellation registry. This is not a distributed job queue;
 # a later R1 increment will persist completed sessions and audit records.
 ACTIVE_TURNS: dict[str, asyncio.Task[dict[str, Any]]] = {}
+ACTIVE_LOCAL_TURNS: set[str] = set()
 LOG = logging.getLogger("uvicorn.error")
 
 
@@ -100,6 +101,11 @@ async def query_stream(body: QueryRequest):
         raise HTTPException(409, detail="Agent run is already active")
     if sum(not task.done() for task in ACTIVE_TURNS.values()) >= 4:
         raise HTTPException(429, detail="Agent gateway is at its concurrent run limit")
+    if body.modelMode == "local-deepseek" and any(
+        not ACTIVE_TURNS[local_id].done()
+        for local_id in ACTIVE_LOCAL_TURNS if local_id in ACTIVE_TURNS
+    ):
+        raise HTTPException(429, detail="Local CPU model allows one active Agent task; stop or finish the previous run")
     runner = HeadlessHarnessRunner(model_mode=body.modelMode, **(
         {"task_tier": "multi"} if body.taskTier == "multi" else {}
     ))
@@ -114,10 +120,13 @@ async def query_stream(body: QueryRequest):
         runner.run(body.question.strip(), session_id=body.sessionId, on_activity=on_activity)
     )
     ACTIVE_TURNS[run_id] = task
+    if body.modelMode == "local-deepseek":
+        ACTIVE_LOCAL_TURNS.add(run_id)
 
     def forget_done(done_task: asyncio.Task[dict[str, Any]]) -> None:
         if ACTIVE_TURNS.get(run_id) is done_task:
             ACTIVE_TURNS.pop(run_id, None)
+            ACTIVE_LOCAL_TURNS.discard(run_id)
 
     task.add_done_callback(forget_done)
 
@@ -145,6 +154,7 @@ async def query_stream(body: QueryRequest):
         finally:
             if ACTIVE_TURNS.get(run_id) is task:
                 ACTIVE_TURNS.pop(run_id, None)
+                ACTIVE_LOCAL_TURNS.discard(run_id)
             if not task.done():
                 task.cancel()
             await asyncio.gather(task, return_exceptions=True)

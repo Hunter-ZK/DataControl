@@ -48,3 +48,19 @@ def test_profile_preserves_mcp_and_guard_and_changes_provider_only(monkeypatch):
     assert "maxTokensField: max_tokens" in text
     assert "mcp-agent3" in text and "agent3-guard" in text
     assert profile_name("multi") == "dataagent-headless-local-multi"
+
+
+def test_multiple_models_require_exact_explicit_id(monkeypatch):
+    original_client = httpx.Client
+    def fake_client(*, trust_env, timeout):
+        return original_client(
+            transport=httpx.MockTransport(lambda req: httpx.Response(
+                200, json={"data": [{"id": "model-a"}, {"id": "model-b"}]}
+            )),
+            trust_env=False, timeout=timeout,
+        )
+    monkeypatch.setattr("dataagent_gateway.local_provider.httpx.Client", fake_client)
+    monkeypatch.delenv("DATACONTROL_LOCAL_MODEL_ID", raising=False)
+    with pytest.raises(LocalModelError, match="Multiple local models"):
+        discover_local_model()
+    assert discover_local_model(requested_id="model-b").id == "model-b"
