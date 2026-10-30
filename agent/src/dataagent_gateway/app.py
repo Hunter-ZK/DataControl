@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from dataagent_gateway.runner import HarnessRunError, HeadlessHarnessRunner
+from dataagent_gateway.runner import HarnessRunError, HeadlessHarnessRunner, _debug_capture_enabled
 from dataagent_gateway.quick import LocalQuickRunner
 
 app = FastAPI(title="DataControl Embedded DataAgent Gateway", version="0.3.0-p3")
@@ -71,10 +71,11 @@ async def debug_config(
             raise HTTPException(422, "Quick mode only supports local DeepSeek")
         status = await LocalQuickRunner().health()
         return {
-            "captureEnabled": True,
+            "captureEnabled": _debug_capture_enabled(),
+            "apiKeyPresent": False,
             "modelMode": modelMode, "taskTier": "quick",
             "provider": status["provider"], "model": status["model"],
-            "profile": "local-quick-direct", "profileDir": None,
+            "profile": "local-quick-direct", "profileDir": "",
             "timeoutSeconds": 240, "sqlExecutionEnabled": False,
             "hiddenReasoningCaptured": False, "files": [],
             "limitations": [
