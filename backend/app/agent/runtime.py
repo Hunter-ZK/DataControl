@@ -142,7 +142,7 @@ class EmbeddedAgentGateway:
     async def run(
         self, prompt: str, *, session_id: str | None = None,
         model_mode: str = "deepseek", public_gateway_consent: bool = False,
-        task_tier: str = "standard",
+        task_tier: str = "standard", quick_max_tokens: int = 256,
     ) -> dict[str, Any]:
         status = await self.status(model_mode, task_tier)
         if not status.ready:
@@ -150,6 +150,7 @@ class EmbeddedAgentGateway:
         body: dict[str, Any] = {
             "question": prompt, "modelMode": model_mode, "taskTier": task_tier,
             "publicGatewayConsent": public_gateway_consent,
+            "quickMaxTokens": quick_max_tokens,
         }
         if session_id:
             body["sessionId"] = session_id
@@ -181,7 +182,7 @@ class EmbeddedAgentGateway:
     async def stream(
         self, prompt: str, *, run_id: str, session_id: str | None = None,
         model_mode: str = "deepseek", public_gateway_consent: bool = False,
-        task_tier: str = "standard",
+        task_tier: str = "standard", quick_max_tokens: int = 256,
     ) -> AsyncIterator[bytes]:
         status = await self.status(model_mode, task_tier)
         if not status.ready:
@@ -189,6 +190,7 @@ class EmbeddedAgentGateway:
         body: dict[str, Any] = {
             "question": prompt, "runId": run_id, "modelMode": model_mode,
             "taskTier": task_tier, "publicGatewayConsent": public_gateway_consent,
+            "quickMaxTokens": quick_max_tokens,
         }
         if session_id:
             body["sessionId"] = session_id

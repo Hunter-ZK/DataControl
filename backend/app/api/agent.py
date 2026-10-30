@@ -27,8 +27,9 @@ class AgentQuery(BaseModel):
     conversationId: UUID | None = None
     displayQuestion: str | None = Field(default=None, max_length=4000)
     modelMode: Literal["deepseek", "free-test", "local-deepseek"] = "deepseek"
-    taskTier: Literal["standard", "multi"] = "standard"
+    taskTier: Literal["standard", "multi", "quick"] = "standard"
     publicGatewayConsent: bool = False
+    quickMaxTokens: Literal[128, 256, 512] = 256
 
 
 def check_public_test(mode: str, consent: bool = False) -> None:
@@ -40,7 +41,7 @@ def check_public_test(mode: str, consent: bool = False) -> None:
 
 @router.get("/status")
 async def agent_status(modelMode: Literal["deepseek", "free-test", "local-deepseek"] = "deepseek",
-                       taskTier: Literal["standard", "multi"] = "standard"):
+                       taskTier: Literal["standard", "multi", "quick"] = "standard"):
     status = await EmbeddedAgentGateway().status(modelMode, taskTier)
     return {
         "code": "OK",
@@ -59,6 +60,8 @@ async def agent_query(body: AgentQuery, user: User = Depends(get_current_user)):
     if body.sessionId or body.conversationId:
         raise HTTPException(400, detail="Use authenticated conversation stream for continuation")
     check_public_test(body.modelMode, body.publicGatewayConsent)
+    if body.taskTier == "quick" and body.modelMode != "local-deepseek":
+        raise HTTPException(422, "Quick mode only supports local DeepSeek")
     runtime = EmbeddedAgentGateway()
     status = await runtime.status(body.modelMode, body.taskTier)
     if not status.ready:
@@ -78,7 +81,7 @@ async def agent_query(body: AgentQuery, user: User = Depends(get_current_user)):
         data = await runtime.run(
             body.question.strip(), session_id=body.sessionId,
             model_mode=body.modelMode, public_gateway_consent=body.publicGatewayConsent,
-            task_tier=body.taskTier,
+            task_tier=body.taskTier, quick_max_tokens=body.quickMaxTokens,
         )
     except AgentRuntimeError as exc:
         raise HTTPException(502, detail=str(exc)) from exc
@@ -92,6 +95,8 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
     if body.runId is None:
         raise HTTPException(422, detail="runId is required")
     check_public_test(body.modelMode, body.publicGatewayConsent)
+    if body.taskTier == "quick" and body.modelMode != "local-deepseek":
+        raise HTTPException(422, "Quick mode only supports local DeepSeek")
     if user is None:
         raise HTTPException(401, detail="Agent login is required")
     if body.conversationId is None:
@@ -143,7 +148,7 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
             async for line in runtime.stream(
                 body.question.strip(), run_id=run_id, session_id=effective_session,
                 model_mode=body.modelMode, public_gateway_consent=body.publicGatewayConsent,
-                task_tier=body.taskTier,
+                task_tier=body.taskTier, quick_max_tokens=body.quickMaxTokens,
             ):
                 try:
                     event = json.loads(line)
