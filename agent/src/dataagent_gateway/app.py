@@ -196,10 +196,21 @@ async def query_stream(body: QueryRequest):
                 })
             except HarnessRunError as exc:
                 LOG.exception("[AgentStream:%s] task failed", run_id[:8])
-                reason = "timeout" if "exceeded" in str(exc).lower() or "timeout" in str(exc).lower() else "failed"
+                lower = str(exc).lower()
+                if "exceeded" in lower or "timeout" in lower:
+                    reason, code = "timeout", "HARNESS_TIMEOUT"
+                    message = "完整 Agent 推理超时。当前 CPU 模型速度较低，可改用极速回答测试基础能力。"
+                elif "without a final assistant answer" in lower:
+                    reason, code = "failed", "HARNESS_NO_FINAL_ANSWER"
+                    message = "模型未生成 Harness 可识别的最终回答；可能是模型/模板不兼容或工具调用能力不足。请查看管理员 Trace。"
+                elif "dsh exited with code" in lower:
+                    reason, code = "failed", "HARNESS_EXIT_ERROR"
+                    message = "dsh Harness 进程异常退出。请查看管理员 Trace 中的 stderr 和本地 Gateway 日志。"
+                else:
+                    reason, code = "failed", "HARNESS_FAILURE"
+                    message = "完整 Agent 执行失败，请查看管理员工作台 Trace 或 Gateway 日志。"
                 yield _json_line({
-                    "type": "error", "reason": reason, "code": "HARNESS_FAILURE",
-                    "message": "完整 Agent 执行失败，请查看管理员工作台 Trace 或 Gateway 日志。",
+                    "type": "error", "reason": reason, "code": code, "message": message,
                 })
             except Exception:
                 LOG.exception("[AgentStream:%s] unexpected failure", run_id[:8])
