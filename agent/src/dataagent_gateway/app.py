@@ -20,7 +20,7 @@ class QueryRequest(BaseModel):
     question: str = Field(min_length=2, max_length=4000)
     sessionId: str | None = Field(default=None, max_length=200)
     runId: UUID | None = None
-    modelMode: Literal["deepseek", "free-test"] = "deepseek"
+    modelMode: Literal["deepseek", "free-test", "local-deepseek"] = "deepseek"
     taskTier: Literal["standard", "multi"] = "standard"
     publicGatewayConsent: bool = False
 
@@ -33,7 +33,7 @@ def allow_public_test(mode: str, consent: bool = False) -> None:
 
 
 @app.get("/health")
-async def health(modelMode: Literal["deepseek", "free-test"] | None = None,
+async def health(modelMode: Literal["deepseek", "free-test", "local-deepseek"] | None = None,
                  taskTier: Literal["standard", "multi"] = "standard"):
     status = await HeadlessHarnessRunner(model_mode=modelMode, task_tier=taskTier).health()
     return {
@@ -48,7 +48,7 @@ async def health(modelMode: Literal["deepseek", "free-test"] | None = None,
 @app.get("/v1/debug/config")
 async def debug_config(
     request: Request,
-    modelMode: Literal["deepseek", "free-test"] = "deepseek",
+    modelMode: Literal["deepseek", "free-test", "local-deepseek"] = "deepseek",
     taskTier: Literal["standard", "multi"] = "standard",
 ):
     """Loopback-only config inventory for the authenticated Portal admin workbench."""

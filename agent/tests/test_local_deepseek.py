@@ -18,12 +18,13 @@ def test_local_endpoint_rejects_remote_and_unexpected_paths():
 
 
 def test_model_id_is_discovered_not_guessed(monkeypatch):
+    original_client = httpx.Client
     def fake_client(*, trust_env, timeout):
         assert trust_env is False
         transport = httpx.MockTransport(lambda req: httpx.Response(
             200, json={"data": [{"id": "exact-llamacpp-id", "object": "model"}]}
         ))
-        return httpx.Client(transport=transport, trust_env=False, timeout=timeout)
+        return original_client(transport=transport, trust_env=False, timeout=timeout)
     monkeypatch.setattr("dataagent_gateway.local_provider.httpx.Client", fake_client)
     monkeypatch.delenv("DATACONTROL_LOCAL_MODEL_ID", raising=False)
     item = discover_local_model()

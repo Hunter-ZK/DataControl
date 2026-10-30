@@ -21,10 +21,10 @@ New-Item -ItemType Directory -Force -Path $logs,$dshHome | Out-Null
 & $python -m dataagent_gateway.local_provider probe
 if ($LASTEXITCODE -ne 0) { throw "Local llama.cpp is offline or model selection is ambiguous. Check /v1/models." }
 
-function Invoke-Profile([string[]]$Args) {
+function Invoke-Profile([string[]]$CliArguments) {
   $out = Join-Path $logs "local-model-profile.stdout.log"
   $err = Join-Path $logs "local-model-profile.stderr.log"
-  & $python $helper --executable $dsh --cwd $root --stdout $out --stderr $err -- @Args
+  & $python $helper --executable $dsh --cwd $root --stdout $out --stderr $err -- @CliArguments
   if ($LASTEXITCODE -ne 0) {
     $detail = if (Test-Path $err) { Get-Content -LiteralPath $err -Raw -Encoding UTF8 } else { "" }
     throw "dsh local model profile failed: $detail"
@@ -40,11 +40,11 @@ foreach ($entry in @(
   $dir = Join-Path $dshHome ("profiles\" + $name)
   if ((Test-Path $dir) -and -not(Test-Path (Join-Path $dir "package.json"))) {
     $backupDir = Join-Path $dshHome "profile-backups"
-    New-Item -ItemType Directory -Force $backupDir | Out-Null
+    New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
     Move-Item -LiteralPath $dir -Destination (Join-Path $backupDir "$name-$([DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))")
   }
   if (-not(Test-Path (Join-Path $dir "package.json"))) {
-    $null = Invoke-Profile @("--profile", $name, "--from-default-profile", "headless", "--dump-config")
+    $null = Invoke-Profile -CliArguments @("--profile", $name, "--from-default-profile", "headless", "--dump-config")
   }
   & $python -m dataagent_gateway.local_provider write-profile --profile-dir $dir --task-tier $tier
   if ($LASTEXITCODE -ne 0) { throw "Cannot render local profile $name" }

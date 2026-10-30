@@ -26,7 +26,7 @@ class AgentQuery(BaseModel):
     runId: UUID | None = None
     conversationId: UUID | None = None
     displayQuestion: str | None = Field(default=None, max_length=4000)
-    modelMode: Literal["deepseek", "free-test"] = "deepseek"
+    modelMode: Literal["deepseek", "free-test", "local-deepseek"] = "deepseek"
     taskTier: Literal["standard", "multi"] = "standard"
     publicGatewayConsent: bool = False
 
@@ -39,7 +39,7 @@ def check_public_test(mode: str, consent: bool = False) -> None:
 
 
 @router.get("/status")
-async def agent_status(modelMode: Literal["deepseek", "free-test"] = "deepseek",
+async def agent_status(modelMode: Literal["deepseek", "free-test", "local-deepseek"] = "deepseek",
                        taskTier: Literal["standard", "multi"] = "standard"):
     status = await EmbeddedAgentGateway().status(modelMode, taskTier)
     return {

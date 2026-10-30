@@ -211,7 +211,7 @@ def get_agent_run(
 
 @router.get("/agent/config")
 async def agent_debug_config(
-    modelMode: Literal["deepseek", "free-test"] = "deepseek",
+    modelMode: Literal["deepseek", "free-test", "local-deepseek"] = "deepseek",
     taskTier: Literal["standard", "multi"] = "standard",
     _admin: User = Depends(require_admin),
 ):

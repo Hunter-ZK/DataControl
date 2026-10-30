@@ -97,6 +97,14 @@ if(-not $SkipAgent){
   }
   & $python -c "import agent3, dataagent_gateway"
   if($LASTEXITCODE -ne 0){throw "Embedded DataAgent package is unavailable after setup."}
+  # The local model is optional; never block official DeepSeek when it is offline.
+  & $python -m dataagent_gateway.local_provider probe >$null 2>$null
+  if($LASTEXITCODE -eq 0){
+    Write-Host "[DataControl] Local llama.cpp detected; syncing separate local dsh profiles..."
+    & (Join-Path $root "scripts\setup-local-model.ps1")
+  } else {
+    Write-Host "[DataControl] Local llama.cpp unavailable at 127.0.0.1:9931; local mode disabled until the model starts."
+  }
   if(-not(Test-Path (Join-Path $localDir "free-model-test-v2.7.2.ready"))){
     try {
       & (Join-Path $root "scripts\setup-free-model-test.ps1")
@@ -147,7 +155,7 @@ try {
     }
     Write-Host "Agent 运行记录:     在另一 PowerShell 窗口执行："
     Write-Host "  Get-Content .\.local\agent-gateway.err.log -Tail 40 -Wait"
-    if($env:DATACONTROL_AGENT_MODEL_MODE -ne "free-test" -and [string]::IsNullOrWhiteSpace($env:DEEPSEEK_API_KEY)){Write-Warning "DEEPSEEK_API_KEY is not set; Agent Gateway will be degraded until DataControl is restarted with the key present."}
+    if($env:DATACONTROL_AGENT_MODEL_MODE -eq "deepseek" -and [string]::IsNullOrWhiteSpace($env:DEEPSEEK_API_KEY)){Write-Warning "DEEPSEEK_API_KEY is not set; Agent Gateway will be degraded until DataControl is restarted with the key present."}
   }
 
   Write-Host ("Python runtime:      "+(& $python --version))

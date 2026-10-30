@@ -36,6 +36,7 @@
             <div class="model-options" role="group" aria-label="选择当前对话模型">
               <button type="button" :class="{selected:modelMode==='deepseek'}" :disabled="loading" @click="chooseModel('deepseek')">DeepSeek 官方</button>
               <button type="button" :class="{selected:modelMode==='free-test'}" :disabled="loading" @click="chooseModel('free-test')"><FlaskConical :size="14"/>免费模型测试</button>
+              <button type="button" :class="{selected:modelMode==='local-deepseek'}" :disabled="loading" @click="chooseModel('local-deepseek')"><Cpu :size="14"/>本地 DeepSeek</button>
             </div>
             <div class="tier-options" role="group" aria-label="选择任务类型">
               <button type="button" :class="{active:taskTier==='standard'}" :disabled="loading"
@@ -52,11 +53,12 @@
           </div>
           <div class="agent-mode-strip">
             <span class="mode-indicator"><span class="mode-pulse" :class="{idle:status?.ready&&!loading,offline:!status?.ready}"></span>{{loading?'正在处理任务':status?.ready?'已就绪':'服务未就绪'}}</span>
-            <span><Cpu :size="15"/>{{modelMode==='free-test'?'免费模型测试': 'DeepSeek 官方'}}</span>
+            <span><Cpu :size="15"/>{{modelMode==='local-deepseek'?'本地 DeepSeek · llama.cpp':modelMode==='free-test'?'免费模型测试': 'DeepSeek 官方'}}</span>
             <span><Workflow :size="15"/>{{taskTier==='multi'?'多步任务':'标准问数'}}</span>
             <span class="mode-safe"><ShieldCheck :size="15"/>仅生成和校验 · 不执行 SQL</span>
           </div>
           <div v-if="modelMode==='free-test'" class="runtime-warning"><TriangleAlert :size="18"/><span>免费模型使用第三方公共网关，可能记录问题及工具信息。仅测试模拟数据；不得输入真实业务、内部 SQL、账号或个人信息。</span></div>
+          <div v-if="modelMode==='local-deepseek'" class="runtime-warning"><Cpu :size="18"/><span>调用本机 llama.cpp（127.0.0.1:9931）。7B CPU 推理可能很慢，工具调用稳定性须实际验证；沿用现有 MCP 与静态 SQL 校验，不执行生产 SQL。</span></div>
           <div v-if="contextAsset" class="context-strip">
             <Database :size="17" />
             <div><span>当前数据资产</span><b>{{ contextAsset.bizName || contextAsset.tableName }}</b><code>{{ contextAsset.tableName }}</code></div>
@@ -203,7 +205,7 @@ const modelMode = ref<AgentModelMode>('deepseek')
 async function chooseModel(value: AgentModelMode) {
   if (loading.value || modelMode.value === value) return
   if (messages.value.length) {
-    ElMessage.warning('请新建会话后切换模型，防止第三方与官方上下文混用。')
+    ElMessage.warning('请新建会话后切换模型，避免不同模型混用上下文。')
     return
   }
   if (value === 'free-test' && contextAsset.value) {

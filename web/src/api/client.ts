@@ -170,7 +170,7 @@ export interface SemanticMetric {
   researchPolicy: 'internal_only'
 }
 
-export type AgentModelMode = 'deepseek' | 'free-test'
+export type AgentModelMode = 'deepseek' | 'free-test' | 'local-deepseek'
 
 export interface ServerAgentConversation {
   id: string

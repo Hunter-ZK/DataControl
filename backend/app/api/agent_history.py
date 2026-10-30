@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/v1/agent/conversations", tags=["agent-history"])
 
 class ConversationNew(BaseModel):
     title: str = Field(min_length=1, max_length=200)
-    modelMode: Literal["deepseek", "free-test"] = "deepseek"
+    modelMode: Literal["deepseek", "free-test", "local-deepseek"] = "deepseek"
     taskTier: Literal["standard", "multi"] = "standard"
     contextAsset: dict[str, Any] | None = None
 
@@ -31,7 +31,7 @@ class ConversationEdit(BaseModel):
 
 class LegacyConversation(BaseModel):
     title: str = Field(min_length=1, max_length=200)
-    modelMode: Literal["deepseek", "free-test"] = "deepseek"
+    modelMode: Literal["deepseek", "free-test", "local-deepseek"] = "deepseek"
     pinned: bool = False
     taskTier: Literal["standard", "multi"] = "standard"
     sessionId: str | None = Field(default=None, max_length=200)

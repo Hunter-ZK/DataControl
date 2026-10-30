@@ -122,9 +122,11 @@ class EmbeddedAgentGateway:
             source="DataControl/agent",
             gatewayUrl=self.gateway_url,
             provider=str(gateway_health.get("provider") or (
+                "local-llama" if model_mode == "local-deepseek" else
                 "our-free-model" if model_mode == "free-test" else MODEL_PROVIDER
             )),
             model=str(gateway_health.get("model") or (
+                "local-discovery" if model_mode == "local-deepseek" else
                 "kilo-auto/free" if model_mode == "free-test" else MODEL_NAME
             )),
             modelMode=model_mode,
