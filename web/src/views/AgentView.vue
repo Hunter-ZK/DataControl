@@ -65,7 +65,7 @@
             <span class="mode-indicator"><span class="mode-pulse" :class="{idle:status?.ready&&!loading,offline:!status?.ready}"></span>{{loading?'正在处理任务':status?.ready?'已就绪':'服务未就绪'}}</span>
             <span><Cpu :size="15"/>{{modelMode==='local-deepseek'?'本地 DeepSeek · llama.cpp':modelMode==='free-test'?'免费模型测试': 'DeepSeek 官方'}}</span>
             <span><Workflow :size="15"/>{{taskTier==='quick'?'极速回答 · 单次推理':taskTier==='multi'?'多步任务':'标准问数'}}</span>
-            <span class="mode-safe"><ShieldCheck :size="15"/>仅生成和校验 · 不执行 SQL</span>
+            <span class="mode-safe"><ShieldCheck :size="15"/>{{taskTier==='quick'?'仅生成文本 · 不访问工具与 SQL':'仅生成和校验 · 不执行 SQL'}}</span>
           </div>
           <div v-if="modelMode==='free-test'" class="runtime-warning"><TriangleAlert :size="18"/><span>免费模型使用第三方公共网关，可能记录问题及工具信息。仅测试模拟数据；不得输入真实业务、内部 SQL、账号或个人信息。</span></div>
           <div v-if="modelMode==='local-deepseek' && taskTier!=='quick'" class="runtime-warning"><Cpu :size="18"/><span>调用本机 llama.cpp（127.0.0.1:9931）。7B CPU 推理可能较慢；完整任务仍使用 MCP 与静态 SQL 校验，不执行生产 SQL。</span></div>
