@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 from dataagent_gateway.local_provider import LocalModel
-from dataagent_gateway.quick import LocalQuickRunner
+from dataagent_gateway.quick import LocalQuickFailure, LocalQuickRunner
 from dataagent_gateway.runner import HarnessRunError
 
 
@@ -76,8 +76,15 @@ def test_quick_empty_reasoning_response_is_not_fabricated(monkeypatch):
     monkeypatch.setattr("dataagent_gateway.quick.httpx.AsyncClient", client)
     monkeypatch.setattr("dataagent_gateway.quick.discover_local_model",
                         lambda **_: LocalModel("actual-model-id", "http://127.0.0.1:9931/v1"))
-    with pytest.raises(HarnessRunError, match="only reasoning or an empty response"):
-        asyncio.run(LocalQuickRunner().run("question"))
+    activities = []
+    with pytest.raises(LocalQuickFailure) as err:
+        asyncio.run(LocalQuickRunner().run("question", on_activity=activities.append))
+    assert err.value.code == "LOCAL_EMPTY_ANSWER"
+    assert "思考内容" in err.value.user_message
+    assert "private" not in err.value.user_message
+    assert activities[-1]["eventType"] == "run_failed"
+    assert activities[-1]["payload"]["reasoningContentPresent"] is True
+    assert "private" not in json.dumps(activities[-1])
 
 
 def test_gateway_quick_mode_uses_local_runner_only(monkeypatch):
