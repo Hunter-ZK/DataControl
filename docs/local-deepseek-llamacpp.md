@@ -60,3 +60,14 @@ Vue Agent → Portal :8000 → Gateway :8910 → dsh dataagent-headless-local �
     .\.venv\Scripts\python.exe -m dataagent_gateway.local_provider tool-probe
 
 脚本向本机 /v1/chat/completions 发送合成的工具调用示例（无真实业务数据），检测返回中是否包含结构化 tool_calls。若 toolCallingObserved=false，说明接口能回答不代表 Agent 具备可靠的工具调用能力。测试可能在 CPU 上耗时较久，单次成功也不保证复杂任务稳定。按 llama.cpp 官方 Function Calling 指南，确认启动了 --jinja，并为 DeepSeek R1 Distill Qwen 7B 使用正确的工具调用模板（可能需要 --chat-template-file）。
+
+
+## 在 DataAgent 窗口启用“极速回答”（2026-10-30）
+
+打开 /agent，新建会话，依次选择 **本地 DeepSeek → 极速回答**。可以在同一行调整本轮最长输出为 **128 / 256（推荐）/ 512 tokens**。设置保存在当前浏览器，切换之前已发言的会话时应新建会话以避免混淆任务类型。
+
+- 极速模式只向 `http://127.0.0.1:9931/v1/chat/completions` 发送 **一次** 请求，不再启动 dsh 多次推理、MCP 工具调用或 SQL 静态校验；服务器仍保留身份认证、任务记录、取消和管理员 Trace。
+- 请求字段：`thinking_budget_tokens=0`、`temperature=0.2`、`max_tokens=128/256/512`；尝试禁止深度思考，具体是否生效取决于你的 llama.cpp 版本与 R1 Distill Qwen 聊天模板。**仅屏蔽推理文字不会使推理更快**。
+- 极速回答有显式标记“未检索元数据、未校验 SQL”；不得作为可信数仓查询或 SQL 交付。需要指标口径、元数据来源、SQL 时切回 **标准问数**（完整 Agent 工具链）。
+- 如果本地服务不支持请求级思考预算，可在启动 llama-server 时使用新版支持的 `--reasoning-budget 0`（或 `--reasoning off`），但是该参数会影响使用同一端口的所有请求，包括标准 Agent；如果需要两种模式分别运行，可以采用两个独立 llama-server 实例及不同端口，避免以隐藏推理文本代替禁用推理。参考 llama.cpp 官方 server README 和其关于逐请求 `thinking_budget_tokens` 的讨论。
+- 速度的主要组成：模型 Prompt 预处理 + 输出 token 数 ÷ CPU 每秒输出 token；极速模式减少串行模型调用次数和输出上限，不保证对所有问题产生接近云端模型的响应速度。
