@@ -36,12 +36,23 @@
             <div class="model-options" role="group" aria-label="选择当前对话模型">
               <button type="button" :class="{selected:modelMode==='deepseek'}" :disabled="loading" @click="chooseModel('deepseek')">DeepSeek 官方</button>
               <button type="button" :class="{selected:modelMode==='free-test'}" :disabled="loading" @click="chooseModel('free-test')"><FlaskConical :size="14"/>免费模型测试</button>
+              <button type="button" :class="{selected:modelMode==='local-deepseek'}" :disabled="loading" @click="chooseModel('local-deepseek')"><Cpu :size="14"/>本地 DeepSeek</button>
             </div>
             <div class="tier-options" role="group" aria-label="选择任务类型">
               <button type="button" :class="{active:taskTier==='standard'}" :disabled="loading"
                 @click="chooseTier('standard')">标准问数</button>
               <button type="button" :class="{active:taskTier==='multi'}" :disabled="loading"
                 @click="chooseTier('multi')">多步任务</button>
+              <button v-if="modelMode==='local-deepseek'" type="button" :class="{active:taskTier==='quick'}" :disabled="loading"
+                @click="chooseTier('quick')"><Zap :size="14"/>极速回答</button>
+            </div>
+            <div v-if="modelMode==='local-deepseek' && taskTier==='quick'" class="quick-token-config">
+              <label for="quick-tokens">最长输出</label>
+              <select id="quick-tokens" v-model.number="quickMaxTokens" :disabled="loading" aria-label="极速模式最长输出 Token">
+                <option :value="128">128 tokens · 最快</option>
+                <option :value="256">256 tokens · 推荐</option>
+                <option :value="512">512 tokens · 详细</option>
+              </select>
             </div>
             <button class="deliverables-toggle" :class="{active:workspaceOpen}" @click="toggleWorkspace">
               <PanelsTopLeft :size="19"/> {{workspaceOpen?'收起成果':'成果工作区'}} <span v-if="deliverableCount">{{deliverableCount}}</span>
@@ -52,11 +63,13 @@
           </div>
           <div class="agent-mode-strip">
             <span class="mode-indicator"><span class="mode-pulse" :class="{idle:status?.ready&&!loading,offline:!status?.ready}"></span>{{loading?'正在处理任务':status?.ready?'已就绪':'服务未就绪'}}</span>
-            <span><Cpu :size="15"/>{{modelMode==='free-test'?'免费模型测试': 'DeepSeek 官方'}}</span>
-            <span><Workflow :size="15"/>{{taskTier==='multi'?'多步任务':'标准问数'}}</span>
-            <span class="mode-safe"><ShieldCheck :size="15"/>仅生成和校验 · 不执行 SQL</span>
+            <span><Cpu :size="15"/>{{modelMode==='local-deepseek'?'本地 DeepSeek · llama.cpp':modelMode==='free-test'?'免费模型测试': 'DeepSeek 官方'}}</span>
+            <span><Workflow :size="15"/>{{taskTier==='quick'?'极速回答 · 单次推理':taskTier==='multi'?'多步任务':'标准问数'}}</span>
+            <span class="mode-safe"><ShieldCheck :size="15"/>{{taskTier==='quick'?'仅生成文本 · 不访问工具与 SQL':'仅生成和校验 · 不执行 SQL'}}</span>
           </div>
           <div v-if="modelMode==='free-test'" class="runtime-warning"><TriangleAlert :size="18"/><span>免费模型使用第三方公共网关，可能记录问题及工具信息。仅测试模拟数据；不得输入真实业务、内部 SQL、账号或个人信息。</span></div>
+          <div v-if="modelMode==='local-deepseek' && taskTier!=='quick'" class="runtime-warning"><Cpu :size="18"/><span>调用本机 llama.cpp（127.0.0.1:9931）。7B CPU 推理可能较慢；完整任务仍使用 MCP 与静态 SQL 校验，不执行生产 SQL。</span></div>
+          <div v-if="modelMode==='local-deepseek' && taskTier==='quick'" class="runtime-warning"><Zap :size="18"/><span>极速模式：仅参考本次问题，单次调用本地模型并尝试关闭深度思考；不读取历史对话、不查询元数据、不调用 Agent 工具或校验 SQL。可信问数请切换标准模式。</span></div>
           <div v-if="contextAsset" class="context-strip">
             <Database :size="17" />
             <div><span>当前数据资产</span><b>{{ contextAsset.bizName || contextAsset.tableName }}</b><code>{{ contextAsset.tableName }}</code></div>
@@ -88,14 +101,14 @@
                   <span>{{ item }}</span><ArrowUpRight :size="17" />
                 </button>
               </div>
-              <p class="welcome-note"><ShieldCheck :size="16"/>只生成与校验 SQL，不执行生产查询</p>
+              <p class="welcome-note"><ShieldCheck :size="16"/>{{taskTier==='quick'?'极速模式仅回答一般问题，不查询元数据或验证 SQL':'只生成与校验 SQL，不执行生产查询'}}</p>
             </div>
 
             <AgentMessageView
               v-for="(item, index) in messages"
               :key="index"
               :message="item"
-              :tier="taskTier"
+              :tier="taskTier==='quick'?'standard':taskTier"
               @clarify="submitClarification(index, $event)"
             />
             <div v-if="latestAnswer && !loading && (latestAnswer.sql || latestAnswer.evidence || latestAnswer.events?.length)" class="result-shortcuts">
@@ -124,8 +137,11 @@
                 <b>{{ stopRequested ? '正在停止任务' : 'DataAgent 正在分析' }}</b>
                 <button class="stop-turn" :disabled="stopRequested" @click="stopAgentTurn"><Square :size="12" />停止</button>
               </div>
-              <p>{{ liveEvents.length ? '以下步骤来自真实 Agent3 工具调用，完成后将展示证据与最终答案。' : '已开始处理，等待 Agent3 返回实际工具步骤。' }}</p>
-              <AgentTaskJourney :events="liveEvents" :tier="taskTier" :running="true"/>
+              <p v-if="taskTier==='quick'">本地 CPU 模型单次生成中{{liveElapsedMs>0?'，已运行 '+Math.floor(liveElapsedMs/1000)+' 秒':''}}；不调用 MCP 工具。服务器每 10 秒发送一次保活信号。</p>
+              <template v-else>
+                <p>{{ liveEvents.length ? '以下步骤来自真实 Agent3 工具调用，完成后将展示证据与最终答案。' : '已开始处理，等待 Agent3 返回实际工具步骤。' }}</p>
+                <AgentTaskJourney :events="liveEvents" :tier="taskTier" :running="true"/>
+              </template>
             </article>
           </div>
 
@@ -145,7 +161,7 @@
             <div class="composer-hint"><span>Enter 发送 · Shift+Enter 换行</span><span><ShieldCheck :size="16" />资产依据 · SQL 静态校验 · 不执行查询</span></div>
           </div>
         </section>
-        <AgentDeliverableWorkspace v-if="workspaceOpen" :messages="messages" :tier="taskTier" :running="loading" @close="workspaceOpen=false"/>
+        <AgentDeliverableWorkspace v-if="workspaceOpen" :messages="messages" :tier="taskTier==='quick'?'standard':taskTier" :running="loading" @close="workspaceOpen=false"/>
         <aside v-if="inspectorOpen" class="agent-inspector" aria-label="依据与 SQL 检查器">
           <header><div><b>工作面板</b><small>证据、SQL 和工具活动</small></div><button @click="inspectorOpen=false" title="收起面板" aria-label="收起面板"><X :size="17"/></button></header>
           <nav class="inspector-tabs" aria-label="检查器页面">
@@ -166,8 +182,8 @@
               <p v-else class="inspector-empty">本轮尚无生成的 SQL。</p>
             </template>
             <template v-if="inspectorTab==='steps'">
-              <AgentTaskJourney v-if="loading" :events="liveEvents" :tier="taskTier" :running="true"/>
-              <AgentTaskJourney v-else-if="latestAnswer?.events?.length" :events="latestAnswer.events" :tier="taskTier" :running="false"/>
+              <AgentTaskJourney v-if="loading" :events="liveEvents" :tier="taskTier==='quick'?'standard':taskTier" :running="true"/>
+              <AgentTaskJourney v-else-if="latestAnswer?.events?.length" :events="latestAnswer.events" :tier="taskTier==='quick'?'standard':taskTier" :running="false"/>
               <AgentTrace v-if="loading && liveEvents.length" :events="liveEvents"/>
               <AgentTrace v-else-if="latestAnswer?.events?.length" :events="latestAnswer.events"/>
               <p v-else class="inspector-empty">真实工具调用会在这里逐步显示，不展示模型隐藏推理。</p>
@@ -180,11 +196,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUp, ArrowUpRight, ChartNoAxesCombined, Code2, Copy, Cpu, Database, FlaskConical, History, LoaderCircle, PanelRight, PanelsTopLeft, RotateCcw, ShieldCheck, Sparkles, Square, ThumbsDown, ThumbsUp, TriangleAlert, Workflow, X } from 'lucide-vue-next'
+import { ArrowUp, ArrowUpRight, ChartNoAxesCombined, Code2, Copy, Cpu, Database, FlaskConical, History, LoaderCircle, PanelRight, PanelsTopLeft, RotateCcw, ShieldCheck, Sparkles, Square, ThumbsDown, ThumbsUp, TriangleAlert, Workflow, X, Zap } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { agentApi, assetApi, type AgentActivity, type AgentModelMode, type AgentResult, type AgentStatus, type AgentStreamEvent, AgentTurnCancelledError } from '@/api/client'
+import { agentApi, assetApi, type AgentActivity, type AgentModelMode, type AgentResult, type AgentStatus, type AgentStreamEvent, AgentTurnCancelledError, AgentStreamFailureError } from '@/api/client'
 import AgentConversationSidebar from '@/components/agent/AgentConversationSidebar.vue'
 import AgentMessageView from '@/components/agent/AgentMessage.vue'
 import AgentTrace from '@/components/agent/AgentTrace.vue'
@@ -203,7 +219,7 @@ const modelMode = ref<AgentModelMode>('deepseek')
 async function chooseModel(value: AgentModelMode) {
   if (loading.value || modelMode.value === value) return
   if (messages.value.length) {
-    ElMessage.warning('请新建会话后切换模型，防止第三方与官方上下文混用。')
+    ElMessage.warning('请新建会话后切换模型，避免不同模型混用上下文。')
     return
   }
   if (value === 'free-test' && contextAsset.value) {
@@ -223,8 +239,18 @@ async function chooseModel(value: AgentModelMode) {
   taskTier.value = 'standard'
   await refreshStatus()
 }
-const taskTier = ref<'standard' | 'multi'>('standard')
-function chooseTier(value: 'standard' | 'multi') {
+const taskTier = ref<'standard' | 'multi' | 'quick'>('standard')
+const savedQuickTokenChoice = Number(localStorage.getItem('datacontrol_local_quick_tokens_v1'))
+const quickMaxTokens = ref<128 | 256 | 512>(
+  savedQuickTokenChoice === 128 || savedQuickTokenChoice === 512 ? savedQuickTokenChoice : 256,
+)
+watch(quickMaxTokens, value => localStorage.setItem('datacontrol_local_quick_tokens_v1', String(value)))
+function chooseTier(value: 'standard' | 'multi' | 'quick') {
+  if (value === 'quick' && modelMode.value !== 'local-deepseek') return
+  if (value === 'quick' && contextAsset.value) {
+    ElMessage.warning('极速回答不查询绑定资产，请先清除资产上下文或使用标准问数。')
+    return
+  }
   if (loading.value) return
   if (messages.value.length && taskTier.value !== value) {
     ElMessage.warning('当前对话的任务类型已固定，请先新建会话后切换。')
@@ -263,6 +289,7 @@ const question = ref('')
 const loading = ref(false)
 const liveEvents = ref<AgentActivity[]>([])
 const stopRequested = ref(false)
+const liveElapsedMs = ref(0)
 let activeRunId: string | null = null
 let activeController: AbortController | null = null
 const messages = ref<AgentMessage[]>([])
@@ -303,14 +330,21 @@ const {
   declineUnscopedLegacy,
 } = useAgentConversations()
 
-const quickPrompts = [
+const quickPrompts = computed(() => taskTier.value === 'quick' ? [
+  '解释 ODS、DWD、DWS 的区别',
+  '帮我把这段需求表述得更简洁',
+  '简要说明数仓开发的主要流程',
+  'SQL 中 GROUP BY 有什么作用？',
+  '给我几个规范的字段命名建议',
+  '如何写好业务需求说明？',
+] : [
   '今年贷款增长怎么样？',
   '本期各地区贷款余额是多少？',
   '各地区不良贷款率是多少？',
   '贷款余额最高的前 10 个地区',
   '广东省人民币贷款余额怎么统计？',
   '贷款余额使用哪张数据表？',
-]
+])
 
 async function refreshStatus() {
   const serial = ++statusRequestSerial
@@ -335,7 +369,7 @@ async function loadContext() {
 }
 
 function restoreConversation(conversation: AgentConversation) {
-  taskTier.value = conversation.taskTier === 'multi' ? 'multi' : 'standard'
+  taskTier.value = conversation.taskTier === 'multi' ? 'multi' : conversation.taskTier === 'quick' ? 'quick' : 'standard'
   modelMode.value = conversation.modelMode
   sessionId.value = null
   messages.value = [...conversation.messages]
@@ -441,6 +475,12 @@ function reportAgentDevtools(result: AgentResult) {
 }
 
 function onAgentStreamEvent(update: AgentStreamEvent) {
+  if (update.type === 'heartbeat') {
+    if (Number.isFinite(update.elapsedMs) && update.elapsedMs >= 0) {
+      liveElapsedMs.value = Math.max(liveElapsedMs.value, update.elapsedMs)
+    }
+    return
+  }
   if (update.type !== 'activity') return
   if (update.event.type !== 'tool_call' && update.event.type !== 'tool_result') return
   liveEvents.value = [...liveEvents.value, update.event].slice(-40)
@@ -526,6 +566,7 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
   }
   stopRequested.value = false
   liveEvents.value = []
+  liveElapsedMs.value = 0
   activeRunId = crypto.randomUUID()
   activeController = new AbortController()
   await scrollBottom()
@@ -533,7 +574,7 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
     const serverId = conversations.value.find((c) => c.id === activeConversationId.value)?.serverId || null
     const result = await agentApi.stream(prompt, sessionId.value, activeRunId,
       onAgentStreamEvent, activeController.signal, selectedMode, serverId, displayText,
-      taskTier.value, selectedMode==='free-test')
+      taskTier.value, selectedMode==='free-test', quickMaxTokens.value)
     reportAgentDevtools(result)
     if (result.sessionId) sessionId.value = result.sessionId
     messages.value.push(assistantMessage(result))
@@ -547,11 +588,25 @@ async function runAgentTurn(displayText: string, prompt: string, createTitle?: s
       syncActive(messages.value, sessionId.value, contextAsset.value, modelMode.value)
     } else {
       console.error('DataAgent query failed', error)
-      // The dsh session may already contain an incomplete model turn.
-      // Do not resume it after a broken stream or unknown server outcome.
+      // Never reuse an interrupted or failed Harness session.
       sessionId.value = null
-      messages.value.push({ role: 'assistant', text: '本轮请求未完成，服务端最终状态暂时无法确认。为避免沿用不完整上下文，已重置模型会话。' })
-      ElMessage.error('智能问数本次未完成，请检查 Agent 服务与运行日志。')
+      let explanation: string
+      if (error instanceof AgentStreamFailureError) {
+        explanation = `本轮运行失败 [${error.code}]：${error.message}`
+      } else {
+        let serverStatus: string | null = null
+        if (activeRunId) {
+          try { serverStatus = (await agentApi.runStatus(activeRunId)).status }
+          catch { /* The status endpoint may also be unavailable. */ }
+        }
+        explanation = serverStatus === 'completed'
+          ? '浏览器结果连接中断，但服务端记录显示任务已完成。请刷新当前会话查看结果，不要重复提交。'
+          : serverStatus === 'failed' || serverStatus === 'timeout'
+            ? `本轮在服务端的实际状态为 ${serverStatus}；请在管理员工作台查看对应 Run 的错误信息。`
+            : 'Agent 连接中断，尚未确认服务端最终结果；请在管理员工作台查看该运行记录。'
+      }
+      messages.value.push({ role: 'assistant', text: explanation })
+      ElMessage.error('本轮请求未成功，请查看聊天中的具体原因。')
       await refreshStatus()
       syncActive(messages.value, sessionId.value, contextAsset.value, modelMode.value)
     }
@@ -929,4 +984,11 @@ onMounted(async () => {
 @media(max-width:760px){.agent-head h1{font-size:22px}.agent-mode-strip{gap:8px}.agent-mode-strip>span{font-size:11px}.agent-mode-strip .mode-safe{width:100%}.welcome-capabilities{gap:5px;margin-bottom:14px}.welcome-capabilities span{font-size:11px;padding:7px 9px}.welcome-constellation{transform:scale(.7)}.welcome h2{font-size:24px}.result-shortcuts{padding:9px}.result-shortcuts>span{width:100%}.result-shortcuts button{font-size:11px}}
 @media(prefers-reduced-motion:reduce){.mode-pulse{animation:none}.prompt-grid button{transition:none}}
 
+</style>
+
+<style scoped>
+.quick-token-config{display:flex;align-items:center;gap:7px;color:#607692;font-size:12px;font-weight:650}
+.quick-token-config select{max-width:160px;min-height:34px;padding:5px 8px;border:1px solid #cbdcf4;border-radius:8px;background:#f9fbff;color:#375477;font-size:12px}
+.quick-token-config select:focus-visible{outline:2px solid #6ca0f1;outline-offset:2px}
+@media(max-width:760px){.quick-token-config{width:100%;justify-content:flex-start}}
 </style>

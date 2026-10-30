@@ -256,3 +256,101 @@ def test_duplicate_run_is_rejected_before_stream_consumption(monkeypatch):
         _ = [line async for line in response.body_iterator]
 
     asyncio.run(scenario())
+
+
+
+def test_long_running_cpu_request_emits_heartbeat_without_fake_tool_events(monkeypatch):
+    """Prove a slow model keeps the browser stream open without exposing internals."""
+    from types import SimpleNamespace
+    from uuid import UUID
+    import dataagent_gateway.app as gateway_app
+
+    ticks = iter([0.0, 11.0, 22.0, 33.0])
+    monkeypatch.setattr(gateway_app, "time", SimpleNamespace(monotonic=lambda: next(ticks)))
+
+    class SlowRunner:
+        def __init__(self, **_):
+            pass
+
+        async def run(self, question, *, session_id=None, on_activity=None):
+            await asyncio.sleep(0.35)
+            return {"answer": "OK", "sqlExecuted": False, "hiddenReasoningExposed": False}
+
+    monkeypatch.setattr(gateway_app, "HeadlessHarnessRunner", SlowRunner)
+
+    async def scenario():
+        response = await gateway_app.query_stream(gateway_app.QueryRequest(
+            question="synthetic slow question",
+            runId=UUID("a2114722-952b-48e0-bd09-88497178dacc"),
+        ))
+        events = [json.loads(chunk) async for chunk in response.body_iterator]
+        assert events[0]["type"] == "started"
+        assert any(item["type"] == "heartbeat" and item["elapsedMs"] == 11000 for item in events)
+        assert events[-1]["type"] == "result"
+        assert not any(item["type"] == "activity" for item in events)
+
+    asyncio.run(scenario())
+
+
+def test_quick_failure_exposes_safe_code_and_not_reasoning(monkeypatch):
+    from uuid import UUID
+    import dataagent_gateway.app as gateway_app
+    from dataagent_gateway.quick import LocalQuickFailure
+
+    class FailingQuickRunner:
+        def __init__(self, max_tokens):
+            assert max_tokens == 128
+
+        async def run(self, question, *, session_id=None, on_activity=None):
+            raise LocalQuickFailure(
+                "LOCAL_EMPTY_ANSWER",
+                "模型只输出了思考内容，没有最终回答。",
+            )
+
+    monkeypatch.setattr(gateway_app, "LocalQuickRunner", FailingQuickRunner)
+
+    async def scenario():
+        response = await gateway_app.query_stream(gateway_app.QueryRequest(
+            question="synthetic quick question",
+            runId=UUID("a2114722-952b-48e0-bd09-88497178dacd"),
+            modelMode="local-deepseek", taskTier="quick", quickMaxTokens=128,
+        ))
+        events = [json.loads(chunk) async for chunk in response.body_iterator]
+        assert events[-1] == {
+            "type": "error",
+            "reason": "failed",
+            "code": "LOCAL_EMPTY_ANSWER",
+            "message": "模型只输出了思考内容，没有最终回答。",
+        }
+        assert "reasoning_content" not in json.dumps(events)
+
+    asyncio.run(scenario())
+
+
+
+def test_harness_without_final_answer_has_actionable_error_code(monkeypatch):
+    from uuid import UUID
+    import dataagent_gateway.app as gateway_app
+    from dataagent_gateway.runner import HarnessRunError
+
+    class NoFinalRunner:
+        def __init__(self, **_):
+            pass
+
+        async def run(self, question, *, session_id=None, on_activity=None):
+            raise HarnessRunError("dsh completed without a final assistant answer")
+
+    monkeypatch.setattr(gateway_app, "HeadlessHarnessRunner", NoFinalRunner)
+
+    async def scenario():
+        response = await gateway_app.query_stream(gateway_app.QueryRequest(
+            question="synthetic local question",
+            runId=UUID("a2114722-952b-48e0-bd09-88497178dace"),
+            modelMode="local-deepseek", taskTier="standard",
+        ))
+        events = [json.loads(chunk) async for chunk in response.body_iterator]
+        assert events[-1]["code"] == "HARNESS_NO_FINAL_ANSWER"
+        assert "最终回答" in events[-1]["message"]
+        assert events[-1]["reason"] == "failed"
+
+    asyncio.run(scenario())

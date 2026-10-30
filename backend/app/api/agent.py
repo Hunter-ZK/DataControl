@@ -26,9 +26,10 @@ class AgentQuery(BaseModel):
     runId: UUID | None = None
     conversationId: UUID | None = None
     displayQuestion: str | None = Field(default=None, max_length=4000)
-    modelMode: Literal["deepseek", "free-test"] = "deepseek"
-    taskTier: Literal["standard", "multi"] = "standard"
+    modelMode: Literal["deepseek", "free-test", "local-deepseek"] = "deepseek"
+    taskTier: Literal["standard", "multi", "quick"] = "standard"
     publicGatewayConsent: bool = False
+    quickMaxTokens: Literal[128, 256, 512] = 256
 
 
 def check_public_test(mode: str, consent: bool = False) -> None:
@@ -39,8 +40,8 @@ def check_public_test(mode: str, consent: bool = False) -> None:
 
 
 @router.get("/status")
-async def agent_status(modelMode: Literal["deepseek", "free-test"] = "deepseek",
-                       taskTier: Literal["standard", "multi"] = "standard"):
+async def agent_status(modelMode: Literal["deepseek", "free-test", "local-deepseek"] = "deepseek",
+                       taskTier: Literal["standard", "multi", "quick"] = "standard"):
     status = await EmbeddedAgentGateway().status(modelMode, taskTier)
     return {
         "code": "OK",
@@ -59,6 +60,8 @@ async def agent_query(body: AgentQuery, user: User = Depends(get_current_user)):
     if body.sessionId or body.conversationId:
         raise HTTPException(400, detail="Use authenticated conversation stream for continuation")
     check_public_test(body.modelMode, body.publicGatewayConsent)
+    if body.taskTier == "quick" and body.modelMode != "local-deepseek":
+        raise HTTPException(422, "Quick mode only supports local DeepSeek")
     runtime = EmbeddedAgentGateway()
     status = await runtime.status(body.modelMode, body.taskTier)
     if not status.ready:
@@ -78,7 +81,7 @@ async def agent_query(body: AgentQuery, user: User = Depends(get_current_user)):
         data = await runtime.run(
             body.question.strip(), session_id=body.sessionId,
             model_mode=body.modelMode, public_gateway_consent=body.publicGatewayConsent,
-            task_tier=body.taskTier,
+            task_tier=body.taskTier, quick_max_tokens=body.quickMaxTokens,
         )
     except AgentRuntimeError as exc:
         raise HTTPException(502, detail=str(exc)) from exc
@@ -92,6 +95,8 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
     if body.runId is None:
         raise HTTPException(422, detail="runId is required")
     check_public_test(body.modelMode, body.publicGatewayConsent)
+    if body.taskTier == "quick" and body.modelMode != "local-deepseek":
+        raise HTTPException(422, "Quick mode only supports local DeepSeek")
     if user is None:
         raise HTTPException(401, detail="Agent login is required")
     if body.conversationId is None:
@@ -143,7 +148,7 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
             async for line in runtime.stream(
                 body.question.strip(), run_id=run_id, session_id=effective_session,
                 model_mode=body.modelMode, public_gateway_consent=body.publicGatewayConsent,
-                task_tier=body.taskTier,
+                task_tier=body.taskTier, quick_max_tokens=body.quickMaxTokens,
             ):
                 try:
                     event = json.loads(line)
@@ -170,6 +175,15 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
                     event = {"type": "activity", "event": {
                         key: item[key] for key in ("type", "callId", "tool", "status") if key in item
                     }}
+                elif event_type == "heartbeat":
+                    # Keep long CPU model requests alive end-to-end, without persisting
+                    # a fake tool event or exposing any sensitive model content.
+                    elapsed_ms = event.get("elapsedMs")
+                    event = {
+                        "type": "heartbeat", "runId": run_id,
+                        "elapsedMs": int(elapsed_ms) if isinstance(elapsed_ms, int)
+                        and 0 <= elapsed_ms < 86_400_000 else 0,
+                    }
                 elif event_type == "result":
                     result = event.get("result")
                     if not isinstance(result, dict) or result.get("sqlExecuted") is True or result.get("hiddenReasoningExposed") is True:
@@ -184,13 +198,25 @@ async def agent_query_stream(body: AgentQuery, user: User | None = Depends(get_o
                         history.transition(run_id, "cancelled")
                     terminal = True
                 elif event_type == "error":
+                    reason = "timeout" if event.get("reason") == "timeout" else "failed"
+                    code = str(event.get("code") or "GATEWAY_FAILURE")
+                    if code not in {
+                        "LOCAL_TIMEOUT", "LOCAL_HTTP_ERROR", "LOCAL_TRANSPORT_ERROR",
+                        "LOCAL_MALFORMED_RESPONSE", "LOCAL_EMPTY_ANSWER",
+                        "HARNESS_FAILURE", "HARNESS_TIMEOUT", "HARNESS_NO_FINAL_ANSWER",
+                        "HARNESS_EXIT_ERROR", "GATEWAY_FAILURE",
+                    }:
+                        code = "GATEWAY_FAILURE"
                     if persisted:
                         history.transition(
-                            run_id, "timeout" if event.get("reason") == "timeout" else "failed",
-                            error="Gateway reported an Agent error",
+                            run_id, reason,
+                            error=f"{code}: {str(event.get('message') or 'Gateway error')[:190]}",
                         )
                     terminal = True
-                    event = {"type": "error", "message": str(event.get("message", "Agent failed"))[:240]}
+                    event = {
+                        "type": "error", "reason": reason, "code": code,
+                        "message": str(event.get("message") or "Agent failed")[:240],
+                    }
                 else:
                     continue
                 yield (json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")

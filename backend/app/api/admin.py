@@ -211,8 +211,8 @@ def get_agent_run(
 
 @router.get("/agent/config")
 async def agent_debug_config(
-    modelMode: Literal["deepseek", "free-test"] = "deepseek",
-    taskTier: Literal["standard", "multi"] = "standard",
+    modelMode: Literal["deepseek", "free-test", "local-deepseek"] = "deepseek",
+    taskTier: Literal["standard", "multi", "quick"] = "standard",
     _admin: User = Depends(require_admin),
 ):
     runtime = EmbeddedAgentGateway()

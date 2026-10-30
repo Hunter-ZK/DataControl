@@ -106,8 +106,8 @@
         <button class="secondary-button" :disabled="configLoading" @click="loadConfig"><RefreshCw :size="15" />重新读取</button>
       </div>
       <div class="config-controls">
-        <label>模型模式<select v-model="modelMode" @change="loadConfig"><option value="deepseek">DeepSeek 官方</option><option value="free-test">公共免费模型测试</option></select></label>
-        <label>任务类型<select v-model="taskTier" @change="loadConfig"><option value="standard">标准任务</option><option value="multi">多步任务</option></select></label>
+        <label>模型模式<select v-model="modelMode" @change="loadConfig"><option value="deepseek">DeepSeek 官方</option><option value="local-deepseek">本地 DeepSeek · llama.cpp</option><option value="free-test">公共免费模型测试</option></select></label>
+        <label>任务类型<select v-model="taskTier" @change="loadConfig"><option value="standard">标准任务</option><option value="multi">多步任务</option><option v-if="modelMode==='local-deepseek'" value="quick">极速回答（无工具）</option></select></label>
       </div>
       <div v-if="configLoading" class="empty-state">正在读取 Gateway 实际配置…</div>
       <template v-else-if="config">
@@ -185,7 +185,7 @@ const detailLoading = ref(false)
 const config = ref<AdminAgentConfig | null>(null)
 const configLoading = ref(false)
 const modelMode = ref<AgentModelMode>('deepseek')
-const taskTier = ref<'standard' | 'multi'>('standard')
+const taskTier = ref<'standard' | 'multi' | 'quick'>('standard')
 const selectedFileId = ref('')
 const metadata = ref<AdminMetadataOverview | null>(null)
 const metadataLoading = ref(false)

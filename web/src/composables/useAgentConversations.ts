@@ -54,11 +54,12 @@ function normalizeConversation(value: unknown): AgentConversation | null {
     title: typeof row.title === 'string' && row.title.trim() ? row.title.trim() : '历史会话',
     // Provider session tokens belong to the Portal, not the browser.
     sessionId: null,
-    modelMode: row.modelMode === 'free-test' || (
-      row.modelMode !== 'deepseek' && typeof row.sessionId === 'string'
-      && row.sessionId.startsWith('free-test:')
-    ) ? 'free-test' : 'deepseek',
-    taskTier: row.taskTier === 'multi' ? 'multi' : 'standard',
+    modelMode: row.modelMode === 'local-deepseek' ? 'local-deepseek' :
+      row.modelMode === 'free-test' || (
+        row.modelMode !== 'deepseek' && typeof row.sessionId === 'string'
+        && row.sessionId.startsWith('free-test:')
+      ) ? 'free-test' : 'deepseek',
+    taskTier: row.taskTier === 'multi' ? 'multi' : row.taskTier === 'quick' ? 'quick' : 'standard',
     createdAt: typeof row.createdAt === 'number' ? row.createdAt : now,
     updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : now,
     pinned: row.pinned === true,
@@ -180,7 +181,7 @@ export function useAgentConversations() {
   function create(
     firstQuestion: string, contextAsset?: ContextAsset | null,
     modelMode: AgentModelMode = 'deepseek',
-    taskTier: 'standard' | 'multi' = 'standard',
+    taskTier: 'standard' | 'multi' | 'quick' = 'standard',
   ): AgentConversation {
     const now = Date.now()
     const conversation: AgentConversation = {

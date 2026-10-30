@@ -90,7 +90,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $scripts = @('scripts/dev.ps1', 'scripts/agent-profile-state.ps1', 'scripts/start-dev.ps1', 'scripts/setup-free-model-test.ps1', 'scripts/start-free-test.ps1', 'scripts/setup-agent.ps1', 'scripts/setup-dev.ps1', 'scripts/run-npm-install.ps1', 'agent/scripts/setup_dataagent.ps1')
+          $scripts = @('scripts/dev.ps1', 'scripts/agent-profile-state.ps1', 'scripts/start-dev.ps1', 'scripts/setup-local-model.ps1', 'scripts/setup-free-model-test.ps1', 'scripts/start-free-test.ps1', 'scripts/setup-agent.ps1', 'scripts/setup-dev.ps1', 'scripts/run-npm-install.ps1', 'agent/scripts/setup_dataagent.ps1')
           foreach ($script in $scripts) {
             $tokens = $null
             $errors = $null
@@ -159,6 +159,8 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: DSH_HOME="$RUNNER_TEMP/datacontrol-dsh-home" bash agent/scripts/setup_dataagent.sh
+      - name: Validate local llama.cpp provider in pinned dsh (offline)
+        run: python agent/scripts/smoke_local_provider.py
 
   agent-stub-e2e:
     runs-on: ubuntu-latest
