@@ -35,26 +35,39 @@ class SearchEngine:
         asset_type: str = "ALL",
     ) -> dict:
         empty = {"items": [], "total": 0, "facets": {}}
-        if not query.strip() or not self.path.exists():
+        needle = query.strip()
+        if not needle or not self.path.exists():
             return empty
+        # SQLite FTS5 trigram MATCH cannot find shorter than three characters.
+        # Use a bounded-result LIKE fallback for one/two-character queries.
+        if len(needle) < 3:
+            where = "(title LIKE ? OR technical_name LIKE ? OR body LIKE ?)"
+            value = f"%{needle}%"
+            params = [value, value, value]
+            excerpt_expr = "substr(body, 1, 120)"
+            rank_expr = "0.0"
+        else:
+            where = "asset_fts MATCH ?"
+            params = [needle]
+            excerpt_expr = "snippet(asset_fts, 4, '', '', '…', 18)"
+            rank_expr = "bm25(asset_fts, 0, 0, 5, 4, 2)"
         with self.connect() as c:
             c.row_factory = sqlite3.Row
             counts = c.execute(
-                "SELECT asset_type, COUNT(*) AS n FROM asset_fts "
-                "WHERE asset_fts MATCH ? GROUP BY asset_type", (query.strip(),)
+                "SELECT asset_type, COUNT(*) AS n FROM asset_fts WHERE " +
+                where + " GROUP BY asset_type", tuple(params)
             ).fetchall()
             facets = {row["asset_type"]: row["n"] for row in counts}
             total = sum(facets.values()) if asset_type == "ALL" else facets.get(asset_type, 0)
             clause = "" if asset_type == "ALL" else " AND asset_type = ?"
-            params = [query.strip()]
+            args = params.copy()
             if asset_type != "ALL":
-                params.append(asset_type)
+                args.append(asset_type)
             rows = c.execute(
-                "SELECT asset_id, asset_type, title, technical_name, "
-                "snippet(asset_fts, 4, '', '', '…', 18) AS excerpt, "
-                "bm25(asset_fts, 0, 0, 5, 4, 2) AS score "
-                "FROM asset_fts WHERE asset_fts MATCH ?" + clause +
-                " ORDER BY score LIMIT ? OFFSET ?",
-                (*params, limit, offset),
+                "SELECT asset_id, asset_type, title, technical_name, " +
+                excerpt_expr + " AS excerpt, " + rank_expr + " AS score "
+                "FROM asset_fts WHERE " + where + clause +
+                " ORDER BY score, asset_id LIMIT ? OFFSET ?",
+                (*args, limit, offset),
             ).fetchall()
             return {"items": [dict(row) for row in rows], "total": total, "facets": facets}
