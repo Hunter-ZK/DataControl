@@ -1,75 +1,91 @@
 <template>
-  <div class="dc-page">
-    <div class="dc-container">
-      <button class="dc-back" @click="router.back()"><ArrowLeft :size="16"/>返回</button>
-      <section class="search-head dc-card">
-        <span class="dc-eyebrow">ASSET SEARCH</span>
-        <h1 class="dc-title">资产检索</h1>
-        <p class="dc-subtitle">从数据集、字段、指标与标准资产中快速定位目标。</p>
-        <div class="search-box">
-          <Search :size="19"/>
-          <input v-model="q" @keydown.enter="runSearch" placeholder="搜索业务名称、表名、字段名、指标…" />
-          <button @click="runSearch">搜索</button>
-        </div>
-        <div class="recent"><span>快捷：</span><button v-for="x in ['贷款余额','region_code','企业风险','监管报送']" :key="x" @click="quick(x)">{{x}}</button></div>
-      </section>
-
-      <div class="summary"><b>{{ summary }}</b><span>按综合相关度排序</span></div>
-      <div class="search-layout">
-        <aside class="facets dc-card">
-          <div class="facet-title">结果范围</div>
-          <button v-for="item in types" :key="item.key" :class="{active:type===item.key}" @click="type=item.key">
-            <span>{{item.label}}</span><b>{{count(item.key)}}</b>
-          </button>
-          <div class="sep" />
-          <div class="facet-title">快捷入口</div>
-          <RouterLink to="/catalog">资产目录</RouterLink>
-          <RouterLink to="/code-tables">标准码值</RouterLink>
-          <RouterLink to="/word-roots">词根索引</RouterLink>
-        </aside>
-
-        <section class="results dc-card">
-          <div v-if="loading" class="dc-empty">正在检索资产索引…</div>
-          <div v-else-if="filtered.length===0" class="dc-empty">没有找到匹配资产，试试更短的业务词或技术名称。</div>
-          <article v-for="item in filtered" :key="item.asset_id" class="result-card" @click="open(item)">
-            <div class="result-main">
-              <div class="kicker"><span class="dc-chip">{{label(item.asset_type)}}</span><span>统一资产索引</span></div>
-              <h3 v-html="item.title_hl || item.title" />
-              <code class="dc-tech">{{item.technical_name}}</code>
-              <p v-html="item.body_hl || '点击查看资产定义、字段、口径及相关信息。'" />
-            </div>
-            <div class="score"><small>相关度</small><b>{{Number(item.score || 0).toFixed(2)}}</b><ArrowRight :size="18"/></div>
-          </article>
-        </section>
+  <div class="dc-page compact-page">
+    <div class="dc-container page-inner">
+      <div class="search-toolbar">
+        <div><b>资产检索</b><span v-if="q">“{{q}}” · 共 {{total.toLocaleString()}} 条结果</span></div>
+        <span class="hint">在顶部搜索框可修改关键词 · Ctrl/⌘ K</span>
       </div>
+      <section class="dc-card search-panel">
+        <div class="facets" role="tablist" aria-label="资产类型">
+          <button v-for="option in types" :key="option.key" role="tab"
+            :aria-selected="type===option.key" :class="{active:type===option.key}"
+            @click="selectType(option.key)">{{option.label}} <span>{{count(option.key)}}</span></button>
+        </div>
+        <div ref="resultContainer" class="results">
+          <div v-if="!q" class="dc-empty">使用顶部搜索框或返回首页输入关键词。</div>
+          <div v-else-if="loading" class="dc-empty">正在搜索…</div>
+          <div v-else-if="!rows.length" class="dc-empty">没有找到匹配资产，请尝试更短的业务词或技术标识。</div>
+          <RouterLink v-for="item in rows" v-else :key="item.asset_id" :to="target(item)" class="result">
+            <div class="result-head">
+              <span class="type">{{typeLabel(item.asset_type)}}</span>
+              <b>{{item.title}}</b><code class="dc-tech">{{item.technical_name}}</code>
+              <ArrowUpRight :size="15" class="arrow"/>
+            </div>
+            <p>{{item.excerpt||'点击查看资产定义与关联信息'}}</p>
+          </RouterLink>
+        </div>
+        <Pager :page="page" :page-size="pageSize" :total="total" @update:page="page=$event"/>
+      </section>
     </div>
   </div>
 </template>
-
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight, Search } from 'lucide-vue-next'
-import { activityApi, assetApi } from '@/api/client'
-
-const route=useRoute(); const router=useRouter(); const q=ref(String(route.query.q||'')); const type=ref('ALL'); const rows=ref<any[]>([]); const loading=ref(false)
-const types=[{key:'ALL',label:'全部'},{key:'TABLE',label:'数据集'},{key:'COLUMN',label:'字段'},{key:'METRIC',label:'指标'},{key:'CODE_TABLE',label:'码表'}]
-const filtered=computed(()=>type.value==='ALL'?rows.value:rows.value.filter(x=>x.asset_type===type.value))
-const summary=computed(()=>q.value?`“${q.value}” · ${filtered.value.length} 条结果`:'请输入关键词开始检索')
-function count(k:string){ return k==='ALL'?rows.value.length:rows.value.filter(x=>x.asset_type===k).length }
-function label(v:string){ return ({TABLE:'数据集',COLUMN:'字段',METRIC:'指标',CODE_TABLE:'码表'} as Record<string,string>)[v]||v }
-async function runSearch(){ const value=q.value.trim(); if(!value)return; loading.value=true; try{rows.value=await assetApi.search(value) as any[]; await activityApi.recordSearch(value); await router.replace({query:{...route.query,q:value}})}finally{loading.value=false} }
-function quick(v:string){q.value=v;runSearch()}
-function open(item:any){
-  if(item.asset_type==='TABLE') router.push(`/datasets/${item.asset_id}`)
-  else if(item.asset_type==='COLUMN') router.push(`/fields/${item.asset_id}`)
-  else if(item.asset_type==='CODE_TABLE') router.push(`/code-tables/${item.technical_name}`)
-  else if(item.asset_type==='METRIC') router.push(`/metrics/${item.technical_name}`)
+import { onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
+import { ArrowUpRight } from 'lucide-vue-next'
+import { assetApi, activityApi } from '@/api/client'
+import Pager from '@/components/Pager.vue'
+import { useFitPageSize } from '@/composables/useFitPageSize'
+import { typeLabel } from '@/utils/labels'
+const route=useRoute()
+const q=ref(String(route.query.q||'')),type=ref('ALL'),rows=ref<any[]>([]),
+  facets=ref<Record<string,number>>({}),total=ref(0),loading=ref(false),page=ref(1)
+const types=[{key:'ALL',label:'全部'},{key:'TABLE',label:'数据集'},{key:'COLUMN',label:'字段'},
+ {key:'METRIC',label:'指标'},{key:'CODE_TABLE',label:'码表'}]
+const resultContainer=ref<HTMLElement|null>(null)
+const pageSize=useFitPageSize(resultContainer,66,4)
+function count(k:string){return k==='ALL'?Object.values(facets.value).reduce((a,b)=>a+b,0):facets.value[k]||0}
+function selectType(k:string){type.value=k;page.value=1;load()}
+function target(item:any){
+  const value=encodeURIComponent(item.asset_type==='TABLE'||item.asset_type==='COLUMN'?item.asset_id:item.technical_name)
+  if(item.asset_type==='TABLE')return '/datasets/'+value
+  if(item.asset_type==='COLUMN')return '/fields/'+value
+  if(item.asset_type==='METRIC')return '/metrics/'+value
+  if(item.asset_type==='CODE_TABLE')return '/code-tables/'+value
+  return '/search?q='+encodeURIComponent(q.value)
 }
-watch(()=>route.query.q,(v)=>{if(typeof v==='string'&&v!==q.value){q.value=v;runSearch()}})
-onMounted(()=>{if(q.value)runSearch()})
+let seq=0
+async function load(){
+  const i=++seq;if(!q.value.trim()){rows.value=[];total.value=0;facets.value={};return}
+  loading.value=true
+  try{
+    const result=await assetApi.searchPage({q:q.value,asset_type:type.value,offset:(page.value-1)*pageSize.value,limit:pageSize.value})
+    if(i===seq){rows.value=result.items;total.value=result.total;facets.value=result.facets}
+  }catch{if(i===seq){rows.value=[];total.value=0;facets.value={}}}
+  finally{if(i===seq)loading.value=false}
+}
+watch(()=>route.query.q,(value)=>{const next=typeof value==='string'?value:'';if(next!==q.value){q.value=next;page.value=1;type.value='ALL';load();if(next)activityApi.recordSearch(next).catch(()=>{})}})
+watch(page,load)
+watch(pageSize,()=>{page.value=1;load()})
+onMounted(()=>{load();if(q.value)activityApi.recordSearch(q.value).catch(()=>{})})
 </script>
-
 <style scoped>
-.search-head{padding:26px 28px}.search-box{margin-top:20px;height:54px;display:flex;align-items:center;gap:10px;padding:5px 5px 5px 16px;border:1px solid #cfe3ee;border-radius:13px;background:#fbfdff;color:#72a0b7}.search-box input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--dc-text)}.search-box button{height:42px;border:0;border-radius:9px;padding:0 22px;color:white;background:linear-gradient(135deg,var(--dc-primary),var(--dc-accent));cursor:pointer}.recent{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:11px;color:var(--dc-text-3);font-size:12px}.recent button{border:1px solid #dceaf2;background:#fff;border-radius:999px;padding:5px 10px;color:#4d809b;cursor:pointer}.summary{display:flex;gap:12px;align-items:center;margin:18px 2px 12px}.summary span{font-size:11px;color:var(--dc-text-3)}.search-layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;align-items:start}.facets{padding:14px;position:sticky;top:86px;display:grid;gap:4px}.facet-title{padding:5px 8px 7px;font-size:11px;font-weight:700;color:#7b92a1}.facets button{border:0;background:transparent;padding:9px 10px;display:flex;justify-content:space-between;border-radius:8px;color:#5f798a;cursor:pointer}.facets button.active,.facets button:hover{background:var(--dc-primary-soft);color:var(--dc-primary-strong)}.facets button b{font-size:11px}.facets a{padding:8px 10px;font-size:12px;color:#5f798a}.sep{height:1px;background:#edf3f6;margin:9px 4px}.results{min-width:0;padding:4px 20px 12px}.result-card{display:grid;grid-template-columns:minmax(0,1fr) 76px;gap:20px;padding:20px 4px;border-bottom:1px solid #edf2f5;cursor:pointer}.result-card:last-child{border-bottom:0}.result-main{min-width:0}.kicker{display:flex;align-items:center;gap:8px;font-size:10px;color:#8da0ac}.result-card h3{font-size:17px;margin:8px 0 5px;color:#234a60}.result-card code{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}.result-card p{margin:9px 0 0;font-size:12px;line-height:1.65;color:#6f8493;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.result-card :deep(mark){background:#e2f6ff;color:#1f6686}.score{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;color:#82a0af}.score small{font-size:9px}.score b{font-size:12px;color:#347d9d;margin:3px 0}@media(max-width:980px){.search-layout{grid-template-columns:1fr}.facets{position:static;display:flex;flex-wrap:wrap}.facet-title,.sep{display:none}.facets button,.facets a{width:auto}}@media(max-width:620px){.search-head{padding:21px 18px}.result-card{grid-template-columns:1fr}.score{display:none}.results{padding:3px 14px 10px}.summary{align-items:flex-start;flex-direction:column;gap:4px}}
+.compact-page{height:100%;min-height:450px}.page-inner{height:100%;display:flex;flex-direction:column;min-height:0}
+.search-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:5px 0 14px}
+.search-toolbar div{display:flex;gap:12px;align-items:center}.search-toolbar b{font-size:15px}.search-toolbar span,.hint{font-size:12px;color:var(--dc-text-2)}
+.search-panel{display:flex;flex-direction:column;flex:1;min-height:0;padding:0 14px 4px}
+.facets{display:flex;gap:5px;border-bottom:1px solid var(--dc-border);padding:6px 0;overflow-x:auto;flex:0 0 auto}
+.facets button{border:0;background:transparent;white-space:nowrap;color:var(--dc-text-2);padding:9px 13px;font-size:13px;border-radius:5px}
+.facets button.active{color:var(--dc-primary-strong);background:var(--dc-primary-soft);font-weight:700}
+.facets span{margin-left:3px;font-size:12px}
+.results{flex:1;min-height:0;overflow:auto}
+.result{display:block;padding:11px 5px;border-bottom:1px solid #edf2f5;min-height:66px}
+.result:hover{background:#f8fbfd}
+.result-head{display:flex;align-items:center;gap:10px;min-width:0;font-size:13px}
+.result-head b{max-width:35%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.result-head code{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}
+.type{flex:0 0 46px;color:var(--dc-primary-strong);font-size:12px}
+.arrow{margin-left:auto;flex:0 0 auto;color:var(--dc-text-2)}
+.result p{margin:5px 0 0 56px;color:var(--dc-text-2);font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+@media(max-width:820px){.compact-page{height:auto}.page-inner{height:auto}.search-panel{min-height:470px}.hint{display:none}.result-head b{max-width:48%}.result-head code{display:none}}
 </style>
