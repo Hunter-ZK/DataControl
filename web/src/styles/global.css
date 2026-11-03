@@ -1,1 +1,38 @@
-*{box-sizing:border-box}html,body,#app{min-height:100%;margin:0}body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--dc-bg);color:var(--dc-text);-webkit-font-smoothing:antialiased}button,input,textarea{font:inherit}a{text-decoration:none;color:inherit}.dc-container{width:min(calc(100% - 48px),var(--dc-container));margin:0 auto}.dc-page{padding:28px 0 48px}.dc-page-head{display:flex;justify-content:space-between;gap:24px;align-items:flex-end;margin-bottom:22px}.dc-eyebrow{font-size:11px;letter-spacing:.14em;font-weight:700;color:var(--dc-primary-strong);text-transform:uppercase}.dc-title{margin:5px 0 0;font-size:30px;line-height:1.2;letter-spacing:-.025em}.dc-subtitle{margin:8px 0 0;color:var(--dc-text-2);font-size:14px}.dc-card{background:var(--dc-surface);border:1px solid var(--dc-border);border-radius:var(--dc-radius-md);box-shadow:var(--dc-shadow-sm)}.dc-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:999px;background:var(--dc-primary-soft);color:var(--dc-primary-strong);font-size:11px;font-weight:650}.dc-tech{font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;color:#58758a;overflow-wrap:anywhere}.dc-empty{padding:56px 24px;text-align:center;color:var(--dc-text-3)}.dc-section-title{font-size:18px;margin:0 0 16px}.dc-muted{color:var(--dc-text-2)}.dc-grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.dc-stat{padding:20px}.dc-stat small{color:var(--dc-text-3)}.dc-stat strong{display:block;font-size:28px;margin:8px 0 3px;color:#245d7c}.dc-stat span{font-size:12px;color:var(--dc-text-2)}.dc-list{display:grid;gap:10px}.dc-list-item{padding:16px 18px;border:1px solid var(--dc-border);border-radius:12px;background:#fff;transition:.18s ease}.dc-list-item:hover{border-color:#bcddea;box-shadow:0 10px 28px rgba(53,121,158,.07);transform:translateY(-1px)}.dc-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.dc-table-wrap{overflow:auto;border:1px solid var(--dc-border);border-radius:12px}.dc-table{width:100%;border-collapse:collapse;min-width:760px;background:#fff}.dc-table th,.dc-table td{padding:13px 14px;border-bottom:1px solid #edf3f7;text-align:left;font-size:13px;vertical-align:top}.dc-table th{font-size:11px;letter-spacing:.04em;color:#7f95a4;background:#f8fbfd}.dc-table tr:last-child td{border-bottom:0}.dc-back{display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;color:#557a91;padding:0;margin-bottom:18px;cursor:pointer}.dc-back:hover{color:var(--dc-primary-strong)}@media(max-width:1100px){:root{--dc-container:100%}.dc-container{width:min(calc(100% - 36px),var(--dc-container))}.dc-grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.dc-container{width:min(calc(100% - 24px),var(--dc-container))}.dc-page{padding-top:18px}.dc-page-head{align-items:flex-start;flex-direction:column}.dc-title{font-size:25px}.dc-grid-4{grid-template-columns:1fr}.dc-toolbar{align-items:stretch;flex-direction:column}.dc-toolbar>*{width:100%}}
+*{box-sizing:border-box}
+html,body,#app{min-height:100%;margin:0}
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--dc-bg);color:var(--dc-text);font-size:14px;-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit}
+button{cursor:pointer}button:disabled{cursor:not-allowed}
+a{text-decoration:none;color:inherit}
+:focus-visible{outline:2px solid var(--dc-primary);outline-offset:2px}
+.dc-container{width:min(calc(100% - 32px),var(--dc-container));margin:0 auto;min-width:0}
+.dc-page{padding:18px 0 28px}
+.dc-page-head{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:14px}
+.dc-eyebrow{display:none}
+.dc-title{margin:0;font-size:20px;line-height:1.4;letter-spacing:-.01em}
+.dc-subtitle{margin:3px 0 0;color:var(--dc-text-2);font-size:13px}
+.dc-card{background:var(--dc-surface);border:1px solid var(--dc-border);border-radius:var(--dc-radius-md);box-shadow:var(--dc-shadow-sm)}
+.dc-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:5px;background:var(--dc-primary-soft);color:var(--dc-primary-strong);font-size:12px;font-weight:650}
+.dc-tech{font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;color:#3c627a;overflow-wrap:anywhere}
+.dc-empty{padding:32px 18px;text-align:center;color:var(--dc-text-3);font-size:13px}
+.dc-section-title{font-size:16px;margin:0 0 12px}
+.dc-muted{color:var(--dc-text-2)}
+.dc-grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.dc-stat{padding:16px}.dc-stat small{color:var(--dc-text-2)}
+.dc-stat strong{display:block;font-size:24px;margin:6px 0 3px;color:var(--dc-text)}
+.dc-stat span{font-size:12px;color:var(--dc-text-2)}
+.dc-list{display:grid;gap:8px}
+.dc-list-item{padding:12px;border:1px solid var(--dc-border);border-radius:var(--dc-radius-sm);background:#fff;transition:.12s}
+.dc-list-item:hover{border-color:#9cc7dd;background:#f7fbfd}
+.dc-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dc-table-wrap{overflow:auto;border:1px solid var(--dc-border);border-radius:var(--dc-radius-sm);max-width:100%}
+.dc-table{width:100%;border-collapse:collapse;min-width:700px;background:#fff}
+.dc-table th,.dc-table td{padding:10px 12px;border-bottom:1px solid #eaf0f4;text-align:left;font-size:13px;vertical-align:top}
+.dc-table th{font-size:12px;color:#506879;background:#f7fafc;position:sticky;top:0;z-index:1}
+.dc-table tr:last-child td{border-bottom:0}
+.dc-back{display:none}
+.dc-fit-layout{display:flex;flex-direction:column;min-height:0;gap:12px}
+.dc-fit-main{min-height:0;flex:1;overflow:auto}
+.dc-long-content{overflow:auto;min-height:0}
+@media(max-width:1100px){:root{--dc-container:100%}.dc-container{width:calc(100% - 28px)}.dc-grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.dc-container{width:calc(100% - 24px)}.dc-page{padding-top:14px}.dc-page-head{align-items:flex-start;flex-direction:column}.dc-title{font-size:19px}.dc-grid-4{grid-template-columns:1fr}.dc-toolbar{align-items:stretch;flex-direction:column}.dc-toolbar>*{width:100%}}
