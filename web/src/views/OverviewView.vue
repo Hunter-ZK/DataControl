@@ -1,6 +1,6 @@
 <template>
   <div class="dc-page"><div class="dc-container">
-    <div class="overview-title"><b>数据资产概览</b><span>按资产类型、数仓层级和业务目录查看</span></div>
+    <div class="overview-title"><span>按资产类型、数仓层级和业务目录查看</span></div>
     <section class="stats">
       <RouterLink v-for="item in statItems" :key="item.label" :to="item.to" class="dc-card stat">
         <strong>{{fmt(data[item.key])}}</strong><span>{{item.label}}</span>

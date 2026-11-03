@@ -2,7 +2,7 @@
   <div class="dc-page compact-page">
     <div class="dc-container page-inner">
       <div class="search-toolbar">
-        <div><b>资产检索</b><span v-if="q">“{{q}}” · 共 {{total.toLocaleString()}} 条结果</span></div>
+        <div><span v-if="q">“{{q}}” · 共 {{total.toLocaleString()}} 条结果</span><span v-else>输入关键词开始检索</span></div>
         <span class="hint">在顶部搜索框可修改关键词 · Ctrl/⌘ K</span>
       </div>
       <section class="dc-card search-panel">

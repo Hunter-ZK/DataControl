@@ -2,7 +2,7 @@
   <div class="dc-page compact-page">
     <div class="dc-container page-inner">
       <div class="toolbar">
-        <div class="toolbar-title"><b>资产目录</b><span>共 {{total.toLocaleString()}} 条</span></div>
+        <div class="toolbar-title"><span>共 {{total.toLocaleString()}} 条资产</span></div>
         <el-input v-model="keyword" clearable placeholder="按业务名称或物理表名搜索" @keyup.enter="applyKeyword"/>
         <el-select v-model="layer" aria-label="数仓分层" class="layer-filter">
           <el-option label="全部层级" value=""/>
