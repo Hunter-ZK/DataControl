@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/v1", tags=["reference"])
 @router.get("/home/overview")
 def home_overview(db: Session = Depends(get_db)):
     layer_rows = db.execute(
-        select(Dataset.layer_code, func.count()).where(Dataset.status != "OFFLINE").group_by(Dataset.layer_code)
+        select(Dataset.layer_code, func.count()).group_by(Dataset.layer_code)
     ).all()
     catalog_rows = db.execute(
         select(Catalog.catalog_code, Catalog.catalog_name, func.count(Dataset.asset_id))
@@ -103,8 +103,16 @@ def metrics(keyword: str | None = None, db: Session = Depends(get_db)):
 
 
 @router.get("/stat-systems")
-def stat_systems(db: Session = Depends(get_db)):
-    rows = db.execute(select(StatisticalSystem).order_by(StatisticalSystem.stat_system_code)).scalars().all()
+def stat_systems(keyword: str | None = None, db: Session = Depends(get_db)):
+    stmt = select(StatisticalSystem)
+    if keyword:
+        like = f"%{keyword}%"
+        stmt = stmt.where(or_(
+            StatisticalSystem.stat_system_code.like(like),
+            StatisticalSystem.stat_system_name.like(like),
+            StatisticalSystem.document_no.like(like),
+        ))
+    rows = db.execute(stmt.order_by(StatisticalSystem.stat_system_code)).scalars().all()
     return {"code": "OK", "data": [{"assetId": x.asset_id, "code": x.stat_system_code, "name": x.stat_system_name, "version": x.version, "issuer": x.issuer, "documentNo": x.document_no, "status": x.status} for x in rows]}
 
 

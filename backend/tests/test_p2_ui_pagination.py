@@ -24,3 +24,9 @@ def test_search_page_facets_are_complete():
     data = response.json()["data"]
     assert data["total"] == sum(data["facets"].values())
     assert len(data["items"]) <= 5
+
+
+def test_statistical_system_filter_respects_keyword():
+    response = client.get("/api/v1/stat-systems", params={"keyword": "___not_an_existing_stat_code___"})
+    assert response.status_code == 200
+    assert response.json()["data"] == []

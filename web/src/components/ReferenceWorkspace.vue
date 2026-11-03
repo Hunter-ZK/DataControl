@@ -115,7 +115,7 @@ async function fetchDetail(key:string){
  detailLoading.value=true;valueKeyword.value='';valuePage.value=1
  try{
    let row=rows.value.find(x=>keyOf(x)===key)
-   if(props.kind==='code-tables')row=await api.get('/code-tables/'+encodeURIComponent(key))
+   if(props.kind==='code-tables')row={...(row||{}),...((await api.get('/code-tables/'+encodeURIComponent(key))) as object)}
    else if(!row){
      const data=await assetApi.reference('/'+props.kind,key) as any[]
      row=data.find(x=>keyOf(x)===key)
