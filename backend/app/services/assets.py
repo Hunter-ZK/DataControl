@@ -48,3 +48,7 @@ class AssetService:
             ],
         })
         return data
+
+    def page_datasets(self, **filters):
+        rows, total = self.repo.page_datasets(**filters)
+        return {"items": [self._brief(row) for row in rows], "total": total}

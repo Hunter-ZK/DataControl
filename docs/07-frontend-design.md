@@ -30,9 +30,8 @@ Home is a search portal, not a dashboard.
 Priority order:
 1. search proposition and large search field
 2. common searches
-3. module launchers
-4. recent work
-5. only a lightweight asset overview entry
+3. recent browsing and favorites as continuation workspaces
+4. only a lightweight link to Data Overview
 
 Primary launchers:
 - Asset Catalog
@@ -68,3 +67,12 @@ Required verification widths include 1920, 1440, 1280, 1024, 820 and narrow brow
 ## Agent UI boundary
 
 P2 may show the Intelligent Q&A entry. Real dsh + Agent3 conversation is P3. Future Agent UI may show task/tool/provenance activity, never private chain-of-thought.
+
+## Compact workspace revision (2026-11-03)
+
+- Reduce the side navigation to Home, Asset Catalog, Data Standards (including code tables and word roots), Metrics & Systems, Intelligent Q&A (P3 placeholder) and Data Overview. Personal Center is reached from the account menu.
+- Preserve direct detail URLs; use contextual list/detail workspaces and field drawers as enhancements rather than breaking deep links.
+- Prefer a stationary sidebar and top bar on desktop. Main content may independently scroll or paginate where necessary; content must remain reachable with keyboard, browser zoom and at 1280×720.
+- List page totals and pagination are backed by complete filtered server results, not by the first 200 loaded records.
+- Default readable body copy is 14px; metadata and compact dense row labels may be 12–13px. Avoid purely decorative English eyebrow text, duplicate page headers and misleading inactive actions.
+- Command search is available from the top bar on non-home pages with Ctrl/⌘+K, and via the prominent home search.

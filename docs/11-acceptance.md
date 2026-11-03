@@ -74,3 +74,12 @@ Not P2 gates:
 - production SSO/LDAP
 - admin/operations console
 - metadata ingestion/governance
+
+## Compact workspace regression acceptance
+
+1. Search and dataset pagination show accurate server totals beyond 200 records; catalog filters run before pagination.
+2. ONLINE is the default catalog lifecycle filter; users can explicitly view other statuses.
+3. All detail deep links, breadcrumbs and browser forward/back flows remain valid after compact navigation.
+4. All content stays reachable at 1280×720, 1440×900 and 1920×1080; both narrow viewport and keyboard/zoom navigation remain usable.
+5. Command search gives results without redirecting to a blank generic search page.
+6. The P3 intelligent-Q&A placeholder never pretends to perform real Q&A.

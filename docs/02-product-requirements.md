@@ -10,7 +10,11 @@ The V2 information architecture remains the baseline with these approved changes
 6. Intelligent Q&A shows tool/activity summaries, never chain-of-thought.
 7. Read-only Agent3 tools do not require repetitive user confirmation.
 8. Existing 9-screen prototype defines information architecture, not final visual quality. Frontend implementation must refine hierarchy, spacing, density and interaction quality.
-9. **Home is a search portal, not a dashboard.** The first screen contains one dominant global search box, immediate search feedback, and 4–6 module launchers such as Asset Catalog, Standards/Code Tables, Word Roots, Metrics/Statistical Systems and Intelligent Q&A.
+9. **Home is a search portal, not a dashboard.** The first screen contains one dominant global search box, immediate search feedback, and lightweight recent/favorite continuation. Module discovery belongs primarily to the left navigation and command search.
 10. Search preview/results must be visually adjacent to the search box. Typing and result feedback form one interaction block rather than being separated by dashboard content.
 11. **Asset Overview is a separate page.** It contains asset counts, layer/domain distribution and recent asset changes. The home page may only show very lightweight continuation/recent-work content.
 12. **Primary navigation remains on the left.** The top bar is reserved for breadcrumb/page title, compact global search, Agent shortcut and user/system controls. Pure top navigation is not used because the product has too many persistent tool modules and must remain extensible.
+
+13. P2 UI uses a stable compact application shell. Long technical descriptions, columns, code values and search results may scroll or paginate inside their content areas; never clip accessible information to satisfy a no-scroll aesthetic.
+14. The default dataset catalog lists ONLINE assets, while other lifecycle states remain accessible through explicit filters. Displayed counts and pagination must reflect the complete server-side filtered set, not a truncated local subset.
+15. The P2 global command search may preview assets; actual intelligent Q&A and relationship exploration remain P3 features, without misleading routes.

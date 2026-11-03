@@ -17,6 +17,23 @@ def get_db():
 def list_tables(limit: int = Query(50, ge=1, le=200), keyword: str | None = None, db: Session = Depends(get_db)):
     return {"code": "OK", "data": AssetService(AssetRepository(db)).list_datasets(limit, keyword)}
 
+@router.get("/tables/page")
+def page_tables(
+    limit: int = Query(30, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    keyword: str | None = None,
+    catalog_code: str | None = None,
+    layer_code: str | None = None,
+    status: str = Query("ONLINE", pattern="^(ONLINE|DEPRECATED|OFFLINE|ALL)$"),
+    db: Session = Depends(get_db),
+):
+    data = AssetService(AssetRepository(db)).page_datasets(
+        limit=limit, offset=offset, keyword=keyword, catalog_code=catalog_code,
+        layer_code=layer_code, status=status,
+    )
+    return {"code": "OK", "data": data}
+
+
 @router.get("/tables/{asset_id}")
 def get_table(asset_id: str, db: Session = Depends(get_db)):
     data = AssetService(AssetRepository(db)).get_dataset(asset_id)
