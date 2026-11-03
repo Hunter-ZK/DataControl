@@ -8,7 +8,6 @@ a{text-decoration:none;color:inherit}
 .dc-container{width:min(calc(100% - 32px),var(--dc-container));margin:0 auto;min-width:0}
 .dc-page{padding:18px 0 28px}
 .dc-page-head{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:14px}
-.dc-eyebrow{display:none}
 .dc-title{margin:0;font-size:20px;line-height:1.4;letter-spacing:-.01em}
 .dc-subtitle{margin:3px 0 0;color:var(--dc-text-2);font-size:13px}
 .dc-card{background:var(--dc-surface);border:1px solid var(--dc-border);border-radius:var(--dc-radius-md);box-shadow:var(--dc-shadow-sm)}

@@ -7,7 +7,9 @@
         <div class="heading-line">
           <div class="identity"><div class="tags"><LayerTag :layer="data.layerCode"/><span class="status">{{statusLabel(data.status)}}</span></div>
             <h1>{{data.bizName}}</h1>
-            <div class="technical"><code class="dc-tech">{{data.tableName}}</code><button title="复制表名" aria-label="复制表名" @click="copyText(data.tableName)"><Copy :size="14"/></button></div>
+            <div class="technical"><code class="dc-tech">{{data.tableName}}</code><button title="复制表名" aria-label="复制表名" @click="copyText(data.tableName)"><Copy :size="14"/></button>
+              <button v-if="loggedIn" class="favorite-button" :aria-pressed="favorited" @click="toggleFavorite"><Star :size="15" :fill="favorited?'currentColor':'none'"/>{{favorited?'已收藏':'收藏'}}</button>
+            </div>
           </div>
           <details class="more"><summary>更多信息</summary><div><span>资产标识</span><code>{{data.assetId}}</code></div>
             <div><span>工作空间</span><code>{{data.workspaceCode||'—'}}</code></div>
@@ -117,7 +119,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowRight, Copy } from 'lucide-vue-next'
+import { ArrowRight, Copy, Star } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import { assetApi, activityApi } from '@/api/client'
 import api from '@/api/client'
@@ -129,6 +131,7 @@ const columns=ref<any[]>([]),tags=ref<any[]>([]),sqlRows=ref<any[]>([]),changes=
 const relations=ref<any>({upstream:[],downstream:[]})
 const tab=ref('overview'),fieldQuery=ref(''),fieldPage=ref(1),changePage=ref(1),sqlCode=ref('')
 const selectedField=ref<any|null>(null),drawerOpen=ref(false)
+const loggedIn=ref(Boolean(localStorage.getItem('datacontrol_token'))),favorited=ref(false)
 const drawerSize=ref('440px')
 const fieldPageSize=8
 const filteredColumns=computed(()=>{
@@ -142,6 +145,15 @@ const currentSql=computed(()=>sqlRows.value.find(x=>x.sqlCode===sqlCode.value)||
 function fmt(v?:string){return v?String(v).replace('T',' ').slice(0,16):'—'}
 function number(n?:number){return n===undefined||n===null?'—':Number(n).toLocaleString()}
 async function copyText(text:string){try{await navigator.clipboard.writeText(text);ElMessage.success('已复制')}catch{ElMessage.warning('复制失败，请手动选择文本')}}
+async function toggleFavorite(){
+ if(!data.value)return
+ try{
+  if(favorited.value)await activityApi.removeFavorite(data.value.assetId)
+  else await activityApi.addFavorite(data.value.assetId)
+  favorited.value=!favorited.value
+  ElMessage.success(favorited.value?'已加入收藏':'已取消收藏')
+ }catch{ElMessage.error('收藏操作失败')}
+}
 function openField(field:any){
  selectedField.value=field;drawerOpen.value=true;tab.value='columns'
  router.replace({query:{...route.query,tab:'columns',field:field.assetId}})
@@ -169,7 +181,8 @@ async function load(id:string){
   data.value=dataset
   const results=await Promise.allSettled([
     assetApi.columns({dataset_id:id,limit:500}),assetApi.tags(id),assetApi.commonSql(id),
-    assetApi.changes(id),assetApi.relations(id),activityApi.recordView(id)
+    assetApi.changes(id),assetApi.relations(id),activityApi.recordView(id),
+    loggedIn.value?activityApi.favorites():Promise.resolve([])
   ])
   if(request!==seq)return
   if(results[0].status==='fulfilled')columns.value=results[0].value as any[]
@@ -177,6 +190,7 @@ async function load(id:string){
   if(results[2].status==='fulfilled')sqlRows.value=results[2].value as any[]
   if(results[3].status==='fulfilled')changes.value=results[3].value as any[]
   if(results[4].status==='fulfilled')relations.value=results[4].value as any
+  if(results[6].status==='fulfilled')favorited.value=(results[6].value as any[]).some(x=>x.assetType==='TABLE'&&x.assetId===id)
   if(sqlRows.value.length)sqlCode.value=sqlRows.value[0].sqlCode
   drawerSize.value=window.innerWidth<540?'92%':'440px'
   await resolveField()
@@ -196,6 +210,7 @@ watch(fieldQuery,()=>fieldPage.value=1)
 .heading h1{font-size:19px;margin:4px 0}
 .technical{display:flex;align-items:center;gap:9px}.technical code{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .technical button,.field-tech button{border:0;color:var(--dc-primary-strong);background:transparent}
+.technical .favorite-button{display:flex;align-items:center;gap:5px;padding:4px 8px;border:1px solid var(--dc-border);border-radius:5px;font-size:12px;white-space:nowrap}
 .more{position:relative;font-size:12px;color:var(--dc-primary-strong);margin-top:5px}
 .more summary{cursor:pointer}.more>div{display:flex;gap:9px;justify-content:space-between;margin-top:8px}
 .more code{color:var(--dc-text-2);max-width:220px;overflow-wrap:anywhere}

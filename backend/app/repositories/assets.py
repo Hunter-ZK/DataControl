@@ -1,6 +1,6 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
-from backend.app.db.models import Dataset
+from backend.app.db.models import Catalog, Dataset
 
 class AssetRepository:
     def __init__(self, db: Session):
@@ -27,7 +27,16 @@ class AssetRepository:
             needle = f"%{keyword}%"
             filters.append((Dataset.biz_name.like(needle)) | (Dataset.table_name.like(needle)))
         if catalog_code:
-            filters.append(Dataset.catalog_code == catalog_code)
+            # A selected directory includes all of its nested descendants.
+            catalog_rows = self.db.execute(
+                select(Catalog.catalog_code, Catalog.parent_code)
+            ).all()
+            allowed = {catalog_code}
+            for _ in catalog_rows:
+                for code, parent in catalog_rows:
+                    if parent in allowed:
+                        allowed.add(code)
+            filters.append(Dataset.catalog_code.in_(allowed))
         if layer_code:
             filters.append(Dataset.layer_code == layer_code)
         if status and status != "ALL":

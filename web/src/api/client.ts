@@ -46,6 +46,8 @@ export const authApi = {
 
 export const activityApi = {
   favorites: () => get('/activity/favorites'),
+  addFavorite: (assetId: string) => post('/activity/favorites', { assetType: 'TABLE', assetId }),
+  removeFavorite: (assetId: string) => remove('/activity/favorites/TABLE/'+encodeURIComponent(assetId)),
   recent: () => get('/activity/recent-views'),
   history: () => get('/activity/search-history'),
   recordSearch: (keyword: string) => post('/activity/search-history', { keyword }),

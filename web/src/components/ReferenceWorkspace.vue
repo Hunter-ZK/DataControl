@@ -157,7 +157,6 @@ async function load(){
 watch(()=>[props.kind,props.selectedKey,route.query.selected],()=>{
  const key=props.selectedKey||String(route.query.selected||'')
  if(key && key!==currentKey.value){currentKey.value=key;fetchDetail(key)}
- if(!key && props.kind!==config.value.path.slice(1)){current.value=null}
 })
 watch(valueKeyword,()=>valuePage.value=1)
 watch(pageSize,()=>{

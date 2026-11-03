@@ -25,7 +25,7 @@
           </nav>
         </div>
         <button v-if="route.name !== 'home'" class="command-trigger" @click="openCommand">
-          <Search :size="16"/><span>搜索数据集、字段、指标、码表…</span>
+          <Search :size="16"/><span>{{route.name==='search' && route.query.q ? '检索：'+String(route.query.q) : '搜索数据集、字段、指标、码表…'}}</span>
           <kbd>{{shortcutLabel}} K</kbd>
         </button>
         <div class="account">
