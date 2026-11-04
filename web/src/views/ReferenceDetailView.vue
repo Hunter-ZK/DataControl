@@ -1,6 +1,6 @@
 <template>
   <div class="dc-page"><div class="dc-container">
-    <button class="dc-back" @click="router.back()"><ArrowLeft :size="16"/>返回</button>
+    <div class="ref-detail-layout"><ReferenceSidebar :kind="kind" :selected="identifier()"/><div class="ref-detail-content">
     <section v-if="data" class="detail-head dc-card">
       <div><span class="dc-chip">{{config.badge}}</span><h1>{{titleOf(data)}}</h1><CopyTech :value="codeOf(data)"/><p>{{descriptionOf(data)}}</p></div>
       <div class="reference-actions"><span class="status">{{statusLabel(data.status||data.version||'VALID')}}</span><AssetOperationBar :kind="kind==='word-roots'?'WORD_ROOT':'STAT_SYSTEM'" :asset="data"/></div>
@@ -20,22 +20,23 @@
           </template>
         </div>
       </section>
-      <aside class="dc-card panel side"><h3>资产身份</h3><div><span>稳定标识</span><code class="dc-tech">{{data.assetId||'—'}}</code></div><div><span>状态</span><b>{{statusLabel(data.status||'VALID')}}</b></div></aside>
+
     </div>
     <AssetReferencePanel v-if="data && kind==='stat-systems'" kind="STAT_SYSTEM" :asset-id="data.assetId" title="统计制度下属指标"/>
     <div v-if="!data && loading" class="dc-empty">正在加载资产详情…</div><div v-if="!data && !loading" class="dc-empty">未找到该资产。</div>
+    </div></div>
   </div></div>
 </template>
 <script setup lang="ts">
 import CopyTech from '@/components/CopyTech.vue'
+import ReferenceSidebar from '@/components/ReferenceSidebar.vue'
 import { computed, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft } from 'lucide-vue-next'
+import { RouterLink, useRoute } from 'vue-router'
 import { assetApi } from '@/api/client'
 import { statusLabel } from '@/utils/labels'
 import AssetOperationBar from '@/components/AssetOperationBar.vue'
 import AssetReferencePanel from '@/components/AssetReferencePanel.vue'
-const props=defineProps<{kind:string}>();const route=useRoute();const router=useRouter();const data=ref<any|null>(null);const loading=ref(true)
+const props=defineProps<{kind:string}>();const route=useRoute();const data=ref<any|null>(null);const loading=ref(true)
 const configs:any={
   'word-roots':{badge:'词根',sectionTitle:'词根定义'},
   metrics:{badge:'指标',sectionTitle:'指标定义与统计口径'},
