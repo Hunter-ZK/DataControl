@@ -165,7 +165,12 @@ const filteredValues = computed(() => {
 })
 
 function keyOf(row: any) {
-  return row.assetId || row.codeTableNo || row.standardNo || row.root || row.metricCode || row.code
+  if (props.kind === 'code-tables') return row.codeTableNo || row.assetId
+  if (props.kind === 'data-standards') return row.standardNo || row.assetId
+  if (props.kind === 'word-roots') return row.root || row.assetId
+  if (props.kind === 'metrics') return row.metricCode || row.assetId
+  if (props.kind === 'stat-systems') return row.code || row.assetId
+  return row.assetId || row.code
 }
 function titleOf(row: any) {
   return row.name || row.cnName || row.metricName || row.codeTableName || row.standardName || row.root || '未命名资产'
@@ -198,15 +203,16 @@ async function load() {
   page.value = 1
   rows.value = await assetApi.reference(`/${props.kind}`, keyword.value || undefined) as any[]
   const requested = String(route.query.selected || '')
-  const row = (requested && rows.value.find((item) => String(keyOf(item)) === requested)) || rows.value[0]
-  if (row) await select(row, false)
+  const matched = requested ? rows.value.find((item) => String(keyOf(item)) === requested) : null
+  const row = matched || rows.value[0]
+  if (row) await select(row, Boolean(requested && !matched))
   else { selectedKey.value = ''; selectedData.value = null }
 }
 watch(() => props.kind, load)
 watch(() => route.query.selected, (value) => {
-  if (!value) return
+  if (!value || String(value) === selectedKey.value) return
   const row = rows.value.find((item) => String(keyOf(item)) === String(value))
-  if (row) select(row, false)
+  if (row) void select(row, false)
 })
 watch(pageSize, () => { page.value = 1 })
 onMounted(load)
