@@ -214,7 +214,10 @@ watch(() => route.query.selected, (value) => {
   const row = rows.value.find((item) => String(keyOf(item)) === String(value))
   if (row) void select(row, false)
 })
-watch(pageSize, () => { page.value = 1 })
+watch(pageSize, () => {
+  const selectedIndex = rows.value.findIndex((row) => String(keyOf(row)) === selectedKey.value)
+  page.value = selectedIndex >= 0 ? Math.floor(selectedIndex / pageSize.value) + 1 : 1
+})
 onMounted(load)
 </script>
 

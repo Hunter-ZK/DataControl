@@ -74,3 +74,19 @@ Not P2 gates:
 - production SSO/LDAP
 - admin/operations console
 - metadata ingestion/governance
+
+
+## Targeted UI refinement regression acceptance
+
+1. The existing Light Ocean shell, sidebar treatment, hero treatment, card styling and icon language remain recognizable; this work is not a replacement design.
+2. The sidebar exposes six functional entries; Personal Center is reachable from the account menu; Intelligent Q&A is visibly disabled until P3.
+3. Home keeps its original search hero and hot searches, removes duplicate module launchers and overview counts, and shows recent browsing plus favorites.
+4. Asset Catalog keeps the business-directory tree and existing asset row language, with layer/status filters and pagination over the rows returned by the existing API.
+5. Search results retain the existing result-card language and expose horizontal type filters with counts and pagination.
+6. Data Overview presents the seven asset counts together while retaining the existing distribution panels.
+7. Personal Center presents favorites, recent browsing and search history in three paginated sections.
+8. Reference assets use a left list/right detail workspace; direct URLs for code tables, standards, word roots, metrics and statistical systems remain valid.
+9. A field selected from Dataset Detail opens a field drawer; a direct `/fields/:id` URL resolves to the owning dataset and opens that same drawer.
+10. Dataset identity, lifecycle, definition and update metadata are not repeated in multiple panels; Asset ID is available under More Information.
+11. No backend endpoint, database schema or asset-data contract is changed for this UI refinement.
+12. `npm run type-check`, `npm test` and `npm run build` pass.
