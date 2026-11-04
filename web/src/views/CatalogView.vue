@@ -1,17 +1,5 @@
 <template>
   <div class="dc-page catalog-atlas"><div class="dc-container">
-    <header class="dc-page-head">
-      <div>
-        <h1 class="dc-title">资产目录<span class="heading-accent"> / Explore</span></h1>
-        <p class="dc-subtitle">沿业务主题逐级发现数据资产，再按数仓分层定位数据集。</p>
-      </div>
-      <RouterLink to="/search" class="explore-link"><Search :size="18"/> 切换到全局检索 <ArrowUpRight :size="17"/></RouterLink>
-    </header>
-    <section class="catalog-banner">
-      <div class="banner-mark"><FolderTree :size="30"/></div>
-      <div><span>BUSINESS DATA CATALOG</span><h2>按业务层级发现数据</h2><p>主题 → 子目录 → 数据集。目录名称与层级均来自元数据，不按代码猜测。</p></div>
-      <div class="banner-metrics"><strong>{{ allCatalogs.length }}</strong><span>已登记目录</span></div>
-    </section>
     <div class="catalog-workspace">
       <aside class="tree-pane dc-card">
         <div class="pane-title"><div><FolderTree :size="21"/><b>业务目录</b></div><span>{{ allCatalogs.length }} 个</span></div>
@@ -232,4 +220,7 @@ onMounted(async()=>{try{catalogs.value=await assetApi.catalogs() as CatalogEntry
 .folder-card:nth-child(even){background:linear-gradient(145deg,#eff6ff,#fff)}
 .folder-card:focus-visible{outline:3px solid #72a4fa;outline-offset:2px}
 
+
+.catalog-atlas{padding-top:12px}.catalog-workspace{min-height:calc(100vh - 100px)}.tree-pane,.catalog-main{min-height:0}.dataset-row{min-height:44px!important}.datasets-header{min-height:40px}.pager{min-height:36px;padding:5px 10px!important}
+@media(min-width:1280px) and (min-height:720px){.catalog-workspace{max-height:calc(100vh - 94px);overflow:hidden}.tree-pane{overflow:hidden;display:flex;flex-direction:column}.tree-scroll{min-height:0;overflow:auto}.catalog-main{overflow-y:auto}}
 </style>

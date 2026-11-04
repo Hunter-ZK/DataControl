@@ -82,3 +82,6 @@ body{background:radial-gradient(ellipse 1200px 540px at 76% -210px,#daeaff 0,tra
 :where(.layer-badge,.layer-tag,.layer-chip)[data-layer="DWS"]{color:#0f766e!important;background:rgba(15,118,110,.10)!important}
 :where(.layer-badge,.layer-tag,.layer-chip)[data-layer="ADS"]{color:#7c3aed!important;background:rgba(124,58,237,.10)!important}
 :where(.layer-badge,.layer-tag,.layer-chip)[data-layer="DIM"]{color:#b45309!important;background:rgba(180,83,9,.10)!important}
+
+/* Standardize typography of technical and supporting text without shrinking hero hierarchy. */
+.dc-subtitle,.dc-muted,.dc-tech{color:#5B6B7A}.dc-table th,.dc-table td{padding:9px 12px}.dc-stat strong{font-variant-numeric:tabular-nums}

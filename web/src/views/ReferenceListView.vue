@@ -1,22 +1,17 @@
 <template>
   <div class="dc-page reference-atlas"><div class="dc-container">
-    <header class="dc-page-head">
-      <div><h1 class="dc-title">{{config.title}}</h1><p class="dc-subtitle">{{config.desc}}</p></div>
-      <div class="reference-switch">
-        <RouterLink v-if="kind==='metrics'" to="/stat-systems"><FileText :size="18"/>统计制度 <ArrowRight :size="16"/></RouterLink>
-        <RouterLink v-else-if="kind==='stat-systems'" to="/metrics"><ChartNoAxesCombined :size="18"/>业务指标 <ArrowRight :size="16"/></RouterLink>
-        <RouterLink v-else to="/search"><Search :size="18"/>全局检索 <ArrowRight :size="16"/></RouterLink>
-      </div>
-    </header>
-    <section class="reference-hero">
-      <div class="reference-hero-icon"><AssetIcon :type="referenceType" :size="30"/></div>
-      <div><h2>{{config.heading}}</h2><p>{{config.note}}</p></div>
-      <div class="reference-total"><strong>{{visibleRows.length}}</strong><span>当前结果</span></div>
-    </section>
+    <nav v-if="kind==='data-standards'||kind==='code-tables'" class="reference-tabs" aria-label="数据标准分类">
+      <RouterLink to="/standards" :class="{active:kind==='data-standards'}">数据标准</RouterLink>
+      <RouterLink to="/code-tables" :class="{active:kind==='code-tables'}">码表</RouterLink>
+    </nav>
+    <nav v-else-if="kind==='metrics'||kind==='stat-systems'" class="reference-tabs" aria-label="指标与制度分类">
+      <RouterLink to="/metrics" :class="{active:kind==='metrics'}">指标</RouterLink>
+      <RouterLink to="/stat-systems" :class="{active:kind==='stat-systems'}">统计制度</RouterLink>
+    </nav>
     <section class="reference-toolbar dc-card">
       <div class="reference-search"><Search :size="21"/><input v-model="keyword" :placeholder="config.placeholder" @keydown.enter.prevent="load" aria-label="资产字典检索"/>
         <button @click="load">查询 <ArrowRight :size="16"/></button></div>
-      <div class="toolbar-desc"><span>当前：{{config.title}}</span><button v-if="keyword||letter" @click="clearSearch">清空筛选</button></div>
+      <div class="toolbar-desc"><span>{{visibleRows.length}} 项</span><button v-if="keyword||letter" @click="clearSearch">清空筛选</button></div>
     </section>
 
     <div v-if="kind==='code-tables'" class="code-workspace">
@@ -271,4 +266,9 @@ watch(()=>props.kind,()=>{keyword.value='';letter.value='';rows.value=[];selecte
 .document-row{border-bottom-color:#dce8f8}
 @media(max-width:760px){.dictionary-table th,.dictionary-table td{padding:13px 15px}.table-clip{overscroll-behavior-x:contain}}
 
+
+.reference-atlas{padding-top:12px}.reference-tabs{height:38px;display:flex;align-items:center;gap:7px;margin:0 0 10px}.reference-tabs a{padding:7px 19px;font-size:13px;font-weight:650;color:var(--dc-text-2);border-radius:7px}
+.reference-tabs a.active{background:var(--dc-primary-soft);color:var(--dc-primary);font-weight:750}.reference-tabs a:hover{background:#e8f1ff}
+.reference-toolbar{display:flex;align-items:center;min-height:40px;padding:5px 10px!important;margin-bottom:10px!important;gap:12px}.reference-search{flex:1}.reference-toolbar .toolbar-desc{margin-left:auto}
+@media(min-width:821px){.code-workspace{min-height:0;height:min(580px,calc(100vh - 174px));grid-template-columns:360px minmax(0,1fr)!important;overflow:hidden}.code-list,.code-detail{min-height:0;overflow:hidden}.code-list{display:flex;flex-direction:column}.code-list .code-items{flex:1;min-height:0;overflow-y:auto}.code-detail .table-clip{max-height:calc(100% - 150px);overflow:auto}}
 </style>

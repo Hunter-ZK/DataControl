@@ -1,34 +1,16 @@
 <template>
   <div class="dc-page atlas-search"><div class="dc-container">
-    <header class="search-heading"><div><h1 class="dc-title">全局资产检索</h1>
-      <p class="dc-subtitle">找表、找字段、查指标、查标准。搜索结果按资产类型分组，一眼看清来源与层级。</p></div>
-      <RouterLink to="/catalog" class="catalog-switch"><FolderTree :size="19"/> 按业务目录浏览 <ArrowRight :size="16"/></RouterLink>
-    </header>
-    <section class="search-hero">
-      <div class="search-box-wrap">
-        <div class="search-box"><Search :size="23"/><input v-model="q" placeholder="输入中文业务名称、技术名或字段名称…"
-          @input="loadSuggestions" @focus="showSuggestions=true" @keydown.enter.prevent="runSearch(true)" aria-label="全局资产搜索"/>
-          <button @click="runSearch(true)">搜索资产 <ArrowRight :size="18"/></button>
-        </div>
-        <div v-if="showSuggestions&&suggestions.length" class="suggestions">
-          <button v-for="item in suggestions" :key="item.assetType+item.assetId" @mousedown.prevent="openSuggestion(item)">
-            <AssetIcon :type="item.assetType" :size="21"/><span><b>{{item.title}}</b><code>{{item.technicalName}}</code></span><ArrowRight :size="17"/>
-          </button>
-        </div>
-      </div>
-      <div class="search-actions"><div v-if="q.trim()" class="query-meta"><span>关键词</span>
-        <b v-for="term in terms" :key="term">{{term}}</b><span v-if="total">匹配 {{total}} 项</span>
-      </div><div v-else class="query-meta"><span>支持按业务词、字段技术名、标准编码检索</span></div>
-      <button @click="askAgent"><Sparkles :size="17"/>让 DataAgent 解释相关资产 <ArrowRight :size="16"/></button></div>
-    </section>
-    <section v-if="q.trim() && typeHighlights.length" class="type-highlights" aria-label="按资产类型查看">
-      <button v-for="item in typeHighlights" :key="item.key" @click="selectType(item.key)" :class="{active:type===item.key}">
-        <AssetIcon :type="item.key" :size="25"/><span><b>{{item.count}}</b><small>{{item.label}}</small></span><ArrowRight :size="16"/>
-      </button>
-    </section>
-    <button class="mobile-filter-toggle" @click="filtersOpen=!filtersOpen"><Filter :size="19"/>筛选范围 <span>{{filtersOpen?'收起':'展开'}}</span></button>
+    <nav v-if="q.trim()" class="type-tabs" aria-label="按资产类型查看">
+      <button :class="{active:!type}" @click="selectType('')">全部 <b>{{facetCount}}</b></button>
+      <button v-for="item in typeHighlights" :key="item.key" :class="{active:type===item.key}" @click="selectType(item.key)">{{item.label}} <b>{{item.count}}</b></button>
+    </nav>
+    <div class="search-toolbar"><div><b>搜索结果</b><span>{{total}} 项</span><span v-if="q.trim()">· {{q}}</span></div>
+      <button @click="filtersOpen=true"><Filter :size="16"/> 高级筛选</button>
+      <button @click="savePreset"><BookmarkPlus :size="16"/> 保存筛选</button>
+      <button @click="askAgent"><Sparkles :size="16"/>智能问数</button>
+    </div>
     <div class="search-grid">
-      <aside class="filter-panel dc-card" :class="{'mobile-open':filtersOpen}">
+      <el-drawer v-model="filtersOpen" title="高级筛选与常用筛选" append-to-body size="min(390px,96vw)" direction="rtl"><aside class="filter-panel dc-card">
         <div class="filter-head"><b><Filter :size="19"/>筛选数据资产</b><button @click="clearFilters">清除</button></div>
         <div class="filter-section">
           <div class="filter-title"><FolderTree :size="17"/>业务目录层级</div>
@@ -59,10 +41,10 @@
           <div v-else class="preset-empty">尚无保存的筛选方案</div>
         </section>
         <p class="facet-note">目录层级由系统中的真实父子关系生成。筛选仅约束当前目录，不自动合并下级目录结果。</p>
-      </aside>
+      </aside></el-drawer>
       <main class="search-main">
         <div class="results-head"><div><h2>搜索结果 <em>{{total}}</em></h2></div>
-          <div class="results-tools"><button class="save-preset-action" @click="savePreset"><BookmarkPlus :size="16"/> 保存筛选</button><span>查看方式</span>
+          <div class="results-tools"><span>查看方式</span>
             <div class="density-switch" role="group" aria-label="结果展示密度">
               <button :class="{active:!compactResults}" :aria-pressed="!compactResults" @click="compactResults=false">详细</button>
               <button :class="{active:compactResults}" :aria-pressed="compactResults" @click="compactResults=true">精简</button>
@@ -80,16 +62,11 @@
         <div v-else-if="loading" class="search-empty-state dc-card"><Search :size="33"/><h3>正在检索统一资产索引…</h3></div>
         <div v-else-if="!rows.length" class="search-empty-state dc-card"><Database :size="37"/><h3>没有找到符合条件的资产</h3><p>尝试更换关键词、清除目录筛选，或向 DataAgent 描述你的需求。</p></div>
         <template v-else>
-          <section v-for="group in groupedRows" :key="group.assetType" class="result-group dc-card" :data-asset-type="group.assetType">
-            <header class="result-group-head">
-              <AssetIcon :type="group.assetType" :size="25"/>
-              <div><h3>{{label(group.assetType)}}</h3><p>本页 {{group.items.length}} 条相关资产</p></div>
-              <button v-if="type!==group.assetType" @click="selectType(group.assetType)">只看{{label(group.assetType)}} <ChevronRight :size="17"/></button>
-            </header>
+          <section class="result-group dc-card">
             <div class="group-items" :class="{ 'density-compact': compactResults }">
-              <article v-for="item in group.items" :key="item.assetType+item.assetId"
+              <article v-for="item in rows" :key="item.assetType+item.assetId"
                 class="result-asset" role="link" tabindex="0" @click="open(item)" @keydown.enter="open(item)">
-                <div class="asset-heading-block"><div class="asset-headline"><h4 v-html="safeMarkHtml(item.titleHighlight||item.title)"/>
+                <div class="asset-heading-block"><div class="asset-headline"><span class="result-type">{{label(item.assetType)}}</span><h4 v-html="safeMarkHtml(item.titleHighlight||item.title)"/>
                   <span v-if="item.layerCode" class="layer-tag" :data-layer="item.layerCode">{{item.layerCode}}</span>
                   <span v-if="item.status" class="status-tag">{{statusText(item.status)}}</span>
                 </div>
@@ -127,12 +104,12 @@ import { useSavedSearchPresets, type SearchPreset } from '@/composables/useSaved
 import AssetIcon from '@/components/AssetIcon.vue'
 import AssetQuickPreview from '@/components/AssetQuickPreview.vue'
 import { buildCatalogTree, flattenCatalogs, type CatalogEntry, type CatalogNode } from '@/utils/catalogTree'
-import { activityApi, assetApi, type SearchItem, type SearchSuggestion } from '@/api/client'
+import { activityApi, assetApi, type SearchItem } from '@/api/client'
 
 interface FacetItem { key: string; label: string; count: number }
 
 const filtersOpen = ref(false)
-const compactResults = ref(false)
+const compactResults = ref(true)
 const { presets, save: saveSearchPreset, remove: removeSearchPreset } = useSavedSearchPresets()
 function currentPresetValues() {
   return {q:q.value,type:type.value,layer:layer.value,catalog:catalog.value,status:status.value}
@@ -172,8 +149,8 @@ const catalogEntries=ref<CatalogEntry[]>([])
 const catalogTree=computed(()=>buildCatalogTree(catalogEntries.value))
 const catalogName=computed(()=>flattenCatalogs(catalogTree.value).find(x=>x.code===catalog.value)?.name||catalog.value)
 const groupOrder=['TABLE','COLUMN','METRIC','CODE_TABLE','STANDARD','WORD_ROOT','STAT_SYSTEM']
-const groupedRows=computed(()=>groupOrder.map(assetType=>({assetType,items:rows.value.filter(row=>row.assetType===assetType)})).filter(group=>group.items.length))
 const typeHighlights=computed(()=>groupOrder.map(key=>({key,label:typeLabels[key],count:Number(facets.value.assetTypes[key]||0)})).filter(x=>x.count>0))
+const facetCount=computed(()=>Object.values(facets.value.assetTypes).reduce((sum,n)=>sum+Number(n||0),0))
 const FilterGroup = defineComponent({
   props: { title: { type: String, required: true }, items: { type: Array as () => FacetItem[], required: true }, selected: { type: String, default: '' } },
   emits: ['select'],
@@ -199,14 +176,10 @@ const total = ref(0)
 const offset = ref(Number(route.query.offset || 0))
 const pageSize = 20
 const loading = ref(false)
-const suggestions = ref<SearchSuggestion[]>([])
-const showSuggestions = ref(false)
 const facets = ref({ assetTypes: {} as Record<string, number>, layers: {} as Record<string, number>, catalogs: {} as Record<string, number>, statuses: {} as Record<string, number> })
-let suggestionSeq = 0
 
 const typeLabels: Record<string,string> = { COLUMN:'字段', METRIC:'指标', TABLE:'数据集', STANDARD:'数据标准', CODE_TABLE:'码表', WORD_ROOT:'词根', STAT_SYSTEM:'统计制度' }
 
-const terms = computed(() => q.value.trim().split(/\s+/).filter(Boolean))
 const agentQuestion = computed(() => `本期${q.value.trim()}怎么统计`)
 const currentPage = computed(() => Math.floor(offset.value / pageSize) + 1)
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
@@ -229,7 +202,6 @@ async function runSearch(reset = false) {
   if (!value) return
   if (reset) offset.value = 0
   loading.value = true
-  showSuggestions.value = false
   try {
     const result = await assetApi.search(value, {
       asset_type: type.value ? [type.value] : undefined,
@@ -247,21 +219,15 @@ async function runSearch(reset = false) {
   } finally { loading.value = false }
 }
 
-async function loadSuggestions() {
-  const value = q.value.trim(); const seq = ++suggestionSeq
-  if (!value) { suggestions.value = []; return }
-  try { const data = await assetApi.suggest(value, 8); if (seq === suggestionSeq) suggestions.value = data } catch { if (seq === suggestionSeq) suggestions.value = [] }
-}
 function selectType(value: string) { type.value = type.value === value ? '' : value; runSearch(true) }
 function selectLayer(value: string) { layer.value = layer.value === value ? '' : value; runSearch(true) }
 function selectCatalog(value: string) { catalog.value = catalog.value === value ? '' : value; runSearch(true) }
 function chooseCatalogNode(node:CatalogNode){ selectCatalog(node.code) }
 function selectStatus(value: string) { status.value = status.value === value ? '' : value; runSearch(true) }
 function clearFilters() { type.value=''; layer.value=''; catalog.value=''; status.value=''; runSearch(true) }
-function goPage(page: number) { const next = Math.min(Math.max(1,page), totalPages.value); offset.value=(next-1)*pageSize; runSearch(false); window.scrollTo({top:0,behavior:'smooth'}) }
+function goPage(page: number) { const next = Math.min(Math.max(1,page), totalPages.value); offset.value=(next-1)*pageSize; runSearch(false) }
 function target(item: { assetType:string; assetId:string; technicalName:string }) { if(item.assetType==='TABLE')return `/datasets/${item.assetId}`; if(item.assetType==='COLUMN')return `/fields/${item.assetId}`; if(item.assetType==='CODE_TABLE')return `/code-tables/${item.technicalName}`; if(item.assetType==='STANDARD')return `/standards/${item.technicalName}`; if(item.assetType==='WORD_ROOT')return `/word-roots/${item.technicalName}`; if(item.assetType==='METRIC')return `/metrics/${item.technicalName}`; if(item.assetType==='STAT_SYSTEM')return `/stat-systems/${item.technicalName}`; return '' }
 function open(item: SearchItem) { const to=target(item); if(to) router.push(to) }
-function openSuggestion(item: SearchSuggestion) { showSuggestions.value=false; const to=target(item); if(to) router.push(to) }
 function askAgent() { router.push({ name:'agent', query:{ q:`请根据 DataControl 中可信的指标、数据集和统计口径回答：${agentQuestion.value}。如需 SQL，请生成并静态校验 MaxCompute SQL。` } }) }
 function askAbout(item: SearchItem) { router.push({ name:'agent', query:{ ...(item.assetType==='TABLE'?{asset:item.assetId}:{}), q:`请基于“${item.title}”（${item.technicalName}）回答我的数据问题，并优先使用该资产的可信口径。` } }) }
 watch(() => route.query.q, (value) => { if (typeof value === 'string' && value !== q.value) { q.value=value; runSearch(true) } })
@@ -419,4 +385,17 @@ onMounted(async() => {try{catalogEntries.value=await assetApi.catalogs() as Cata
 .save-preset-action{display:flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid #b9d4f7;border-radius:8px;background:#f1f7ff;color:#2769ce;cursor:pointer;font-size:12px;font-weight:730}
 .save-preset-action:hover{background:#e5f0ff}
 @media(max-width:680px){.results-tools .save-preset-action{margin-right:auto}.saved-search-panel{padding:12px}}
+
+/* Keep original result cards while moving filters into an on-demand drawer. */
+.atlas-search{padding-top:12px}.search-grid{display:block!important}.search-main{min-width:0;width:100%}.search-toolbar{height:40px;display:flex;align-items:center;gap:8px;margin:8px 0}
+.search-toolbar>div{min-width:0;margin-right:auto;display:flex;gap:8px;align-items:center;font-size:13px;color:var(--dc-text-2)}.search-toolbar>div b{color:var(--dc-text)}
+.search-toolbar button{display:flex;align-items:center;gap:5px;border:1px solid var(--dc-border);background:#fff;border-radius:7px;padding:5px 10px;color:var(--dc-primary);cursor:pointer;font-size:12px}
+.type-tabs{display:flex;align-items:center;gap:5px;overflow-x:auto;white-space:nowrap;margin:4px 0 8px;padding-bottom:2px}.type-tabs button{border:0;border-radius:7px;padding:7px 10px;background:transparent;color:var(--dc-text-2);font-size:13px;cursor:pointer}
+.type-tabs button b{font-variant-numeric:tabular-nums;font-weight:650}.type-tabs button.active{background:var(--dc-primary-soft);color:var(--dc-primary);font-weight:700}
+.filter-panel{display:block!important;width:100%!important;border:none!important;box-shadow:none!important;padding:0!important}.search-toolbar+.search-grid{margin-top:0}
+.results-head{min-height:40px!important;margin-bottom:8px!important}.results-head h2{font-size:16px!important;margin:0}.result-group{margin-bottom:0!important;padding:0!important}.result-group .group-items{padding:6px!important;display:grid;gap:6px}
+.result-asset{min-height:64px;box-shadow:none!important}.density-compact .result-asset{display:flex;align-items:center;gap:8px;padding:8px 11px!important}.density-compact .asset-heading-block{flex:1;min-width:0}.density-compact .asset-footer{padding:0!important;gap:8px;white-space:nowrap}
+.result-type{font-size:12px;color:var(--dc-text-2);background:var(--dc-surface-soft);padding:2px 7px;border-radius:5px;flex:none}
+.pagination{min-height:36px;padding:6px 8px!important}
+@media(max-width:820px){.search-toolbar{height:auto;flex-wrap:wrap}.search-toolbar>div{width:100%}.type-tabs{margin-bottom:8px}}
 </style>
