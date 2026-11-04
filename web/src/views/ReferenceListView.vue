@@ -26,11 +26,11 @@ const tabs=computed(()=>['code-tables','data-standards','word-roots'].includes(p
   {kind:'stat-systems',label:'统计制度',to:'/stat-systems'},
 ])
 const configs:any={
-  'code-tables':{title:'标准码值',desc:'集中查询业务码表、码值标准及其说明。',placeholder:'搜索码表编号或名称',badge:'CODE TABLE',note:'统一编码与业务取值'},
-  'data-standards':{title:'数据标准',desc:'查询字段级数据标准、业务定义和关联码表。',placeholder:'搜索标准编号或名称',badge:'STANDARD',note:'统一定义与口径'},
-  'word-roots':{title:'词根索引',desc:'查询字段命名词根、英文全称和规范用法。',placeholder:'搜索词根、中文名或同义词',badge:'WORD ROOT',note:'字段命名规范入口'},
-  metrics:{title:'指标与制度',desc:'查询指标定义、统计口径、聚合方式与来源数据集。',placeholder:'搜索指标名称或编码',badge:'METRIC',note:'确定性业务口径'},
-  'stat-systems':{title:'统计制度',desc:'查询统计制度、版本、发布机构和文号信息。',placeholder:'搜索统计制度',badge:'SYSTEM',note:'制度依据与版本信息'},
+  'code-tables':{title:'标准码值',desc:'集中查询业务码表、码值标准及其说明。',placeholder:'搜索码表编号或名称',note:'统一编码与业务取值'},
+  'data-standards':{title:'数据标准',desc:'查询字段级数据标准、业务定义和关联码表。',placeholder:'搜索标准编号或名称',note:'统一定义与口径'},
+  'word-roots':{title:'词根索引',desc:'查询字段命名词根、英文全称和规范用法。',placeholder:'搜索词根、中文名或同义词',note:'字段命名规范入口'},
+  metrics:{title:'指标与制度',desc:'查询指标定义、统计口径、聚合方式与来源数据集。',placeholder:'搜索指标名称或编码',note:'确定性业务口径'},
+  'stat-systems':{title:'统计制度',desc:'查询统计制度、版本、发布机构和文号信息。',placeholder:'搜索统计制度',note:'制度依据与版本信息'},
 }
 const config=computed(()=>configs[props.kind]||configs.metrics)
 async function load(){
