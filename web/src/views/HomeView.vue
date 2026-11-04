@@ -109,6 +109,9 @@ function openPreview(item: any) {
   else if (item.asset_type === 'COLUMN') router.push(`/fields/${item.asset_id}`)
   else if (item.asset_type === 'METRIC') router.push(`/metrics/${item.technical_name}`)
   else if (item.asset_type === 'CODE_TABLE') router.push(`/code-tables/${item.technical_name}`)
+  else if (item.asset_type === 'DATA_STANDARD') router.push(`/standards/${item.technical_name}`)
+  else if (item.asset_type === 'WORD_ROOT') router.push(`/word-roots/${item.technical_name}`)
+  else if (item.asset_type === 'STAT_SYSTEM') router.push(`/stat-systems/${item.technical_name}`)
   else submit()
 }
 watch(keyword, (value) => {
