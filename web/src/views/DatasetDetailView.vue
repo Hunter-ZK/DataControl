@@ -64,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowRight, Copy } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
@@ -87,7 +87,8 @@ async function copyName(){if(!data.value)return;await navigator.clipboard.writeT
 async function openField(field:any){selectedField.value=field;fieldDrawerOpen.value=true;await router.replace({query:{...route.query,field:String(field.assetId)}})}
 async function syncFieldDrawer(){const id=String(route.query.field||'');if(!id){selectedField.value=null;fieldDrawerOpen.value=false;return}let field=columns.value.find(x=>String(x.assetId)===id);if(!field){try{field=await api.get(`/columns/${encodeURIComponent(id)}`)}catch{field=null}}if(field){selectedField.value=field;fieldDrawerOpen.value=true}}
 function clearFieldQuery(){if(!route.query.field)return;const query={...route.query};delete query.field;void router.replace({query})}
-onMounted(async()=>{const id=String(route.params.id);data.value=await assetApi.table(id);await Promise.allSettled([assetApi.columns({dataset_id:id,limit:500}).then((v:any)=>columns.value=v),assetApi.tags(id).then((v:any)=>tags.value=v),assetApi.commonSql(id).then((v:any)=>sqlRows.value=v),assetApi.changes(id).then((v:any)=>changes.value=v),assetApi.relations(id).then((v:any)=>Object.assign(relations,v)),activityApi.recordView(id)]);await syncFieldDrawer()})
+async function loadDataset(){const id=String(route.params.id);data.value=await assetApi.table(id);columns.value=[];await Promise.allSettled([assetApi.columns({dataset_id:id,limit:500}).then((v:any)=>columns.value=v),assetApi.tags(id).then((v:any)=>tags.value=v),assetApi.commonSql(id).then((v:any)=>sqlRows.value=v),assetApi.changes(id).then((v:any)=>changes.value=v),assetApi.relations(id).then((v:any)=>Object.assign(relations,v)),activityApi.recordView(id)]);columnsPage.value=1;await syncFieldDrawer()}
+watch(()=>route.params.id,()=>{void loadDataset()},{immediate:true})
 </script>
 
 <style scoped>

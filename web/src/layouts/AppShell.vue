@@ -80,7 +80,7 @@
         <div v-if="commandQuery.trim() && !searching && !commandResults.length" class="command-empty">没有找到匹配资产，按 Enter 查看完整检索页。</div>
         <div v-if="!commandQuery.trim()" class="command-empty">输入关键词，快速定位数据资产。</div>
       </div>
-      <div class="command-foot"><span>↑ ↓ 选择 · Enter 打开 · Esc 关闭</span><span>全局资产检索</span></div>
+      <div class="command-foot"><span>Enter 打开 · Esc 关闭</span><span>全局资产检索</span></div>
     </section>
   </div>
 </template>
@@ -138,12 +138,16 @@ function closeCommand() {
   commandResults.value = []
 }
 function openResult(item: any) {
+  const q = commandQuery.value.trim()
   closeCommand()
   if (item.asset_type === 'TABLE') router.push(`/datasets/${item.asset_id}`)
   else if (item.asset_type === 'COLUMN') router.push(`/fields/${item.asset_id}`)
   else if (item.asset_type === 'CODE_TABLE') router.push(`/code-tables/${item.technical_name}`)
+  else if (item.asset_type === 'DATA_STANDARD') router.push(`/standards/${item.technical_name}`)
+  else if (item.asset_type === 'WORD_ROOT') router.push(`/word-roots/${item.technical_name}`)
   else if (item.asset_type === 'METRIC') router.push(`/metrics/${item.technical_name}`)
-  else router.push({ name: 'search', query: { q: commandQuery.value.trim() } })
+  else if (item.asset_type === 'STAT_SYSTEM') router.push(`/stat-systems/${item.technical_name}`)
+  else router.push({ name: 'search', query: { q } })
 }
 function submitCommand() {
   if (commandResults.value.length) {

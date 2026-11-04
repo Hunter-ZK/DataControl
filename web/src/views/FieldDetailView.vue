@@ -1,11 +1,9 @@
 <template>
-  <div class="dc-page">
-    <div class="dc-container dc-empty">{{message}}</div>
-  </div>
+  <div class="dc-page"><div class="dc-container dc-empty">{{message}}</div></div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/api/client'
 
@@ -13,7 +11,7 @@ const route = useRoute()
 const router = useRouter()
 const message = ref('正在定位字段所属的数据集…')
 
-onMounted(async () => {
+async function openField() {
   try {
     const id = String(route.params.id)
     const field = await api.get(`/columns/${encodeURIComponent(id)}`)
@@ -26,5 +24,6 @@ onMounted(async () => {
   } catch {
     message.value = '无法定位该字段所属的数据集，请检查字段链接是否有效。'
   }
-})
+}
+watch(() => route.params.id, openField, { immediate: true })
 </script>

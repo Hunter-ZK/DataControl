@@ -3,7 +3,7 @@
     <div class="dc-container">
       <div class="search-summary">
         <b>{{ summary }}</b>
-        <span v-if="q">检索结果 · 按相关度排序</span>
+
       </div>
       <section class="dc-card search-panel">
         <div class="facets" role="tablist" aria-label="资产类型">
