@@ -2,7 +2,7 @@
   <div class="login-page">
     <div class="login-shell">
       <section class="login-brand"><span class="brand-mark">D</span><div><h1>DataControl</h1><p>统一的数据资产服务入口。搜索、理解、追踪并安全使用数据资产。</p></div></section>
-      <section class="login-card dc-card"><h2>登录数据资产服务平台</h2><p v-if="import.meta.env.DEV">当前使用开发演示账号登录。</p><el-form label-position="top" @submit.prevent="submit"><el-form-item label="用户名"><el-input v-model="username" autocomplete="username"/></el-form-item><el-form-item label="密码"><el-input v-model="password" type="password" show-password autocomplete="current-password" @keyup.enter="submit"/></el-form-item><el-button type="primary" class="submit" :loading="loading" @click="submit">登录</el-button></el-form><div class="demo"><b>演示账号</b><span>demo / DataControl123!</span><span>admin / DataControlAdmin123!</span></div></section>
+      <section class="login-card dc-card"><h2>登录数据资产服务平台</h2><p v-if="isDev">当前使用开发演示账号登录。</p><el-form label-position="top" @submit.prevent="submit"><el-form-item label="用户名"><el-input v-model="username" autocomplete="username"/></el-form-item><el-form-item label="密码"><el-input v-model="password" type="password" show-password autocomplete="current-password" @keyup.enter="submit"/></el-form-item><el-button type="primary" class="submit" :loading="loading" @click="submit">登录</el-button></el-form><div class="demo"><b>演示账号</b><span>demo / DataControl123!</span><span>admin / DataControlAdmin123!</span></div></section>
     </div>
   </div>
 </template>
@@ -11,6 +11,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { authApi } from '@/api/client'
+const isDev = import.meta.env.DEV
 const router=useRouter(); const username=ref('demo'); const password=ref('DataControl123!'); const loading=ref(false)
 async function submit(){loading.value=true;try{const data:any=await authApi.login(username.value,password.value);localStorage.setItem('datacontrol_token',data.accessToken);localStorage.setItem('datacontrol_user',JSON.stringify(data.user));ElMessage.success('登录成功');router.push('/')}catch{ElMessage.error('用户名或密码错误')}finally{loading.value=false}}
 </script>
