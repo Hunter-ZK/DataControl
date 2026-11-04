@@ -68,3 +68,11 @@ Required verification widths include 1920, 1440, 1280, 1024, 820 and narrow brow
 ## Agent UI boundary
 
 P2 may show the Intelligent Q&A entry. Real dsh + Agent3 conversation is P3. Future Agent UI may show task/tool/provenance activity, never private chain-of-thought.
+
+## P2 targeted polish (approved original UI)
+
+- Preserve the existing Light Ocean sidebar gradient, hero orbit/gradient, card radii, shadows, content composition, login layout and detail-page tabs.
+- Remove decorative English subtitles; localize asset lifecycle and type labels. Keep technical identifiers intact.
+- Consolidate the primary navigation into six destinations while retaining all existing routes and clickable details.
+- Add adjacent home search previews and in-place list pagination without introducing a new design system, fixed viewport, new API or changed database schema.
+- Search totals shown after an existing API cap must explicitly identify their limited scope; do not claim globally exhaustive results without server pagination.
