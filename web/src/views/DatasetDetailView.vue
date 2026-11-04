@@ -64,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, inject, reactive, ref, watch, type Ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowRight, Copy } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
@@ -73,7 +73,7 @@ import LayerTag from '@/components/LayerTag.vue'
 import Pager from '@/components/Pager.vue'
 import { useFitPageSize } from '@/composables/useFitPageSize'
 import { statusLabel } from '@/utils/labels'
-const route=useRoute(); const router=useRouter(); const data=ref<any|null>(null); const columns=ref<any[]>([]); const tags=ref<any[]>([]); const sqlRows=ref<any[]>([]); const changes=ref<any[]>([]); const relations=reactive<any>({upstream:[],downstream:[]}); const tab=ref('overview'); const columnKeyword=ref('')
+const route=useRoute(); const router=useRouter(); const pageContextTitle=inject<Ref<string>>('dataControlPageTitle'); const data=ref<any|null>(null); const columns=ref<any[]>([]); const tags=ref<any[]>([]); const sqlRows=ref<any[]>([]); const changes=ref<any[]>([]); const relations=reactive<any>({upstream:[],downstream:[]}); const tab=ref('overview'); const columnKeyword=ref('')
 const columnsEl=ref<HTMLElement|null>(null); const columnsPageSize=useFitPageSize(columnsEl,44,5); const columnsPage=ref(1)
 const fieldDrawerOpen=ref(false); const selectedField=ref<any|null>(null)
 const filteredColumns=computed(()=>{const k=columnKeyword.value.trim().toLowerCase();return k?columns.value.filter(x=>`${x.columnName} ${x.cnName||''} ${x.bizDefinition||''}`.toLowerCase().includes(k)):columns.value})
@@ -87,7 +87,7 @@ async function copyName(){if(!data.value)return;await navigator.clipboard.writeT
 async function openField(field:any){selectedField.value=field;fieldDrawerOpen.value=true;await router.replace({query:{...route.query,field:String(field.assetId)}})}
 async function syncFieldDrawer(){const id=String(route.query.field||'');if(!id){selectedField.value=null;fieldDrawerOpen.value=false;return}let field=columns.value.find(x=>String(x.assetId)===id);if(!field){try{field=await api.get(`/columns/${encodeURIComponent(id)}`)}catch{field=null}}if(field){selectedField.value=field;fieldDrawerOpen.value=true}}
 function clearFieldQuery(){if(!route.query.field)return;const query={...route.query};delete query.field;void router.replace({query})}
-async function loadDataset(){const id=String(route.params.id);data.value=await assetApi.table(id);columns.value=[];await Promise.allSettled([assetApi.columns({dataset_id:id,limit:500}).then((v:any)=>columns.value=v),assetApi.tags(id).then((v:any)=>tags.value=v),assetApi.commonSql(id).then((v:any)=>sqlRows.value=v),assetApi.changes(id).then((v:any)=>changes.value=v),assetApi.relations(id).then((v:any)=>Object.assign(relations,v)),activityApi.recordView(id)]);columnsPage.value=1;await syncFieldDrawer()}
+async function loadDataset(){const id=String(route.params.id);data.value=await assetApi.table(id);if(pageContextTitle)pageContextTitle.value=data.value.bizName||data.value.tableName||'数据集详情';columns.value=[];await Promise.allSettled([assetApi.columns({dataset_id:id,limit:500}).then((v:any)=>columns.value=v),assetApi.tags(id).then((v:any)=>tags.value=v),assetApi.commonSql(id).then((v:any)=>sqlRows.value=v),assetApi.changes(id).then((v:any)=>changes.value=v),assetApi.relations(id).then((v:any)=>Object.assign(relations,v)),activityApi.recordView(id)]);columnsPage.value=1;await syncFieldDrawer()}
 watch(()=>route.params.id,()=>{void loadDataset()},{immediate:true})
 </script>
 
