@@ -17,9 +17,11 @@
           <div v-else-if="filtered.length===0" class="dc-empty">没有找到匹配资产，试试更短的业务词或技术名称。</div>
           <article v-for="item in visibleRows" :key="item.asset_id" class="result-card" @click="open(item)">
             <div class="result-main">
-              <div class="kicker"><span class="dc-chip">{{assetTypeLabel(item.asset_type)}}</span></div>
-              <h3 v-html="item.title_hl || item.title" />
-              <code class="dc-tech">{{item.technical_name}}</code>
+              <div class="result-heading">
+                <span class="dc-chip">{{assetTypeLabel(item.asset_type)}}</span>
+                <h3 v-html="item.title_hl || item.title" />
+                <code class="dc-tech">{{item.technical_name}}</code>
+              </div>
               <p v-html="item.body_hl || '点击查看资产定义、字段、口径及相关信息。'" />
             </div>
             <div class="score"><small>相关度</small><b>{{Number(item.score || 0).toFixed(2)}}</b><ArrowRight :size="18"/></div>
@@ -47,7 +49,7 @@ const type = ref('ALL')
 const rows = ref<any[]>([])
 const loading = ref(false)
 const resultsEl = ref<HTMLElement | null>(null)
-const pageSize = useFitPageSize(resultsEl, 82, 5)
+const pageSize = useFitPageSize(resultsEl, 64, 5)
 const page = ref(1)
 const types = [
   { key: 'ALL', label: '全部' },
@@ -100,5 +102,5 @@ onMounted(() => { if (q.value) runSearch() })
 </script>
 
 <style scoped>
-.search-summary{display:flex;align-items:center;gap:12px;margin:0 2px 14px;min-height:32px}.search-summary b{font-size:15px;color:var(--dc-text)}.search-summary span{font-size:12px;color:var(--dc-text-3)}.search-panel{padding:4px 20px 10px;min-width:0}.facets{display:flex;align-items:center;gap:6px;overflow-x:auto;padding:8px 0 12px;border-bottom:1px solid #edf2f5}.facets button{display:flex;align-items:center;gap:7px;flex:0 0 auto;padding:8px 12px;border:1px solid transparent;border-radius:9px;background:transparent;color:#5f798a;font-size:12px;cursor:pointer}.facets button b{font-size:12px;color:var(--dc-text-3)}.facets button.active,.facets button:hover{background:var(--dc-primary-soft);border-color:#d9edf6;color:var(--dc-primary-strong)}.results{max-height:calc(100vh - 350px);min-height:280px;overflow:auto}.result-card{display:grid;grid-template-columns:minmax(0,1fr) 76px;gap:20px;padding:13px 4px;border-bottom:1px solid #edf2f5;cursor:pointer;min-height:82px}.result-card:last-child{border-bottom:0}.result-main{min-width:0}.kicker{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dc-text-2)}.result-card h3{font-size:15px;margin:5px 0 3px;color:#234a60}.result-card code{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}.result-card p{margin:5px 0 0;font-size:12px;line-height:1.5;color:#5B6B7A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.result-card :deep(mark){background:#e2f6ff;color:#1f6686}.score{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;color:#5B6B7A}.score small{font-size:12px}.score b{font-size:12px;color:#347d9d;margin:3px 0}.result-pager{border-top:1px solid #edf2f5}.result-pager :deep(.pager){padding-top:8px}@media(max-width:980px){.facets{flex-wrap:nowrap}}@media(max-width:820px){.results{max-height:none;min-height:0;overflow:visible}}@media(max-width:620px){.result-card{grid-template-columns:1fr}.score{display:none}.search-panel{padding:3px 14px 8px}.search-summary{align-items:flex-start;flex-direction:column;gap:3px}}
+.search-summary{display:flex;align-items:center;gap:12px;margin:0 2px 14px;min-height:32px}.search-summary b{font-size:15px;color:var(--dc-text)}.search-summary span{font-size:12px;color:var(--dc-text-3)}.search-panel{padding:4px 20px 10px;min-width:0}.facets{display:flex;align-items:center;gap:6px;overflow-x:auto;padding:8px 0 12px;border-bottom:1px solid #edf2f5}.facets button{display:flex;align-items:center;gap:7px;flex:0 0 auto;padding:8px 12px;border:1px solid transparent;border-radius:9px;background:transparent;color:#5f798a;font-size:12px;cursor:pointer}.facets button b{font-size:12px;color:var(--dc-text-3)}.facets button.active,.facets button:hover{background:var(--dc-primary-soft);border-color:#d9edf6;color:var(--dc-primary-strong)}.results{max-height:calc(100vh - 350px);min-height:280px;overflow:auto}.result-card{display:grid;grid-template-columns:minmax(0,1fr) 76px;gap:20px;padding:9px 4px;border-bottom:1px solid #edf2f5;cursor:pointer;min-height:64px;align-items:center}.result-card:last-child{border-bottom:0}.result-main{min-width:0}.result-heading{display:flex;align-items:center;gap:9px;min-width:0}.result-card h3{font-size:14px;margin:0;color:#234a60;min-width:0;max-width:44%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.result-card code{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;flex:1;min-width:0}.result-card p{margin:5px 0 0;font-size:12px;line-height:1.35;color:#5B6B7A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.result-card :deep(mark){background:#e2f6ff;color:#1f6686}.score{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;color:#5B6B7A}.score small{font-size:12px}.score b{font-size:12px;color:#347d9d;margin:3px 0}.result-pager{border-top:1px solid #edf2f5}.result-pager :deep(.pager){padding-top:8px}@media(max-width:980px){.facets{flex-wrap:nowrap}}@media(max-width:820px){.results{max-height:none;min-height:0;overflow:visible}}@media(max-width:620px){.result-card{grid-template-columns:1fr}.score{display:none}.search-panel{padding:3px 14px 8px}.search-summary{align-items:flex-start;flex-direction:column;gap:3px}}
 </style>
