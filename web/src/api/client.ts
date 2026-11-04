@@ -29,7 +29,7 @@ export const assetApi = {
   tables: (params?: Record<string, unknown>) => get('/tables', { params }),
   table: (id: string) => get(`/tables/${id}`),
   columns: (params?: Record<string, unknown>) => get('/columns', { params }),
-  search: (q: string) => get('/search', { params: { q } }),
+  search: (q: string, limit = 100) => get('/search', { params: { q, limit } }),
   tags: (id: string) => get(`/tables/${id}/tags`),
   changes: (id: string) => get(`/tables/${id}/changes`),
   commonSql: (id: string) => get(`/tables/${id}/common-sql`),
