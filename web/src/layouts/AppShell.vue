@@ -100,7 +100,7 @@ const primary = [
   { to: '/catalog', label: '资产目录', icon: Database, matches: ['/catalog', '/datasets', '/fields'] },
   { to: '/standards', label: '数据标准', icon: Boxes, matches: ['/standards', '/code-tables', '/word-roots'] },
   { to: '/metrics', label: '指标与制度', icon: BookOpenCheck, matches: ['/metrics', '/stat-systems'] },
-  { to: '#', label: '智能问数', icon: Sparkles, matches: [], disabled: true },
+  { to: '#', label: '智能问数', icon: Sparkles, matches: ['__disabled__'] as string[], disabled: true },
   { to: '/overview', label: '数据概览', icon: BarChart3, matches: ['/overview'] },
 ]
 const userMenuOpen = ref(false)
