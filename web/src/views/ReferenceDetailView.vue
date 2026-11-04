@@ -2,7 +2,7 @@
   <div class="dc-page"><div class="dc-container">
     <button class="dc-back" @click="router.back()"><ArrowLeft :size="16"/>返回</button>
     <section v-if="data" class="detail-head dc-card">
-      <div><span class="dc-chip">{{config.badge}}</span><h1>{{titleOf(data)}}</h1><code class="dc-tech">{{codeOf(data)}}</code><p>{{descriptionOf(data)}}</p></div>
+      <div><span class="dc-chip">{{config.badge}}</span><h1>{{titleOf(data)}}</h1><CopyTech :value="codeOf(data)"/><p>{{descriptionOf(data)}}</p></div>
       <div class="reference-actions"><span class="status">{{statusLabel(data.status||data.version||'VALID')}}</span><AssetOperationBar :kind="kind==='word-roots'?'WORD_ROOT':'STAT_SYSTEM'" :asset="data"/></div>
     </section>
     <div v-if="data" class="detail-grid">
@@ -27,6 +27,7 @@
   </div></div>
 </template>
 <script setup lang="ts">
+import CopyTech from '@/components/CopyTech.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from 'lucide-vue-next'

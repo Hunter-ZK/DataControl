@@ -17,6 +17,7 @@ import RelationView from '@/views/RelationView.vue'
 import AgentView from '@/views/AgentView.vue'
 import NamingWorkbenchView from '@/views/NamingWorkbenchView.vue'
 import AdminWorkbenchView from '@/views/AdminWorkbenchView.vue'
+import api from '@/api/client'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -50,7 +51,13 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async(to) => {
+  if(to.name==='field'){
+    try{
+      const field=await api.get<{datasetId?:string}>(`/columns/${encodeURIComponent(String(to.params.id))}`)
+      if(field.datasetId)return {name:'dataset',params:{id:field.datasetId},query:{tab:'columns',fieldId:String(to.params.id)}}
+    }catch{/* Keep the dedicated fallback detail when the field lookup is unavailable. */}
+  }
   if (to.meta.adminOnly) {
     const token = localStorage.getItem('datacontrol_token')
     let role = ''

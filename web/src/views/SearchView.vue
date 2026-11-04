@@ -70,7 +70,7 @@
                   <span v-if="item.layerCode" class="layer-tag" :data-layer="item.layerCode">{{item.layerCode}}</span>
                   <span v-if="item.status" class="status-tag">{{statusText(item.status)}}</span>
                 </div>
-                <code class="asset-tech" v-html="safeMarkHtml(item.technicalNameHighlight||item.technicalName)"/></div>
+                <code class="asset-tech" v-html="safeMarkHtml(item.technicalNameHighlight||item.technicalName)"/><CopyTech :value="item.technicalName" :show-text="false"/></div>
                 <div class="asset-definition" v-if="!compactResults">
                   <span class="asset-definition-label">资产说明</span>
                   <p v-html="safeMarkHtml(item.snippet||'打开资产详情查看业务定义与关联信息。')"/>
@@ -103,6 +103,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useSavedSearchPresets, type SearchPreset } from '@/composables/useSavedSearchPresets'
 import AssetIcon from '@/components/AssetIcon.vue'
 import AssetQuickPreview from '@/components/AssetQuickPreview.vue'
+import CopyTech from '@/components/CopyTech.vue'
 import { buildCatalogTree, flattenCatalogs, type CatalogEntry, type CatalogNode } from '@/utils/catalogTree'
 import { activityApi, assetApi, type SearchItem } from '@/api/client'
 

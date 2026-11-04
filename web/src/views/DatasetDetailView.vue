@@ -2,19 +2,20 @@
   <div class="dc-page"><div class="dc-container">
     <button class="dc-back" @click="router.back()"><ArrowLeft :size="16"/>返回资产列表</button>
     <section v-if="data" class="detail-head dc-card">
-      <div class="head-main"><div class="head-tags"><AssetIcon type="TABLE" :size="18"/><span class="dc-chip">{{data.layerCode}}</span><span class="status"><CircleCheck v-if="data.status==='ONLINE'" :size="13"/><Clock3 v-else :size="13"/>{{statusLabel(data.status)}}</span></div><h1>{{data.bizName}}</h1><code class="dc-tech">{{data.tableName}}</code><p>{{data.catalogCode}} · {{data.assetId}}</p></div>
+      <div class="head-main"><div class="head-tags"><AssetIcon type="TABLE" :size="18"/><span class="dc-chip layer-chip" :data-layer="data.layerCode">{{data.layerCode}}</span><span class="status"><CircleCheck v-if="data.status==='ONLINE'" :size="13"/><Clock3 v-else :size="13"/>{{statusLabel(data.status)}}</span></div><h1>{{data.bizName}}</h1><CopyTech :value="data.tableName"/><p>{{data.catalogCode}}</p></div>
       <AssetOperationBar kind="TABLE" :asset="data" :columns="exportColumns" :columns-complete="columnsComplete"/>
     </section>
 
     <section v-if="data" class="meta-strip dc-card">
       <div><span>技术负责人</span><b>{{data.techOwner||'—'}}</b></div><div><span>业务负责人</span><b>{{data.bizOwner||'—'}}</b></div><div><span>更新频率</span><b>{{data.updateFreq||'—'}}</b></div><div><span>最近更新</span><b>{{formatTime(data.dataUpdatedAt)}}</b></div><div><span>工作空间</span><b>{{data.workspaceCode||'—'}}</b></div>
+      <details class="asset-more dc-card"><summary>更多信息</summary><div>资产标识：<CopyTech :value="data.assetId"/></div><div>物理表名：<CopyTech :value="data.tableName"/></div><div>状态：{{statusLabel(data.status)}}</div><div v-if="tags.length">标签：{{tags.map(x=>x.name).join('、')}}</div></details>
     </section>
 
     <div v-if="data" class="detail-layout">
       <section class="dc-card detail-main">
         <el-tabs v-model="tab">
           <el-tab-pane label="基本信息" name="overview"><div class="section-block"><h2>资产定义</h2><p>{{data.bizDefinition||'暂无业务定义。'}}</p><div class="caliber"><b>统计口径</b><p>{{data.statCaliber||'暂无统计口径。'}}</p></div><div class="kv-grid"><div><span>数据粒度</span><b>{{data.grain||'—'}}</b></div><div><span>数据来源</span><b>{{data.dataSourceDesc||'—'}}</b></div><div><span>使用说明</span><b>{{data.usageNotes||'—'}}</b></div><div><span>所属目录</span><b>{{data.catalogCode||'—'}}</b></div></div></div></el-tab-pane>
-          <el-tab-pane label="字段信息" name="columns"><div class="table-actions"><b>{{columns.length}} 个字段</b><el-input v-model="columnKeyword" clearable placeholder="搜索字段"/></div><div class="dc-table-wrap"><table class="dc-table"><thead><tr><th>序号</th><th>字段名</th><th>中文名</th><th>类型</th><th>业务定义</th><th>标准/码表</th></tr></thead><tbody><tr v-for="c in filteredColumns" :key="c.assetId"><td>{{c.ordinalNo}}</td><td><RouterLink class="field-link field-with-icon" :to="`/fields/${c.assetId}`"><AssetIcon type="COLUMN" :size="16" mode="inline"/><code class="dc-tech">{{c.columnName}}</code></RouterLink></td><td><RouterLink class="field-link" :to="`/fields/${c.assetId}`">{{c.cnName||'—'}}</RouterLink></td><td><span class="data-type"><Code2 :size="13"/>{{c.dataType}}</span></td><td>{{c.bizDefinition||'—'}}</td><td><div class="reference-actions">
+          <el-tab-pane label="字段信息" name="columns"><div class="table-actions"><b>{{columns.length}} 个字段</b><el-input v-model="columnKeyword" clearable placeholder="搜索字段"/></div><div class="dc-table-wrap"><table class="dc-table"><thead><tr><th>序号</th><th>字段名</th><th>中文名</th><th>类型</th><th>业务定义</th><th>标准/码表</th></tr></thead><tbody><tr v-for="c in filteredColumns" :key="c.assetId"><td>{{c.ordinalNo}}</td><td><button type="button" class="field-link field-with-icon" @click="openField(c)"><AssetIcon type="COLUMN" :size="16" mode="inline"/><code class="dc-tech">{{c.columnName}}</code></button><CopyTech :value="c.columnName" :show-text="false"/></td><td><button type="button" class="field-link" @click="openField(c)">{{c.cnName||'—'}}</button></td><td><span class="data-type"><Code2 :size="13"/>{{c.dataType}}</span></td><td>{{c.bizDefinition||'—'}}</td><td><div class="reference-actions">
   <button v-if="c.standardNo" class="reference-preview" :title="'速览数据标准 '+c.standardNo" @click="openPreview('STANDARD',c.standardNo)"><AssetIcon type="STANDARD" :size="14" mode="inline"/>{{c.standardNo}}<PanelRightOpen :size="13"/></button>
   <button v-if="c.codeTableNo" class="reference-preview" :title="'速览码表 '+c.codeTableNo" @click="openPreview('CODE_TABLE',c.codeTableNo)"><AssetIcon type="CODE_TABLE" :size="14" mode="inline"/>{{c.codeTableNo}}<PanelRightOpen :size="13"/></button>
   <span v-if="!c.standardNo && !c.codeTableNo">—</span>
@@ -22,16 +23,22 @@
           <el-tab-pane label="关系与血缘" name="relations"><DatasetRelationPanel :dataset-id="data.assetId" /></el-tab-pane>
           <el-tab-pane label="常用 SQL" name="sql"><div v-if="sqlRows.length" class="sql-list"><article v-for="x in sqlRows" :key="x.sqlCode"><div><span class="dc-chip">{{x.dialect}}</span><h3>{{x.title}}</h3><p>{{x.question}}</p></div><pre>{{x.sqlText}}</pre></article></div><div v-else class="dc-empty">暂无常用 SQL。</div></el-tab-pane>
           <el-tab-pane label="变更记录" name="changes"><div class="timeline" v-if="changes.length"><article v-for="x in changes" :key="x.id"><span>{{formatTime(x.changeDate)}}</span><div><b>{{x.changeType}}</b><p>{{x.content}}</p><small>{{x.changedBy||'系统'}}</small></div></article></div><div v-else class="dc-empty">暂无变更记录。</div></el-tab-pane>
-          <el-tab-pane label="调度与运行" name="schedule"><div class="schedule-grid"><div><span>更新频率</span><b>{{data.updateFreq||'—'}}</b></div><div><span>调度计划</span><b>{{data.scheduleDesc||'—'}}</b></div><div><span>调度节点</span><code class="dc-tech">{{data.scheduleNode||'—'}}</code></div><div><span>最近数据更新时间</span><b>{{formatTime(data.dataUpdatedAt)}}</b></div></div></el-tab-pane>
+          <el-tab-pane label="调度与运行" name="schedule"><div class="schedule-grid"><div><span>调度计划</span><b>{{data.scheduleDesc||'—'}}</b></div><div><span>调度节点</span><CopyTech :value="data.scheduleNode||'—'"/></div></div></el-tab-pane>
         </el-tabs>
       </section>
 
-      <aside class="detail-side">
-        <section class="dc-card side-card"><h3>资产标识</h3><dl><div><dt>资产标识</dt><dd>{{data.assetId}}</dd></div><div><dt>物理表名</dt><dd class="dc-tech">{{data.tableName}}</dd></div><div><dt>生命周期</dt><dd>{{statusLabel(data.status)}}</dd></div></dl></section>
-        <section class="dc-card side-card"><h3>资产标签</h3><div class="tag-wrap"><span v-for="x in tags" :key="x.code" class="dc-chip">{{x.name}}</span><span v-if="!tags.length" class="dc-muted">暂无标签</span></div></section>
-        <section class="dc-card side-card lineage-entry"><h3>关联与血缘</h3><p>查看这张表的上下游关系与字段级来源。</p><button @click="tab='relations'"><GitFork :size="14"/>查看关系与血缘</button></section>
-      </aside>
     </div>
+    <el-drawer v-model="fieldDrawerOpen" title="字段详情" direction="rtl" size="min(460px,95vw)" append-to-body @close="closeFieldDrawer">
+      <template v-if="selectedField">
+        <h3 class="field-drawer-title">{{selectedField.cnName||selectedField.columnName}}</h3>
+        <CopyTech :value="selectedField.columnName"/>
+        <p class="field-drawer-description">{{selectedField.bizDefinition||'暂无字段业务定义。'}}</p>
+        <dl class="field-drawer-kv"><div><dt>数据类型</dt><dd>{{selectedField.dataType||'—'}}</dd></div><div><dt>字段序号</dt><dd>{{selectedField.ordinalNo||'—'}}</dd></div>
+          <div><dt>单位</dt><dd>{{selectedField.unit||'—'}}</dd></div><div><dt>资产标识</dt><dd><CopyTech :value="selectedField.assetId"/></dd></div>
+          <div><dt>数据标准</dt><dd><RouterLink v-if="selectedField.standardNo" :to="`/standards/${selectedField.standardNo}`">{{selectedField.standardNo}}</RouterLink><span v-else>—</span></dd></div>
+          <div><dt>码表</dt><dd><RouterLink v-if="selectedField.codeTableNo" :to="`/code-tables/${selectedField.codeTableNo}`">{{selectedField.codeTableNo}}</RouterLink><span v-else>—</span></dd></div></dl>
+      </template><div v-else class="dc-empty">正在查找字段…</div>
+    </el-drawer>
     <el-drawer v-model="previewOpen" :size="previewDrawerWidth" direction="rtl" :with-header="false" append-to-body>
       <div class="reference-drawer">
         <header class="drawer-header">
@@ -46,7 +53,7 @@
           <code class="dc-tech">{{previewCode}}</code>
           <p class="preview-definition">{{previewData.definition || previewData.description || '暂无已登记的业务定义。'}}</p>
           <div class="preview-info"><span>资产编号</span><b>{{previewData.assetId || '—'}}</b></div>
-          <div class="preview-info"><span>状态</span><b>{{previewData.status || '未登记'}}</b></div>
+          <div class="preview-info"><span>状态</span><b>{{statusLabel(previewData.status || '未登记')}}</b></div>
           <div v-if="previewKind==='STANDARD' && previewData.codeTableNo" class="preview-info">
             <span>关联码表</span>
             <button @click="openPreview('CODE_TABLE',previewData.codeTableNo)">{{previewData.codeTableNo}} <PanelRightOpen :size="13"/></button>
@@ -78,7 +85,25 @@ import AssetOperationBar from '@/components/AssetOperationBar.vue'
 import api from '@/api/client'
 import DatasetRelationPanel from '@/components/DatasetRelationPanel.vue'
 import { activityApi, assetApi } from '@/api/client'
+import CopyTech from '@/components/CopyTech.vue'
 const route=useRoute(); const router=useRouter(); const data=ref<any|null>(null); const columns=ref<any[]>([]); const tags=ref<any[]>([]); const sqlRows=ref<any[]>([]); const changes=ref<any[]>([]); const tab=ref(String(route.query.tab||'overview')); const columnKeyword=ref('')
+const fieldDrawerOpen=ref(false)
+const selectedFieldId=ref('')
+const selectedField=computed(()=>columns.value.find(x=>String(x.assetId)===selectedFieldId.value)||null)
+function openField(c:any){
+  selectedFieldId.value=String(c.assetId);fieldDrawerOpen.value=true
+  router.replace({name:'dataset',params:{id:String(route.params.id)},query:{...route.query,tab:'columns',fieldId:selectedFieldId.value}})
+}
+function closeFieldDrawer(){
+  if(!route.query.fieldId)return
+  const query={...route.query};delete query.fieldId
+  router.replace({name:'dataset',params:{id:String(route.params.id)},query})
+}
+watch([()=>route.query.fieldId,columns],()=>{
+  const id=String(route.query.fieldId||'');selectedFieldId.value=id
+  fieldDrawerOpen.value=!!id&&columns.value.some(x=>String(x.assetId)===id)
+  if(id)tab.value='columns'
+},{immediate:true})
 const columnsLoaded=ref(false)
 const exportColumns=ref<any[]>([])
 const exportError=ref('')
@@ -157,7 +182,7 @@ watch(()=>route.query.tab,(value)=>{tab.value=String(value||'overview')})
 .meta-strip>div{gap:4px}
 .meta-strip span{font-size:12px;color:var(--dc-text-3)}
 .meta-strip b{font-size:13px;color:var(--dc-text)}
-.detail-layout{grid-template-columns:minmax(0,1fr) 265px;gap:16px;align-items:start}
+.detail-layout{grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
 .detail-main{border-radius:12px;min-width:0}
 .detail-side{display:grid;gap:14px}
 .side-card{padding:18px;border-radius:12px}
@@ -170,8 +195,14 @@ watch(()=>route.query.tab,(value)=>{tab.value=String(value||'overview')})
 .reference-preview:hover{background:#e9f1ff}
 @media(max-width:1060px){.detail-layout{grid-template-columns:1fr}.detail-side{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}}
 @media(max-width:720px){.detail-head{padding:18px}.detail-head h1{font-size:21px}.meta-strip{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.detail-side{grid-template-columns:1fr}}
+
+.asset-more{margin-top:8px;padding:7px 12px;font-size:12px;color:var(--dc-text-2)}.asset-more summary{cursor:pointer;color:var(--dc-primary);font-weight:650}.asset-more>div{padding:3px 0}.field-link{background:transparent;border:0;cursor:pointer;padding:0;text-align:left}
+.detail-head{padding:16px 20px!important;min-height:88px}.detail-head h1{font-size:20px!important;margin:5px 0!important}.meta-strip{margin-top:8px;padding:5px 10px!important}.meta-strip>div{padding:8px 10px!important}.detail-layout{grid-template-columns:1fr!important;margin-top:8px}.detail-main{padding:5px 12px 12px!important}
+@media(min-width:1280px) and (min-height:720px){.detail-main{max-height:calc(100vh - 270px);min-height:0;overflow:auto}.detail-main .dc-table-wrap{max-height:calc(100vh - 370px);overflow:auto}}
 </style>
 <style>
+.field-drawer-title{margin:4px 0;font-size:18px;color:var(--dc-text)}.field-drawer-description{margin:14px 0;padding:14px;background:var(--dc-primary-soft);border-radius:9px;color:var(--dc-text-2);line-height:1.6}
+.field-drawer-kv{display:grid;gap:8px;margin-top:12px}.field-drawer-kv>div{padding:11px;border:1px solid var(--dc-border);border-radius:9px}.field-drawer-kv dt{font-size:12px;color:var(--dc-text-2)}.field-drawer-kv dd{font-size:13px;font-weight:600;margin:5px 0 0}.field-drawer-kv a{color:var(--dc-primary)}
 .reference-drawer{padding:20px 4px 28px;color:var(--dc-text)}
 .drawer-header{display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--dc-border);padding-bottom:18px}
 .drawer-header>div{flex:1}.drawer-header h2{font-size:19px;margin:4px 0 0}

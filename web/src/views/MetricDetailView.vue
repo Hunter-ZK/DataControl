@@ -7,7 +7,7 @@
         <div>
           <div class="head-tags"><span class="type-pill">{{ kindLabel(metric.metricKind) }}</span><span class="status">● {{ statusLabel(metric.status) }}</span><span class="policy"><ShieldCheck :size="13" />仅内部可信证据</span></div>
           <h1>{{ metric.name }}</h1>
-          <code class="metric-code">{{ metric.metricCode }}</code>
+          <CopyTech :value="metric.metricCode"/>
           <p>{{ metric.definition || metric.caliber || '暂无指标定义。' }}</p>
         </div>
         <AssetOperationBar kind="METRIC" :asset="metric"/>
@@ -76,6 +76,7 @@
 </template>
 
 <script setup lang="ts">
+import CopyTech from '@/components/CopyTech.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-vue-next'
