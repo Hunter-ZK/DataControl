@@ -22,11 +22,6 @@
               aria-label="数据资产检索与 DataAgent 统一入口"/>
             <button class="search-primary" @click="submitSearch">检索资产 <ArrowRight :size="16"/></button>
           </div>
-          <div class="search-mode">
-            <button class="mode-active" @click="submitSearch"><Search :size="14"/>查找资产</button>
-            <button @click="askAgent"><Sparkles :size="14"/>向 DataAgent 提问</button>
-            <span>Enter 搜索</span>
-          </div>
           <div v-if="suggestions.length && !assetResults.length" class="search-suggestions" aria-label="资产联想">
             <div class="suggest-title">相关资产 · 点击直接查看</div>
             <RouterLink v-for="item in suggestions" :key="item.assetType+item.assetId"
@@ -136,11 +131,6 @@ async function submitSearch() {
     }
   } catch { assetResults.value=[]; resultTotal.value=0 }
   finally { loadingSearch.value=false }
-}
-function askAgent() {
-  const q=keyword.value.trim()
-  if (q) router.push({name:'agent',query:{q}})
-  else router.push({name:'agent'})
 }
 function quick(value:string){ keyword.value=value; submitSearch() }
 onMounted(async()=>{

@@ -1,22 +1,22 @@
 import { expect, test } from '@playwright/test'
 
-test('Atlas 2.1 homepage information architecture is preserved', async ({page}) => {
+test('approved homepage keeps original hero and removes duplicate module cards',async({page})=>{
   await page.goto('/')
   await expect(page.locator('.atlas-home .atlas-hero')).toBeVisible()
   await expect(page.locator('.atlas-hero .hero-art')).toBeAttached()
-  await expect(page.locator('.quick-capabilities .capability')).toHaveCount(4)
-  await expect(page.locator('.naming-home-entry')).toHaveCount(0)
-  await expect(page.locator('.workspace-heading')).toBeVisible()
+  await expect(page.locator('.quick-capabilities')).toHaveCount(0)
+  await expect(page.locator('.recent-panel')).toHaveCount(2)
+  await expect(page.locator('.overview-panel')).toHaveCount(0)
+  await expect(page.locator('.topbar .command')).toHaveCount(0)
 })
 
-test('Atlas navigation order stays stable when the naming workspace is added', async ({page}) => {
+test('approved navigation shows six primary destinations, with tools accessible by secondary routes',async({page})=>{
   await page.goto('/')
-  const nav=page.locator('.nav-group').filter({has:page.locator('.nav-section', {hasText:'数据理解'})})
-  await expect(nav.locator('.nav-item')).toHaveText([
-    '业务指标', '数据标准', '标准码表', '统计制度', '词根索引',
-  ])
-  const work=page.locator('.nav-group').filter({has:page.locator('.nav-section',{hasText:'工作空间'})})
-  await expect(work.locator('.nav-item')).toHaveText(['首页','智能问数','字段规范化命名'])
+  const nav=page.locator('.sidebar .nav-item')
+  await expect(nav).toHaveCount(6)
+  await expect(nav).toHaveText(['首页','资产目录','数据标准','词根索引','指标与制度','智能问数'])
+  await expect(page.locator('.sidebar .sidebar-foot .account-trigger')).toBeVisible()
+  await expect(page.locator('.sidebar .nav-item[href="/profile"]')).toHaveCount(0)
 })
 
 test('naming workbench uses Atlas-styled controls and not browser-native grey selects', async ({page}) => {

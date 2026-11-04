@@ -11,7 +11,7 @@ const queryData = {
   },
 }
 
-test('unified search keeps asset search and Agent Q&A as explicit choices', async ({ page }) => {
+test('homepage search remains usable without duplicate Agent navigation', async ({ page }) => {
   await page.route('**/api/v1/search**', async route => {
     const url = route.request().url()
     await route.fulfill({
@@ -35,7 +35,7 @@ for (const width of [1440, 1024, 390]) {
     await page.goto('/')
     await expect(page.getByRole('heading', { name: /数据触手可及/ })).toBeVisible()
     await expect(page.getByRole('button', { name: '检索资产' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '向 DataAgent 提问' })).toBeVisible()
+    await expect(page.locator('.atlas-home .atlas-hero')).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath(`homepage-${width}.png`), fullPage: true })
   })
 }
@@ -58,6 +58,8 @@ test('asset search separates result records and switches detail density', async 
   await page.goto('/search?q=贷款余额')
   await expect(page.getByRole('heading', { name: '贷款余额汇总' })).toBeVisible()
   await expect(page.locator('.result-group')).toHaveCount(1)
+  await expect(page.locator('.asset-definition')).toHaveCount(0)
+  await page.getByRole('button', { name: '详细' }).click()
   await expect(page.locator('.asset-definition')).toHaveCount(1)
   await page.getByRole('button', { name: '精简' }).click()
   await expect(page.locator('.asset-definition')).toHaveCount(0)
@@ -107,8 +109,10 @@ test('search presets can be named, restored and deleted in this browser', async 
   await page.getByRole('button',{name:'保存筛选',exact:true}).click()
   await page.locator('.el-message-box input').fill('贷款常用查询')
   await page.locator('.el-message-box__btns .el-button--primary').click()
+  await page.getByRole('button',{name:'高级筛选'}).click()
   await expect(page.getByRole('button',{name:'应用：贷款常用查询'})).toBeVisible()
   await page.reload()
+  await page.getByRole('button',{name:'高级筛选'}).click()
   await expect(page.getByRole('button',{name:'应用：贷款常用查询'})).toBeVisible()
   await page.getByRole('button',{name:'应用：贷款常用查询'}).click()
   await expect(page.getByRole('heading',{name:'贷款余额汇总'})).toBeVisible()

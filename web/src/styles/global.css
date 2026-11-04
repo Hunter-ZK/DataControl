@@ -92,3 +92,6 @@ body{background:radial-gradient(ellipse 1200px 540px at 76% -210px,#daeaff 0,tra
 .ref-detail-content>.dc-card:first-child{margin-top:0}
 @media(max-width:1100px) and (min-width:821px){.ref-detail-layout{grid-template-columns:280px minmax(0,1fr)}}
 @media(max-width:820px){.ref-detail-layout{display:block;height:auto;overflow:visible}.ref-detail-content{overflow:visible}}
+
+/* Accessible supporting type: never render explanatory text below 12px. */
+.dc-page :where(p,small,dt,dd,em){font-size:max(12px,1em)}

@@ -7,7 +7,6 @@
     <div class="search-toolbar"><div><b>搜索结果</b><span>{{total}} 项</span><span v-if="q.trim()">· {{q}}</span></div>
       <button @click="filtersOpen=true"><Filter :size="16"/> 高级筛选</button>
       <button @click="savePreset"><BookmarkPlus :size="16"/> 保存筛选</button>
-      <button @click="askAgent"><Sparkles :size="16"/>智能问数</button>
     </div>
     <div class="search-grid">
       <el-drawer v-model="filtersOpen" title="高级筛选与常用筛选" append-to-body size="min(390px,96vw)" direction="rtl"><aside class="filter-panel dc-card">
@@ -98,7 +97,7 @@
 import { statusLabel } from '@/utils/labels'
 import { computed, defineComponent, h, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowRight, Bookmark, BookmarkPlus, Database, Filter, FolderTree, Search, Sparkles, WandSparkles, X } from 'lucide-vue-next'
+import { ArrowRight, Bookmark, BookmarkPlus, Database, Filter, FolderTree, Search, WandSparkles, X } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFitPageSize } from '@/composables/useFitPageSize'
 import { useSavedSearchPresets, type SearchPreset } from '@/composables/useSavedSearchPresets'
@@ -182,7 +181,6 @@ const facets = ref({ assetTypes: {} as Record<string, number>, layers: {} as Rec
 
 const typeLabels: Record<string,string> = { COLUMN:'字段', METRIC:'指标', TABLE:'数据集', STANDARD:'数据标准', CODE_TABLE:'码表', WORD_ROOT:'词根', STAT_SYSTEM:'统计制度' }
 
-const agentQuestion = computed(() => `本期${q.value.trim()}怎么统计`)
 const currentPage = computed(() => Math.floor(offset.value / pageSize.value) + 1)
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
 const visiblePages = computed(() => {
@@ -230,7 +228,6 @@ function clearFilters() { type.value=''; layer.value=''; catalog.value=''; statu
 function goPage(page: number) { const next = Math.min(Math.max(1,page), totalPages.value); offset.value=(next-1)*pageSize.value; runSearch(false) }
 function target(item: { assetType:string; assetId:string; technicalName:string }) { if(item.assetType==='TABLE')return `/datasets/${item.assetId}`; if(item.assetType==='COLUMN')return `/fields/${item.assetId}`; if(item.assetType==='CODE_TABLE')return `/code-tables/${item.technicalName}`; if(item.assetType==='STANDARD')return `/standards/${item.technicalName}`; if(item.assetType==='WORD_ROOT')return `/word-roots/${item.technicalName}`; if(item.assetType==='METRIC')return `/metrics/${item.technicalName}`; if(item.assetType==='STAT_SYSTEM')return `/stat-systems/${item.technicalName}`; return '' }
 function open(item: SearchItem) { const to=target(item); if(to) router.push(to) }
-function askAgent() { router.push({ name:'agent', query:{ q:`请根据 DataControl 中可信的指标、数据集和统计口径回答：${agentQuestion.value}。如需 SQL，请生成并静态校验 MaxCompute SQL。` } }) }
 function askAbout(item: SearchItem) { router.push({ name:'agent', query:{ ...(item.assetType==='TABLE'?{asset:item.assetId}:{}), q:`请基于“${item.title}”（${item.technicalName}）回答我的数据问题，并优先使用该资产的可信口径。` } }) }
 watch(pageSize,()=>{offset.value=0;if(q.value.trim())runSearch(true)})
 watch(() => route.query.q, (value) => { if (typeof value === 'string' && value !== q.value) { q.value=value; runSearch(true) } })

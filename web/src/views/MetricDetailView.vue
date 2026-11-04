@@ -66,7 +66,7 @@
 
         <aside class="metric-side">
           <section class="dc-card side-card"><h3>同义词</h3><div class="tag-list"><span v-for="alias in metric.aliases" :key="alias">{{ alias }}</span><em v-if="!metric.aliases.length">未登记</em></div></section>
-          <section class="dc-card side-card"><h3>治理归属</h3><dl><div><dt>统计制度</dt><dd>{{ metric.statSystemCode || '—' }}</dd></div><div><dt>资产标识</dt><dd><code>{{ metric.assetId }}</code></dd></div><div><dt>研究策略</dt><dd>内部证据优先，不使用外部网络</dd></div></dl></section>
+          <section class="dc-card side-card"><h3>治理归属</h3><dl><div><dt>统计制度</dt><dd>{{ metric.statSystemCode || '—' }}</dd></div><details class="metric-technical"><summary>更多信息</summary><div>资产标识：<CopyTech :value="metric.assetId"/></div></details><div><dt>研究策略</dt><dd>内部证据优先，不使用外部网络</dd></div></dl></section>
           <section class="dc-card yaml-card"><h3>语义模型</h3><pre>{{ modelPreview }}</pre></section>
         </aside>
       </div>

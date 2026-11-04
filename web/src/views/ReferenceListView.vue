@@ -111,12 +111,12 @@ const referenceViewport=ref<HTMLElement|null>(null)
 const page=ref(1)
 const pageSize=useFitPageSize(referenceViewport,{rowHeight:44,reserved:190,min:5,max:14})
 const selectedCode=ref(''),selectedDetail=ref<ReferenceRow|null>(null),valueKeyword=ref(''),detailLoading=ref(false),detailError=ref('')
-const configs:Record<string,{title:string;desc:string;placeholder:string;eyebrow:string;heading:string;note:string}>={
-  'code-tables':{title:'标准码值',desc:'查找编码体系，直接预览完整码值和含义。',placeholder:'搜索码表编号或名称',eyebrow:'CODE TABLE LIBRARY',heading:'标准码值工作台',note:'左侧选择码表，右侧直接查看码值，无需来回跳转。'},
-  'data-standards':{title:'数据标准',desc:'按编号与名称检索字段标准、定义和关联码表。',placeholder:'搜索标准编号或名称',eyebrow:'DATA STANDARD DICTIONARY',heading:'让字段语义与标准保持一致',note:'统一对照标准名称、定义、编码和关联取值。'},
-  'word-roots':{title:'词根索引',desc:'可按首字母定位英文词根并对照中文名和规范释义。',placeholder:'搜索词根、中文名或同义词',eyebrow:'NAMING DICTIONARY',heading:'规范字段命名，快速查找词根',note:'使用字典式视图，比逐张卡片查看更方便。'},
-  metrics:{title:'业务指标',desc:'按指标名称、代码查询计算语义、业务口径及来源数据集。',placeholder:'搜索指标名称或编码',eyebrow:'METRIC KNOWLEDGE BASE',heading:'可查、可追溯的业务指标字典',note:'聚合方式、来源数据集、关联制度在同一行可比较。'},
-  'stat-systems':{title:'统计制度',desc:'以文档目录方式查看统计制度、版本、文号和发布机构。',placeholder:'按制度名称、文号、发布机构筛选',eyebrow:'GOVERNANCE DOCUMENTS',heading:'统计制度与文档索引',note:'清晰对照制度名称、发布机构和版本。'},
+const configs:Record<string,{title:string;placeholder:string}>={
+  'code-tables':{title:'标准码值',placeholder:'搜索码表编号或名称'},
+  'data-standards':{title:'数据标准',placeholder:'搜索标准编号或名称'},
+  'word-roots':{title:'词根索引',placeholder:'搜索词根、中文名或同义词'},
+  metrics:{title:'业务指标',placeholder:'搜索指标名称或编码'},
+  'stat-systems':{title:'统计制度',placeholder:'按制度名称、文号、发布机构筛选'},
 }
 const config=computed(()=>configs[props.kind]||configs.metrics)
 const letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
