@@ -80,10 +80,13 @@ async function runSearch() {
   if (!value) return
   loading.value = true
   page.value = 1
+  type.value = 'ALL'
   try {
     rows.value = await assetApi.search(value, 100) as any[]
-    await activityApi.recordSearch(value)
+    try { await activityApi.recordSearch(value) } catch {}
     if (route.query.q !== value) await router.replace({ query: { ...route.query, q: value } })
+  } catch {
+    rows.value = []
   } finally {
     loading.value = false
   }

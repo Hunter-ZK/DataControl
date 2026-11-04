@@ -38,7 +38,7 @@
           </nav>
         </div>
         <button v-if="route.name !== 'home'" class="command" type="button" @click="openCommand">
-          <Search :size="17" /><span>搜索数据集、字段、指标、码表…</span><kbd>{{ shortcutLabel }}</kbd>
+          <Search :size="17" /><span>搜索数据资产…</span><kbd>{{ shortcutLabel }}</kbd>
         </button>
         <div class="top-actions">
           <div class="account-wrap">
