@@ -22,7 +22,7 @@
                 <h3 v-html="item.title_hl || item.title" />
                 <code class="dc-tech">{{item.technical_name}}</code>
               </div>
-              <p v-html="item.body_hl || '点击查看资产定义、字段、口径及相关信息。'" />
+              <p v-html="item.body_hl || '打开详情查看完整定义与口径。'" />
             </div>
             <div class="score"><small>{{item.fallbackMatch?'关键词匹配':'相关度'}}</small><b>{{item.fallbackMatch?'匹配':Number(item.score || 0).toFixed(2)}}</b><ArrowRight :size="18"/></div>
           </article>
