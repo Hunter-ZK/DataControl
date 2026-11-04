@@ -14,12 +14,16 @@ Design language: **Light Ocean × Calm SaaS × Data Tool**.
 - technical identifiers use monospace treatment and never dominate business names/definitions
 - consistent design tokens for radius, spacing, border, text hierarchy and shadows
 - ODS/DWD/DWS/ADS/DIM layer semantics stay distinct from the brand palette
+- keep the currently approved light-ocean visual language; targeted contrast and density improvements must not become a replacement design system
 
 ## App shell
 
 - left-side primary navigation remains the stable module navigation
 - full sidebar on wide desktop, icon rail on compact desktop, hidden sidebar on narrow viewports
-- top bar contains current page, browser-level back affordance, compact global search/command entry and user actions
+- preserve the current sidebar, brand mark, active-state and topbar visual treatment
+- top bar contains contextual breadcrumbs, compact global search/command entry and account controls
+- consolidate navigation to Home, Asset Catalog, Data Standards, Metrics & Systems, Intelligent Q&A (P3 disabled placeholder) and Data Overview; Personal Center is reached from the account menu
+- preserve all route paths and direct detail URLs
 - all product pages use the same bounded centered content container
 - no `margin-left + calc(width)` page compensation
 
@@ -28,23 +32,17 @@ Design language: **Light Ocean × Calm SaaS × Data Tool**.
 Home is a search portal, not a dashboard.
 
 Priority order:
-1. search proposition and large search field
-2. common searches
-3. module launchers
-4. recent work
-5. only a lightweight asset overview entry
-
-Primary launchers:
-- Asset Catalog
-- Standards & Code Tables
-- Word Roots
-- Metrics & Statistical Systems
-- Intelligent Q&A
+1. preserve the existing hero proposition and prominent search field
+2. keep common searches adjacent to the search field
+3. remove repeated module-launcher cards already represented in the sidebar
+4. show recent browsing and favorites as continuation workspaces
+5. keep asset counts on the dedicated Data Overview page
 
 ## Search
 
 - home search submits into `/search?q=...`
-- search page contains only facets + results as the main work area
+- non-home global search opens a command-style preview and can submit to the full `/search` results page
+- search page contains result type tabs and results as the main work area
 - result cards expose asset type, business name, technical identifier, hit context and score
 - result destinations are real routes for dataset/field/metric/code-table assets
 - advanced ranking, server facets, typo correction and saved searches are P3 concerns
@@ -52,14 +50,14 @@ Primary launchers:
 ## Asset details
 
 Dataset detail uses one consistent asset-detail hierarchy:
-1. identity + lifecycle + actions
+1. identity + lifecycle + necessary actions
 2. compact metadata strip
 3. content tabs
-4. related/identity side widgets
+4. tags and optional additional information
 
-Dataset detail includes basic definition, fields, common SQL, changes, lineage summary and **Scheduling & Operation**. Scheduling never becomes a standalone module.
+Dataset detail includes basic definition, fields, common SQL, changes, lineage summary and **Scheduling & Operation**. Scheduling never becomes a standalone module. Avoid repeating the same identifier, definition, lifecycle state or update metadata in multiple panels.
 
-Fields, code tables, data standards, word roots, metrics and statistical systems expose dedicated detail routes where the current P2 data model supports them.
+Field routes remain valid but open the field drawer within the owning dataset workspace. Code tables, data standards, word roots, metrics and statistical systems retain their direct detail URLs and open the selected item in the relevant list/detail workspace.
 
 ## Responsiveness
 
@@ -67,4 +65,4 @@ Required verification widths include 1920, 1440, 1280, 1024, 820 and narrow brow
 
 ## Agent UI boundary
 
-P2 may show the Intelligent Q&A entry. Real dsh + Agent3 conversation is P3. Future Agent UI may show task/tool/provenance activity, never private chain-of-thought.
+P2 may show the Intelligent Q&A entry as a disabled "即将上线" placeholder. Real dsh + Agent3 conversation is P3. Future Agent UI may show task/tool/provenance activity, never private chain-of-thought.
