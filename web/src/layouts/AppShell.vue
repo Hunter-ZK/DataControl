@@ -88,7 +88,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-import { ArrowRight, BarChart3, BookOpenCheck, Boxes, CircleGauge, Database, Hash, LogOut, Search, Sparkles, UserRound } from 'lucide-vue-next'
+import { ArrowRight, BarChart3, BookOpenCheck, Boxes, CircleGauge, Database, LogOut, Search, Sparkles, UserRound } from 'lucide-vue-next'
 import { assetApi } from '@/api/client'
 import { assetTypeLabel } from '@/utils/labels'
 
