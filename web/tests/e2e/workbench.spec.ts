@@ -115,6 +115,8 @@ test('search presets can be named, restored and deleted in this browser', async 
   await expect(page.getByRole('button',{name:'应用：贷款常用查询'})).toBeVisible()
   await page.getByRole('button',{name:'应用：贷款常用查询'}).click()
   await expect(page.getByRole('heading',{name:'贷款余额汇总'})).toBeVisible()
+  // Applying a preset intentionally closes the drawer; reopen it to manage saved presets.
+  await page.getByRole('button',{name:'高级筛选'}).click()
   await page.getByRole('button',{name:'删除筛选：贷款常用查询'}).click()
   await page.locator('.el-message-box__btns .el-button--primary').click()
   await expect(page.getByRole('button',{name:'应用：贷款常用查询'})).toHaveCount(0)
