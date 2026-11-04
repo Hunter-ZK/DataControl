@@ -44,7 +44,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { ArrowRight, Copy } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import { activityApi, assetApi } from '@/api/client'
