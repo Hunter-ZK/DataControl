@@ -14,11 +14,16 @@ export function useFitPageSize(
   let observer: ResizeObserver | undefined
 
   function measure() {
+    if (typeof window !== 'undefined' && window.innerWidth <= 820) {
+      pageSize.value = 1000
+      return
+    }
     const height = element.value?.clientHeight || 0
     if (height > 0) pageSize.value = Math.max(min, Math.floor(height / rowHeight))
   }
 
   onMounted(() => {
+    if (typeof window !== 'undefined') window.addEventListener('resize', measure)
     if (typeof ResizeObserver !== 'undefined') {
       observer = new ResizeObserver(measure)
       if (element.value) observer.observe(element.value)
@@ -32,7 +37,10 @@ export function useFitPageSize(
     measure()
   })
 
-  onBeforeUnmount(() => observer?.disconnect())
+  onBeforeUnmount(() => {
+    observer?.disconnect()
+    if (typeof window !== 'undefined') window.removeEventListener('resize', measure)
+  })
 
   return pageSize
 }
