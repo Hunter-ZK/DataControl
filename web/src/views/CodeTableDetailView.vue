@@ -1,8 +1,8 @@
 <template>
   <div class="dc-page"><div class="dc-container">
     <button class="dc-back" @click="router.back()"><ArrowLeft :size="16"/>返回</button>
-    <section v-if="data" class="head dc-card"><div><span class="dc-chip">CODE TABLE</span><h1>{{data.name}}</h1><code class="dc-tech">{{data.codeTableNo}}</code><p>{{data.description||'暂无说明。'}}</p></div><div class="head-actions"><span class="status">{{data.status}}</span><AssetOperationBar kind="CODE_TABLE" :asset="data"/></div></section>
-    <section v-if="data" class="dc-card values"><div class="value-head"><div><span class="dc-eyebrow">CODE VALUES</span><h2>码值列表</h2></div><el-input v-model="keyword" clearable placeholder="搜索码值或名称"/></div><div class="dc-table-wrap"><table class="dc-table"><thead><tr><th>码值</th><th>名称</th><th>说明</th></tr></thead><tbody><tr v-for="row in filtered" :key="row.value"><td><code class="dc-tech">{{row.value}}</code></td><td>{{row.name}}</td><td>{{row.description||'—'}}</td></tr></tbody></table></div></section>
+    <section v-if="data" class="head dc-card"><div><span class="dc-chip">码表</span><h1>{{data.name}}</h1><code class="dc-tech">{{data.codeTableNo}}</code><p>{{data.description||'暂无说明。'}}</p></div><div class="head-actions"><span class="status">{{statusLabel(data.status)}}</span><AssetOperationBar kind="CODE_TABLE" :asset="data"/></div></section>
+    <section v-if="data" class="dc-card values"><div class="value-head"><div><h2>码值列表</h2></div><el-input v-model="keyword" clearable placeholder="搜索码值或名称"/></div><div class="dc-table-wrap"><table class="dc-table"><thead><tr><th>码值</th><th>名称</th><th>说明</th></tr></thead><tbody><tr v-for="row in filtered" :key="row.value"><td><code class="dc-tech">{{row.value}}</code></td><td>{{row.name}}</td><td>{{row.description||'—'}}</td></tr></tbody></table></div></section>
     <AssetReferencePanel v-if="data" kind="CODE_TABLE" :asset-id="data.assetId" title="引用该码表的字段"/>
     <div v-else class="dc-empty">正在加载码表详情…</div>
   </div></div>
@@ -12,6 +12,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from 'lucide-vue-next'
 import api from '@/api/client'
+import { statusLabel } from '@/utils/labels'
 import AssetOperationBar from '@/components/AssetOperationBar.vue'
 import AssetReferencePanel from '@/components/AssetReferencePanel.vue'
 const route=useRoute();const router=useRouter();const data=ref<any|null>(null);const keyword=ref('')

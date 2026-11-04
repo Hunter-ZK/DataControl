@@ -1,7 +1,7 @@
 <template>
   <div class="dc-page reference-atlas"><div class="dc-container">
     <header class="dc-page-head">
-      <div><span class="dc-eyebrow">GOVERNED DATA KNOWLEDGE</span><h1 class="dc-title">{{config.title}}</h1><p class="dc-subtitle">{{config.desc}}</p></div>
+      <div><h1 class="dc-title">{{config.title}}</h1><p class="dc-subtitle">{{config.desc}}</p></div>
       <div class="reference-switch">
         <RouterLink v-if="kind==='metrics'" to="/stat-systems"><FileText :size="18"/>统计制度 <ArrowRight :size="16"/></RouterLink>
         <RouterLink v-else-if="kind==='stat-systems'" to="/metrics"><ChartNoAxesCombined :size="18"/>业务指标 <ArrowRight :size="16"/></RouterLink>
@@ -10,7 +10,7 @@
     </header>
     <section class="reference-hero">
       <div class="reference-hero-icon"><AssetIcon :type="referenceType" :size="30"/></div>
-      <div><span class="dc-eyebrow">{{config.eyebrow}}</span><h2>{{config.heading}}</h2><p>{{config.note}}</p></div>
+      <div><h2>{{config.heading}}</h2><p>{{config.note}}</p></div>
       <div class="reference-total"><strong>{{visibleRows.length}}</strong><span>当前结果</span></div>
     </section>
     <section class="reference-toolbar dc-card">
@@ -33,7 +33,7 @@
       </aside>
       <section class="code-detail dc-card">
         <template v-if="selectedCode">
-          <div class="code-detail-head"><div><span class="dc-eyebrow">CODE VALUES</span><h2>{{selectedDetail?.name||currentCodeList?.name||'码值详情'}}</h2><code>{{selectedCode}}</code></div>
+          <div class="code-detail-head"><div><h2>{{selectedDetail?.name||currentCodeList?.name||'码值详情'}}</h2><code>{{selectedCode}}</code></div>
             <RouterLink :to="`/code-tables/${selectedCode}`">查看完整码表 <ArrowRight :size="16"/></RouterLink></div>
           <p class="code-definition">{{selectedDetail?.description||currentCodeList?.description||'该码表尚未登记说明。'}}</p>
           <div class="code-values-toolbar"><b>码值明细 <span>{{filteredValues.length}} 项</span></b>
@@ -49,7 +49,7 @@
     </div>
 
     <section v-else-if="kind==='word-roots'" class="dc-card dictionary-panel">
-      <div class="panel-heading"><div><span class="dc-eyebrow">WORD ROOT DICTIONARY</span><h2>字段命名词根字典</h2></div><span>英文词根与中文含义一一对应</span></div>
+      <div class="panel-heading"><div><h2>字段命名词根字典</h2></div><span>英文词根与中文含义一一对应</span></div>
       <div class="alphabet" aria-label="按首字母筛选词根">
         <button :class="{active:!letter}" @click="letter=''">全部</button>
         <button v-for="x in letters" :key="x" :class="{active:letter===x}" @click="letter=letter===x?'':x">{{x}}</button>
@@ -62,7 +62,7 @@
     </section>
 
     <section v-else-if="kind==='metrics'" class="dc-card dictionary-panel">
-      <div class="panel-heading"><div><span class="dc-eyebrow">METRIC CATALOG</span><h2>业务指标字典</h2></div><span>点击指标名称查看完整计算口径</span></div>
+      <div class="panel-heading"><div><h2>业务指标字典</h2></div><span>点击指标名称查看完整计算口径</span></div>
       <div class="table-clip"><table class="dictionary-table"><thead><tr><th>指标名称与编码</th><th>定义／统计口径</th><th>聚合方式</th><th>来源数据集</th><th>所属制度</th><th></th></tr></thead>
         <tbody><tr v-for="row in visibleRows" :key="keyOf(row)">
           <td><RouterLink :to="target(row)" class="title-link">{{titleOf(row)}}</RouterLink><code class="sub-code">{{row.metricCode}}</code></td>
@@ -75,7 +75,7 @@
     </section>
 
     <section v-else-if="kind==='data-standards'" class="dc-card dictionary-panel">
-      <div class="panel-heading"><div><span class="dc-eyebrow">DATA STANDARDS</span><h2>字段标准目录</h2></div><span>统一定义、编码与关联码表</span></div>
+      <div class="panel-heading"><div><h2>字段标准目录</h2></div><span>统一定义、编码与关联码表</span></div>
       <div class="table-clip"><table class="dictionary-table"><thead><tr><th>标准编号</th><th>标准名称</th><th>业务定义</th><th>关联码表</th><th></th></tr></thead>
         <tbody><tr v-for="row in visibleRows" :key="keyOf(row)">
           <td><RouterLink :to="target(row)" class="code-link">{{row.standardNo}}</RouterLink></td><td><RouterLink :to="target(row)" class="title-link">{{titleOf(row)}}</RouterLink></td>
@@ -86,7 +86,7 @@
     </section>
 
     <section v-else class="dc-card documents-panel">
-      <div class="panel-heading"><div><span class="dc-eyebrow">STATISTICAL DOCUMENTS</span><h2>统计制度文档目录</h2></div><span>按制度、文号与版本查看</span></div>
+      <div class="panel-heading"><div><h2>统计制度文档目录</h2></div><span>按制度、文号与版本查看</span></div>
       <RouterLink v-for="row in visibleRows" :key="keyOf(row)" :to="target(row)" class="document-row">
         <span class="document-icon"><FileText :size="29"/></span>
         <span class="document-main"><b>{{titleOf(row)}}</b><small>{{row.documentNo||row.code||'未登记文号'}}</small></span>

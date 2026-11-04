@@ -1,7 +1,7 @@
 <template>
   <div class="dc-page catalog-atlas"><div class="dc-container">
     <header class="dc-page-head">
-      <div><span class="dc-eyebrow">DATA ASSET DIRECTORY</span>
+      <div>
         <h1 class="dc-title">资产目录<span class="heading-accent"> / Explore</span></h1>
         <p class="dc-subtitle">沿业务主题逐级发现数据资产，再按数仓分层定位数据集。</p>
       </div>
@@ -33,7 +33,7 @@
           <template v-for="(name,index) in selectedPath" :key="index"><ChevronRight :size="15"/><span>{{name}}</span></template>
         </div>
         <section class="directory-heading">
-          <div><span class="dc-eyebrow">CURRENT DIRECTORY</span><h2>{{ activeNode?.name || '全部资产' }}</h2>
+          <div><h2>{{ activeNode?.name || '全部资产' }}</h2>
             <p>{{activeNode?.description || (selected ? '浏览当前业务目录下的直属数据集，或进入下级目录。' : '选择业务目录开始浏览；下方展示全库已发布数据集。')}}</p>
           </div>
           <div class="directory-badge"><FolderTree :size="22"/><span>{{childNodes.length}} 个下级目录</span></div>
@@ -49,7 +49,7 @@
           </div>
         </section>
         <section class="dc-card datasets-section">
-          <div class="datasets-header"><div><span class="dc-eyebrow">DATASETS</span><h3>数据集 <em>{{total}}</em></h3></div>
+          <div class="datasets-header"><div><h3>数据集 <em>{{total}}</em></h3></div>
             <div class="dataset-tools">
               <el-input v-model="keyword" clearable :prefix-icon="Search" placeholder="检索当前目录下的数据集" @keyup.enter="search" @clear="search"/>
               <button class="query-btn" @click="search"><Search :size="17"/>查询</button>

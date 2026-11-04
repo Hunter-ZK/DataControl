@@ -1,6 +1,6 @@
 <template>
   <div class="dc-page atlas-search"><div class="dc-container">
-    <header class="search-heading"><div><span class="dc-eyebrow">UNIFIED ASSET SEARCH</span><h1 class="dc-title">全局资产检索</h1>
+    <header class="search-heading"><div><h1 class="dc-title">全局资产检索</h1>
       <p class="dc-subtitle">找表、找字段、查指标、查标准。搜索结果按资产类型分组，一眼看清来源与层级。</p></div>
       <RouterLink to="/catalog" class="catalog-switch"><FolderTree :size="19"/> 按业务目录浏览 <ArrowRight :size="16"/></RouterLink>
     </header>
@@ -61,7 +61,7 @@
         <p class="facet-note">目录层级由系统中的真实父子关系生成。筛选仅约束当前目录，不自动合并下级目录结果。</p>
       </aside>
       <main class="search-main">
-        <div class="results-head"><div><span class="dc-eyebrow">SEARCH RESULTS</span><h2>搜索结果 <em>{{total}}</em></h2></div>
+        <div class="results-head"><div><h2>搜索结果 <em>{{total}}</em></h2></div>
           <div class="results-tools"><button class="save-preset-action" @click="savePreset"><BookmarkPlus :size="16"/> 保存筛选</button><span>查看方式</span>
             <div class="density-switch" role="group" aria-label="结果展示密度">
               <button :class="{active:!compactResults}" :aria-pressed="!compactResults" @click="compactResults=false">详细</button>
@@ -118,6 +118,7 @@
   </div></div>
 </template>
 <script setup lang="ts">
+import { statusLabel } from '@/utils/labels'
 import { computed, defineComponent, h, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowRight, Bookmark, BookmarkPlus, ChevronRight, Database, Filter, FolderTree, Search, Sparkles, WandSparkles, X } from 'lucide-vue-next'
@@ -204,7 +205,7 @@ const facets = ref({ assetTypes: {} as Record<string, number>, layers: {} as Rec
 let suggestionSeq = 0
 
 const typeLabels: Record<string,string> = { COLUMN:'字段', METRIC:'指标', TABLE:'数据集', STANDARD:'数据标准', CODE_TABLE:'码表', WORD_ROOT:'词根', STAT_SYSTEM:'统计制度' }
-const statusLabels: Record<string,string> = { ONLINE:'在用', EFFECTIVE:'有效', OFFLINE:'已废弃', DISABLED:'停用' }
+
 const terms = computed(() => q.value.trim().split(/\s+/).filter(Boolean))
 const agentQuestion = computed(() => `本期${q.value.trim()}怎么统计`)
 const currentPage = computed(() => Math.floor(offset.value / pageSize) + 1)
@@ -219,7 +220,7 @@ const typeFacetItems = computed<FacetItem[]>(() => Object.entries(facets.value.a
 const layerFacetItems = computed<FacetItem[]>(() => Object.entries(facets.value.layers).sort((a,b)=>Number(b[1])-Number(a[1])).map(([key,count])=>({key,label:key,count:Number(count)})))
 const statusFacetItems = computed<FacetItem[]>(() => Object.entries(facets.value.statuses).sort((a,b)=>Number(b[1])-Number(a[1])).map(([key,count])=>({key,label:statusText(key),count:Number(count)})))
 function label(value: string) { return typeLabels[value] || value }
-function statusText(value?: string | null) { return value ? (statusLabels[value] || value) : '—' }
+function statusText(value?: string | null) { return value ? statusLabel(value) : '—' }
 function escapeHtml(value: string) { return value.replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'} as Record<string,string>)[ch]) }
 function safeMarkHtml(value: string) { return value.split(/(<\/?mark>)/gi).map(part => /^<\/?mark>$/i.test(part) ? part : escapeHtml(part)).join('') }
 

@@ -1,7 +1,7 @@
 <template>
   <div class="dc-page naming-page"><div class="dc-container">
     <header class="dc-page-head">
-      <div><span class="dc-eyebrow">DATA GOVERNANCE · NAMING WORKBENCH</span>
+      <div>
         <h1 class="dc-title">字段规范化命名</h1>
         <p class="dc-subtitle">上传字段清单、按词根规则匹配、逐行复核并导出。未知词根会明确标记，不生成未经确认的缩写。</p>
       </div>
@@ -15,7 +15,7 @@
     </div>
     <section v-if="error" class="notice error" role="alert"><TriangleAlert :size="17"/>{{error}}</section>
     <section v-if="step===0" class="dc-card step-content">
-      <div class="pane-heading"><div><span class="dc-eyebrow">01 · INPUT</span><h2>导入字段材料</h2><p>支持 Excel（.xlsx）、CSV，或直接粘贴每行一个字段中文名。</p></div><span class="soft-flag">最多 2000 行</span></div>
+      <div class="pane-heading"><div><h2>导入字段材料</h2><p>支持 Excel（.xlsx）、CSV，或直接粘贴每行一个字段中文名。</p></div><span class="soft-flag">最多 2000 行</span></div>
       <div class="input-grid">
         <div class="file-zone">
           <span class="upload-symbol"><FileSpreadsheet :size="27"/></span>
@@ -41,7 +41,7 @@
       </div>
     </section>
     <section v-else-if="step===1" class="dc-card step-content">
-      <div class="pane-heading"><div><span class="dc-eyebrow">02 · RULES</span><h2>命名规则</h2>
+      <div class="pane-heading"><div><h2>命名规则</h2>
         <p>当前为试用规则，不代表单位正式规范。相同词根库和输入在同一版本下得到相同的规则建议。</p></div></div>
       <div class="rule-grid">
         <div><span>输出样式</span><b>小写 snake_case</b><small>如 loan_balance；不擅自附加 ODS/DWD/DWS 等表层前缀</small></div>
@@ -56,7 +56,7 @@
       </div>
     </section>
     <section v-else-if="step===2" class="dc-card step-content review-section">
-      <div class="pane-heading"><div><span class="dc-eyebrow">03 · REVIEW</span><h2>逐行复核</h2>
+      <div class="pane-heading"><div><h2>逐行复核</h2>
         <p>命名建议与人工编辑严格区分。即使规则命中，也要确认业务语义与实际命名规范。</p></div>
         <div class="review-stats"><span>共 <b>{{rows.length}}</b> 行</span><span>已确认 <b>{{confirmedCount}}</b></span><span>需关注 <b>{{attentionCount}}</b></span></div>
       </div>
@@ -81,7 +81,7 @@
       </div>
     </section>
     <section v-else class="dc-card step-content">
-      <div class="pane-heading"><div><span class="dc-eyebrow">04 · EXPORT</span><h2>导出复核成果</h2><p>Excel 包含“命名结果”和“建议新增词根”两个工作表，保留输入中的其他列。</p></div></div>
+      <div class="pane-heading"><div><h2>导出复核成果</h2><p>Excel 包含“命名结果”和“建议新增词根”两个工作表，保留输入中的其他列。</p></div></div>
       <div class="export-tiles">
         <div><FileSpreadsheet :size="24"/><h3>命名结果</h3><strong>{{rows.length}} 条</strong><p>建议英文名、拆词过程、来源、校验结果、复核状态及原始列</p></div>
         <div><BookOpenCheck :size="24"/><h3>建议新增词根</h3><strong>{{rootSuggestions.length}} 项</strong><p>未命中词根的中文词语、出现次数、示例字段；缩写留空供审核</p></div>
@@ -95,7 +95,7 @@
       </div>
     </section>
     <section class="dc-card history-panel">
-      <div class="history-head"><div><span class="dc-eyebrow">RECENT RUNS</span><h2>历史命名成果</h2><p>仅展示当前登录账号保存的运行记录，可重新下载或删除。</p></div>
+      <div class="history-head"><div><h2>历史命名成果</h2><p>仅展示当前登录账号保存的运行记录，可重新下载或删除。</p></div>
         <button class="dc-outline" @click="loadRuns">刷新</button></div>
       <div v-if="historyLoading" class="dc-empty">正在读取运行记录…</div>
       <div v-else-if="savedRuns.length" class="history-list">

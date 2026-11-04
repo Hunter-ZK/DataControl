@@ -3,7 +3,7 @@
     <div class="dc-container">
       <section class="atlas-hero">
         <div class="hero-lead">
-          <span class="dc-eyebrow">✦ DATA INTELLIGENCE WORKSPACE</span>
+          
           <h1>数据触手可及，<em>分析从此开始。</em></h1>
           <p>统一连接数仓资产、业务指标与统计标准。快速找数，理解口径，让 DataAgent 帮你生成可信 SQL。</p>
         </div>
@@ -69,7 +69,7 @@
         </RouterLink>
       </section>
       <div class="workspace-heading">
-        <div><span class="dc-eyebrow">YOUR WORKSPACE</span><h2>继续你的工作</h2></div>
+        <div><h2>继续你的工作</h2></div>
         <RouterLink to="/catalog">浏览资产目录 <ArrowUpRight :size="14"/></RouterLink>
       </div>
       <div class="workspace-grid">

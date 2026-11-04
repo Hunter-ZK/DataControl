@@ -2,7 +2,7 @@
   <div class="dc-page"><div class="dc-container">
     <button class="dc-back" @click="router.back()"><ArrowLeft :size="16"/>返回资产列表</button>
     <section v-if="data" class="detail-head dc-card">
-      <div class="head-main"><div class="head-tags"><AssetIcon type="TABLE" :size="18"/><span class="dc-chip">{{data.layerCode}}</span><span class="status"><CircleCheck v-if="data.status==='ONLINE'" :size="13"/><Clock3 v-else :size="13"/>{{data.status==='ONLINE'?'在用':data.status}}</span></div><h1>{{data.bizName}}</h1><code class="dc-tech">{{data.tableName}}</code><p>{{data.catalogCode}} · {{data.assetId}}</p></div>
+      <div class="head-main"><div class="head-tags"><AssetIcon type="TABLE" :size="18"/><span class="dc-chip">{{data.layerCode}}</span><span class="status"><CircleCheck v-if="data.status==='ONLINE'" :size="13"/><Clock3 v-else :size="13"/>{{statusLabel(data.status)}}</span></div><h1>{{data.bizName}}</h1><code class="dc-tech">{{data.tableName}}</code><p>{{data.catalogCode}} · {{data.assetId}}</p></div>
       <AssetOperationBar kind="TABLE" :asset="data" :columns="exportColumns" :columns-complete="columnsComplete"/>
     </section>
 
@@ -13,7 +13,7 @@
     <div v-if="data" class="detail-layout">
       <section class="dc-card detail-main">
         <el-tabs v-model="tab">
-          <el-tab-pane label="基本信息" name="overview"><div class="section-block"><span class="dc-eyebrow">OVERVIEW</span><h2>资产定义</h2><p>{{data.bizDefinition||'暂无业务定义。'}}</p><div class="caliber"><b>统计口径</b><p>{{data.statCaliber||'暂无统计口径。'}}</p></div><div class="kv-grid"><div><span>数据粒度</span><b>{{data.grain||'—'}}</b></div><div><span>数据来源</span><b>{{data.dataSourceDesc||'—'}}</b></div><div><span>使用说明</span><b>{{data.usageNotes||'—'}}</b></div><div><span>所属目录</span><b>{{data.catalogCode||'—'}}</b></div></div></div></el-tab-pane>
+          <el-tab-pane label="基本信息" name="overview"><div class="section-block"><h2>资产定义</h2><p>{{data.bizDefinition||'暂无业务定义。'}}</p><div class="caliber"><b>统计口径</b><p>{{data.statCaliber||'暂无统计口径。'}}</p></div><div class="kv-grid"><div><span>数据粒度</span><b>{{data.grain||'—'}}</b></div><div><span>数据来源</span><b>{{data.dataSourceDesc||'—'}}</b></div><div><span>使用说明</span><b>{{data.usageNotes||'—'}}</b></div><div><span>所属目录</span><b>{{data.catalogCode||'—'}}</b></div></div></div></el-tab-pane>
           <el-tab-pane label="字段信息" name="columns"><div class="table-actions"><b>{{columns.length}} 个字段</b><el-input v-model="columnKeyword" clearable placeholder="搜索字段"/></div><div class="dc-table-wrap"><table class="dc-table"><thead><tr><th>序号</th><th>字段名</th><th>中文名</th><th>类型</th><th>业务定义</th><th>标准/码表</th></tr></thead><tbody><tr v-for="c in filteredColumns" :key="c.assetId"><td>{{c.ordinalNo}}</td><td><RouterLink class="field-link field-with-icon" :to="`/fields/${c.assetId}`"><AssetIcon type="COLUMN" :size="16" mode="inline"/><code class="dc-tech">{{c.columnName}}</code></RouterLink></td><td><RouterLink class="field-link" :to="`/fields/${c.assetId}`">{{c.cnName||'—'}}</RouterLink></td><td><span class="data-type"><Code2 :size="13"/>{{c.dataType}}</span></td><td>{{c.bizDefinition||'—'}}</td><td><div class="reference-actions">
   <button v-if="c.standardNo" class="reference-preview" :title="'速览数据标准 '+c.standardNo" @click="openPreview('STANDARD',c.standardNo)"><AssetIcon type="STANDARD" :size="14" mode="inline"/>{{c.standardNo}}<PanelRightOpen :size="13"/></button>
   <button v-if="c.codeTableNo" class="reference-preview" :title="'速览码表 '+c.codeTableNo" @click="openPreview('CODE_TABLE',c.codeTableNo)"><AssetIcon type="CODE_TABLE" :size="14" mode="inline"/>{{c.codeTableNo}}<PanelRightOpen :size="13"/></button>
@@ -27,16 +27,16 @@
       </section>
 
       <aside class="detail-side">
-        <section class="dc-card side-card"><span class="dc-eyebrow">ASSET PROFILE</span><h3>资产标识</h3><dl><div><dt>Asset ID</dt><dd>{{data.assetId}}</dd></div><div><dt>物理表名</dt><dd class="dc-tech">{{data.tableName}}</dd></div><div><dt>生命周期</dt><dd>{{data.status}}</dd></div></dl></section>
-        <section class="dc-card side-card"><span class="dc-eyebrow">TAGS</span><h3>资产标签</h3><div class="tag-wrap"><span v-for="x in tags" :key="x.code" class="dc-chip">{{x.name}}</span><span v-if="!tags.length" class="dc-muted">暂无标签</span></div></section>
-        <section class="dc-card side-card lineage-entry"><span class="dc-eyebrow">RELATIONS</span><h3>关联与血缘</h3><p>查看这张表的上下游关系与字段级来源。</p><button @click="tab='relations'"><GitFork :size="14"/>查看关系与血缘</button></section>
+        <section class="dc-card side-card"><h3>资产标识</h3><dl><div><dt>资产标识</dt><dd>{{data.assetId}}</dd></div><div><dt>物理表名</dt><dd class="dc-tech">{{data.tableName}}</dd></div><div><dt>生命周期</dt><dd>{{statusLabel(data.status)}}</dd></div></dl></section>
+        <section class="dc-card side-card"><h3>资产标签</h3><div class="tag-wrap"><span v-for="x in tags" :key="x.code" class="dc-chip">{{x.name}}</span><span v-if="!tags.length" class="dc-muted">暂无标签</span></div></section>
+        <section class="dc-card side-card lineage-entry"><h3>关联与血缘</h3><p>查看这张表的上下游关系与字段级来源。</p><button @click="tab='relations'"><GitFork :size="14"/>查看关系与血缘</button></section>
       </aside>
     </div>
     <el-drawer v-model="previewOpen" :size="previewDrawerWidth" direction="rtl" :with-header="false" append-to-body>
       <div class="reference-drawer">
         <header class="drawer-header">
           <AssetIcon :type="previewKind" :size="20"/>
-          <div><span class="dc-eyebrow">CONTEXT PREVIEW</span><h2>{{previewKind==='CODE_TABLE'?'码表速览':'数据标准速览'}}</h2></div>
+          <div><h2>{{previewKind==='CODE_TABLE'?'码表速览':'数据标准速览'}}</h2></div>
           <button class="drawer-close" title="关闭速览" aria-label="关闭速览" @click="previewOpen=false"><X :size="18"/></button>
         </header>
         <div v-if="previewLoading" class="dc-empty">正在获取关联资产…</div>
@@ -68,6 +68,7 @@
 </template>
 
 <script setup lang="ts">
+import { statusLabel } from '@/utils/labels'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowUpRight, CircleCheck, Clock3, Code2, GitFork, ListTree, PanelRightOpen, TriangleAlert, X } from 'lucide-vue-next'

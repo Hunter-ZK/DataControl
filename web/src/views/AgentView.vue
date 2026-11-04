@@ -3,7 +3,7 @@
     <div class="dc-container agent-page">
       <header class="agent-head">
         <div>
-          <span class="dc-eyebrow">✦ DATA INTELLIGENCE COPILOT</span>
+          
           <h1>DataAgent <span>智能工作台</span></h1>
           <p>让数仓知识参与每一次问答：检索数据资产、解释指标口径、生成 SQL 与开发草案。</p>
         </div>
