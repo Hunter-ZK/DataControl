@@ -42,7 +42,7 @@
         </section>
         <p class="facet-note">目录层级由系统中的真实父子关系生成。筛选仅约束当前目录，不自动合并下级目录结果。</p>
       </aside></el-drawer>
-      <main class="search-main">
+      <main class="search-main" ref="searchViewport">
         <div class="results-head"><div><h2>搜索结果 <em>{{total}}</em></h2></div>
           <div class="results-tools"><span>查看方式</span>
             <div class="density-switch" role="group" aria-label="结果展示密度">
@@ -97,11 +97,11 @@
 <script setup lang="ts">
 import { statusLabel } from '@/utils/labels'
 import { computed, defineComponent, h, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowRight, Bookmark, BookmarkPlus, ChevronRight, Database, Filter, FolderTree, Search, Sparkles, WandSparkles, X } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowRight, Bookmark, BookmarkPlus, Database, Filter, FolderTree, Search, Sparkles, WandSparkles, X } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useFitPageSize } from '@/composables/useFitPageSize'
 import { useSavedSearchPresets, type SearchPreset } from '@/composables/useSavedSearchPresets'
-import AssetIcon from '@/components/AssetIcon.vue'
 import AssetQuickPreview from '@/components/AssetQuickPreview.vue'
 import CopyTech from '@/components/CopyTech.vue'
 import { buildCatalogTree, flattenCatalogs, type CatalogEntry, type CatalogNode } from '@/utils/catalogTree'
@@ -175,15 +175,16 @@ const status = ref(String(route.query.status || ''))
 const rows = ref<SearchItem[]>([])
 const total = ref(0)
 const offset = ref(Number(route.query.offset || 0))
-const pageSize = 20
+const searchViewport=ref<HTMLElement|null>(null)
+const pageSize=useFitPageSize(searchViewport,{rowHeight:70,reserved:160,min:5,max:16})
 const loading = ref(false)
 const facets = ref({ assetTypes: {} as Record<string, number>, layers: {} as Record<string, number>, catalogs: {} as Record<string, number>, statuses: {} as Record<string, number> })
 
 const typeLabels: Record<string,string> = { COLUMN:'字段', METRIC:'指标', TABLE:'数据集', STANDARD:'数据标准', CODE_TABLE:'码表', WORD_ROOT:'词根', STAT_SYSTEM:'统计制度' }
 
 const agentQuestion = computed(() => `本期${q.value.trim()}怎么统计`)
-const currentPage = computed(() => Math.floor(offset.value / pageSize) + 1)
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
+const currentPage = computed(() => Math.floor(offset.value / pageSize.value) + 1)
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
 const visiblePages = computed(() => {
   const pages: number[] = []
   const start = Math.max(1, Math.min(currentPage.value - 2, totalPages.value - 4))
@@ -210,7 +211,7 @@ async function runSearch(reset = false) {
       catalog: catalog.value || undefined,
       status: status.value || undefined,
       offset: offset.value,
-      limit: pageSize,
+      limit: pageSize.value,
     })
     rows.value = result.items
     total.value = result.total
@@ -226,11 +227,12 @@ function selectCatalog(value: string) { catalog.value = catalog.value === value 
 function chooseCatalogNode(node:CatalogNode){ selectCatalog(node.code) }
 function selectStatus(value: string) { status.value = status.value === value ? '' : value; runSearch(true) }
 function clearFilters() { type.value=''; layer.value=''; catalog.value=''; status.value=''; runSearch(true) }
-function goPage(page: number) { const next = Math.min(Math.max(1,page), totalPages.value); offset.value=(next-1)*pageSize; runSearch(false) }
+function goPage(page: number) { const next = Math.min(Math.max(1,page), totalPages.value); offset.value=(next-1)*pageSize.value; runSearch(false) }
 function target(item: { assetType:string; assetId:string; technicalName:string }) { if(item.assetType==='TABLE')return `/datasets/${item.assetId}`; if(item.assetType==='COLUMN')return `/fields/${item.assetId}`; if(item.assetType==='CODE_TABLE')return `/code-tables/${item.technicalName}`; if(item.assetType==='STANDARD')return `/standards/${item.technicalName}`; if(item.assetType==='WORD_ROOT')return `/word-roots/${item.technicalName}`; if(item.assetType==='METRIC')return `/metrics/${item.technicalName}`; if(item.assetType==='STAT_SYSTEM')return `/stat-systems/${item.technicalName}`; return '' }
 function open(item: SearchItem) { const to=target(item); if(to) router.push(to) }
 function askAgent() { router.push({ name:'agent', query:{ q:`请根据 DataControl 中可信的指标、数据集和统计口径回答：${agentQuestion.value}。如需 SQL，请生成并静态校验 MaxCompute SQL。` } }) }
 function askAbout(item: SearchItem) { router.push({ name:'agent', query:{ ...(item.assetType==='TABLE'?{asset:item.assetId}:{}), q:`请基于“${item.title}”（${item.technicalName}）回答我的数据问题，并优先使用该资产的可信口径。` } }) }
+watch(pageSize,()=>{offset.value=0;if(q.value.trim())runSearch(true)})
 watch(() => route.query.q, (value) => { if (typeof value === 'string' && value !== q.value) { q.value=value; runSearch(true) } })
 onMounted(async() => {try{catalogEntries.value=await assetApi.catalogs() as CatalogEntry[]}catch{catalogEntries.value=[]};if(q.value)runSearch(false)})
 </script>
@@ -399,4 +401,6 @@ onMounted(async() => {try{catalogEntries.value=await assetApi.catalogs() as Cata
 .result-type{font-size:12px;color:var(--dc-text-2);background:var(--dc-surface-soft);padding:2px 7px;border-radius:5px;flex:none}
 .pagination{min-height:36px;padding:6px 8px!important}
 @media(max-width:820px){.search-toolbar{height:auto;flex-wrap:wrap}.search-toolbar>div{width:100%}.type-tabs{margin-bottom:8px}}
+
+@media(min-width:1280px) and (min-height:720px){.atlas-search{height:calc(100vh - 52px);overflow:hidden}.atlas-search>.dc-container{height:100%;display:flex;flex-direction:column}.search-grid{flex:1;min-height:0}.search-main{height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden}.result-group{flex:1;min-height:0;overflow:auto}.pagination{flex:none}}
 </style>

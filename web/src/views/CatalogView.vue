@@ -36,7 +36,7 @@
             </button>
           </div>
         </section>
-        <section class="dc-card datasets-section">
+        <section class="dc-card datasets-section" ref="catalogViewport">
           <div class="datasets-header"><div><h3>数据集 <em>{{total}}</em></h3></div>
             <div class="dataset-tools">
               <el-input v-model="keyword" clearable :prefix-icon="Search" placeholder="检索当前目录下的数据集" @keyup.enter="search" @clear="search"/>
@@ -72,10 +72,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowUpRight, ChevronRight, Database, FolderClosed, FolderTree, Layers3, Search } from 'lucide-vue-next'
+import { ChevronRight, Database, FolderClosed, FolderTree, Layers3, Search } from 'lucide-vue-next'
 import type { TreeInstance } from 'element-plus'
 import AssetIcon from '@/components/AssetIcon.vue'
 import { assetApi, type DatasetBrief } from '@/api/client'
+import { useFitPageSize } from '@/composables/useFitPageSize'
 import { buildCatalogTree, flattenCatalogs, type CatalogEntry, type CatalogNode } from '@/utils/catalogTree'
 
 const route=useRoute(), router=useRouter()
@@ -86,28 +87,31 @@ const selected=ref(String(route.query.catalog||''))
 const selectedLayer=ref('')
 const keyword=ref('')
 const rows=ref<DatasetBrief[]>([])
-const total=ref(0),page=ref(1),pageSize=20,loading=ref(false)
+const total=ref(0),page=ref(1),loading=ref(false)
+const catalogViewport=ref<HTMLElement|null>(null)
+const pageSize=useFitPageSize(catalogViewport,{rowHeight:44,reserved:174,min:5,max:14})
 const catalogTree=computed(()=>buildCatalogTree(catalogs.value))
 const allCatalogs=computed(()=>flattenCatalogs(catalogTree.value))
 const activeNode=computed(()=>allCatalogs.value.find(node=>node.code===selected.value))
 const selectedPath=computed(()=>activeNode.value?.path||[])
 const childNodes=computed(()=>activeNode.value?.children||catalogTree.value)
 const layerOptions=[{value:'',name:'全部层级'},{value:'DWD',name:'DWD'},{value:'DWS',name:'DWS'},{value:'ADS',name:'ADS'},{value:'ODS',name:'ODS'},{value:'DIM',name:'DIM'}]
-const totalPages=computed(()=>Math.max(1,Math.ceil(total.value/pageSize)))
-const startRow=computed(()=>total.value?(page.value-1)*pageSize+1:0)
-const endRow=computed(()=>Math.min(page.value*pageSize,total.value))
+const totalPages=computed(()=>Math.max(1,Math.ceil(total.value/pageSize.value)))
+const startRow=computed(()=>total.value?(page.value-1)*pageSize.value+1:0)
+const endRow=computed(()=>Math.min(page.value*pageSize.value,total.value))
 const visiblePages=computed(()=>{const out:number[]=[];const from=Math.max(1,Math.min(page.value-2,totalPages.value-4));for(let i=from;i<=Math.min(totalPages.value,from+4);i++)out.push(i);return out})
+watch(pageSize,()=>{page.value=1;load()})
 let requestId=0
 async function load(){
   const seq=++requestId
   loading.value=true
   try {
-    const data=await assetApi.tablePage({offset:(page.value-1)*pageSize,limit:pageSize,
+    const data=await assetApi.tablePage({offset:(page.value-1)*pageSize.value,limit:pageSize.value,
       keyword:keyword.value.trim()||undefined,catalog:selected.value||undefined,layer:selectedLayer.value||undefined,status:'ONLINE'})
     if(seq!==requestId)return
     rows.value=data.items
     total.value=data.total
-    if(page.value>Math.max(1,Math.ceil(data.total/pageSize))){page.value=1;await load()}
+    if(page.value>Math.max(1,Math.ceil(data.total/pageSize.value))){page.value=1;await load()}
   }catch{if(seq===requestId){rows.value=[];total.value=0}}
   finally{if(seq===requestId)loading.value=false}
 }
@@ -223,4 +227,6 @@ onMounted(async()=>{try{catalogs.value=await assetApi.catalogs() as CatalogEntry
 
 .catalog-atlas{padding-top:12px}.catalog-workspace{min-height:calc(100vh - 100px)}.tree-pane,.catalog-main{min-height:0}.dataset-row{min-height:44px!important}.datasets-header{min-height:40px}.pager{min-height:36px;padding:5px 10px!important}
 @media(min-width:1280px) and (min-height:720px){.catalog-workspace{max-height:calc(100vh - 94px);overflow:hidden}.tree-pane{overflow:hidden;display:flex;flex-direction:column}.tree-scroll{min-height:0;overflow:auto}.catalog-main{overflow-y:auto}}
+
+@media(min-width:1280px) and (min-height:720px){.datasets-section{height:calc(100vh - 240px);display:flex;flex-direction:column;min-height:260px}.dataset-table{flex:1;min-height:0;overflow-y:auto}.pager{flex:none}}
 </style>

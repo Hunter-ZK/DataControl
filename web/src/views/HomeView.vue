@@ -82,7 +82,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { ArrowRight, ArrowUpRight, Database, Search, Sparkles } from 'lucide-vue-next'
+import { ArrowRight, ArrowUpRight, ChartNoAxesCombined, Database, Search, Sparkles } from 'lucide-vue-next'
 import { activityApi, assetApi, type SearchItem, type SearchSuggestion } from '@/api/client'
 import AssetIcon from '@/components/AssetIcon.vue'
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="dc-page reference-atlas"><div class="dc-container">
+  <div class="dc-page reference-atlas" ref="referenceViewport"><div class="dc-container">
     <nav v-if="kind==='data-standards'||kind==='code-tables'" class="reference-tabs" aria-label="数据标准分类">
       <RouterLink to="/standards" :class="{active:kind==='data-standards'}">数据标准</RouterLink>
       <RouterLink to="/code-tables" :class="{active:kind==='code-tables'}">码表</RouterLink>
@@ -18,7 +18,7 @@
       <aside class="code-list dc-card">
         <div class="code-list-heading"><b>码表目录</b><span>{{visibleRows.length}} 张码表</span></div>
         <div class="code-items">
-          <button v-for="row in visibleRows" :key="keyOf(row)" class="code-item"
+          <button v-for="row in pagedRows" :key="keyOf(row)" class="code-item"
             :class="{active:selectedCode===row.codeTableNo}" @click="selectCode(row.codeTableNo)">
             <AssetIcon type="CODE_TABLE" :size="20"/>
             <span><b>{{titleOf(row)}}</b><code>{{codeOf(row)}}</code></span><ChevronRight :size="17"/>
@@ -50,7 +50,7 @@
         <button v-for="x in letters" :key="x" :class="{active:letter===x}" @click="letter=letter===x?'':x">{{x}}</button>
       </div>
       <div class="table-clip"><table class="dictionary-table"><thead><tr><th>词根</th><th>中文名称</th><th>英文全称</th><th>同义词／说明</th><th></th></tr></thead>
-        <tbody><tr v-for="row in visibleRows" :key="keyOf(row)"><td><RouterLink :to="target(row)" class="code-link">{{row.root}}</RouterLink></td>
+        <tbody><tr v-for="row in pagedRows" :key="keyOf(row)"><td><RouterLink :to="target(row)" class="code-link">{{row.root}}</RouterLink></td>
           <td><strong>{{row.cnName||'—'}}</strong></td><td>{{row.enFull||'—'}}</td><td>{{row.synonyms||row.description||'—'}}</td>
           <td><RouterLink :to="target(row)" class="row-link"><ArrowRight :size="17"/></RouterLink></td></tr>
           <tr v-if="!visibleRows.length"><td colspan="5" class="empty-row">未找到符合条件的词根。</td></tr></tbody></table></div>
@@ -59,7 +59,7 @@
     <section v-else-if="kind==='metrics'" class="dc-card dictionary-panel">
       <div class="panel-heading"><div><h2>业务指标字典</h2></div><span>点击指标名称查看完整计算口径</span></div>
       <div class="table-clip"><table class="dictionary-table"><thead><tr><th>指标名称与编码</th><th>定义／统计口径</th><th>聚合方式</th><th>来源数据集</th><th>所属制度</th><th></th></tr></thead>
-        <tbody><tr v-for="row in visibleRows" :key="keyOf(row)">
+        <tbody><tr v-for="row in pagedRows" :key="keyOf(row)">
           <td><RouterLink :to="target(row)" class="title-link">{{titleOf(row)}}</RouterLink><code class="sub-code">{{row.metricCode}}</code></td>
           <td class="description-cell">{{row.definition||row.caliber||'尚未登记口径'}}</td>
           <td><span class="aggregation">{{row.aggregation||'—'}}</span></td>
@@ -72,7 +72,7 @@
     <section v-else-if="kind==='data-standards'" class="dc-card dictionary-panel">
       <div class="panel-heading"><div><h2>字段标准目录</h2></div><span>统一定义、编码与关联码表</span></div>
       <div class="table-clip"><table class="dictionary-table"><thead><tr><th>标准编号</th><th>标准名称</th><th>业务定义</th><th>关联码表</th><th></th></tr></thead>
-        <tbody><tr v-for="row in visibleRows" :key="keyOf(row)">
+        <tbody><tr v-for="row in pagedRows" :key="keyOf(row)">
           <td><RouterLink :to="target(row)" class="code-link">{{row.standardNo}}</RouterLink></td><td><RouterLink :to="target(row)" class="title-link">{{titleOf(row)}}</RouterLink></td>
           <td class="description-cell">{{row.definition||'—'}}</td>
           <td><RouterLink v-if="row.codeTableNo" :to="`/code-tables/${row.codeTableNo}`" class="code-link">{{row.codeTableNo}}</RouterLink><span v-else>—</span></td>
@@ -82,26 +82,34 @@
 
     <section v-else class="dc-card documents-panel">
       <div class="panel-heading"><div><h2>统计制度文档目录</h2></div><span>按制度、文号与版本查看</span></div>
-      <RouterLink v-for="row in visibleRows" :key="keyOf(row)" :to="target(row)" class="document-row">
+      <RouterLink v-for="row in pagedRows" :key="keyOf(row)" :to="target(row)" class="document-row">
         <span class="document-icon"><FileText :size="29"/></span>
         <span class="document-main"><b>{{titleOf(row)}}</b><small>{{row.documentNo||row.code||'未登记文号'}}</small></span>
         <span class="document-meta"><span>{{row.issuer||'发布机构未登记'}}</span><small>版本 {{row.version||'—'}}</small></span>
         <ArrowRight :size="20"/></RouterLink>
       <div v-if="!visibleRows.length" class="dc-empty">没有符合条件的统计制度。</div>
     </section>
+    <footer v-if="visibleRows.length>pageSize" class="reference-pager" aria-label="资产字典分页">
+      <span>第 {{(page-1)*pageSize+1}}–{{Math.min(page*pageSize,visibleRows.length)}} 条，共 {{visibleRows.length}} 条</span>
+      <div><button :disabled="page===1" @click="page--">上一页</button><span>{{page}} / {{pageCount}}</span><button :disabled="page>=pageCount" @click="page++">下一页</button></div>
+    </footer>
   </div></div>
 </template>
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { ArrowRight, ChartNoAxesCombined, ChevronRight, FileText, Search } from 'lucide-vue-next'
+import { ArrowRight, ChevronRight, FileText, Search } from 'lucide-vue-next'
 import api, { assetApi } from '@/api/client'
+import { useFitPageSize } from '@/composables/useFitPageSize'
 import AssetIcon from '@/components/AssetIcon.vue'
 
 type ReferenceRow = Record<string, any>
 type CodeValue = {value:string;name:string;description?:string|null}
 const props=defineProps<{kind:string}>()
 const keyword=ref(''),letter=ref(''),rows=ref<ReferenceRow[]>([])
+const referenceViewport=ref<HTMLElement|null>(null)
+const page=ref(1)
+const pageSize=useFitPageSize(referenceViewport,{rowHeight:44,reserved:190,min:5,max:14})
 const selectedCode=ref(''),selectedDetail=ref<ReferenceRow|null>(null),valueKeyword=ref(''),detailLoading=ref(false),detailError=ref('')
 const configs:Record<string,{title:string;desc:string;placeholder:string;eyebrow:string;heading:string;note:string}>={
   'code-tables':{title:'标准码值',desc:'查找编码体系，直接预览完整码值和含义。',placeholder:'搜索码表编号或名称',eyebrow:'CODE TABLE LIBRARY',heading:'标准码值工作台',note:'左侧选择码表，右侧直接查看码值，无需来回跳转。'},
@@ -111,7 +119,6 @@ const configs:Record<string,{title:string;desc:string;placeholder:string;eyebrow
   'stat-systems':{title:'统计制度',desc:'以文档目录方式查看统计制度、版本、文号和发布机构。',placeholder:'按制度名称、文号、发布机构筛选',eyebrow:'GOVERNANCE DOCUMENTS',heading:'统计制度与文档索引',note:'清晰对照制度名称、发布机构和版本。'},
 }
 const config=computed(()=>configs[props.kind]||configs.metrics)
-const referenceType=computed(():string=>({'code-tables':'CODE_TABLE','data-standards':'STANDARD','word-roots':'WORD_ROOT','metrics':'METRIC','stat-systems':'STAT_SYSTEM'} as Record<string,string>)[props.kind]||'REFERENCE')
 const letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 const visibleRows=computed(()=>{
   let list=rows.value
@@ -119,6 +126,9 @@ const visibleRows=computed(()=>{
   if(props.kind==='stat-systems'&&keyword.value.trim()){const q=keyword.value.trim().toLowerCase();list=list.filter(x=>[x.name,x.code,x.documentNo,x.issuer].some(v=>String(v||'').toLowerCase().includes(q)))}
   return list
 })
+const pageCount=computed(()=>Math.max(1,Math.ceil(visibleRows.value.length/pageSize.value)))
+const pagedRows=computed(()=>visibleRows.value.slice((page.value-1)*pageSize.value,page.value*pageSize.value))
+watch([keyword,letter,()=>props.kind,pageSize],()=>{page.value=1})
 const currentCodeList=computed(()=>rows.value.find(row=>row.codeTableNo===selectedCode.value))
 const filteredValues=computed<CodeValue[]>(()=>{
   const list=(selectedDetail.value?.values||[]) as CodeValue[]
@@ -271,4 +281,7 @@ watch(()=>props.kind,()=>{keyword.value='';letter.value='';rows.value=[];selecte
 .reference-tabs a.active{background:var(--dc-primary-soft);color:var(--dc-primary);font-weight:750}.reference-tabs a:hover{background:#e8f1ff}
 .reference-toolbar{display:flex;align-items:center;min-height:40px;padding:5px 10px!important;margin-bottom:10px!important;gap:12px}.reference-search{flex:1}.reference-toolbar .toolbar-desc{margin-left:auto}
 @media(min-width:821px){.code-workspace{min-height:0;height:min(580px,calc(100vh - 174px));grid-template-columns:360px minmax(0,1fr)!important;overflow:hidden}.code-list,.code-detail{min-height:0;overflow:hidden}.code-list{display:flex;flex-direction:column}.code-list .code-items{flex:1;min-height:0;overflow-y:auto}.code-detail .table-clip{max-height:calc(100% - 150px);overflow:auto}}
+
+.reference-pager{display:flex;align-items:center;justify-content:space-between;min-height:36px;font-size:12px;color:var(--dc-text-2);padding:4px 6px}.reference-pager>div{display:flex;gap:12px;align-items:center}.reference-pager button{padding:4px 10px;border:1px solid var(--dc-border);border-radius:6px;background:#fff;cursor:pointer;color:var(--dc-primary)}.reference-pager button:disabled{opacity:.45;cursor:default}
+@media(min-width:1280px) and (min-height:720px){.reference-atlas{height:calc(100vh - 52px);overflow:hidden}.reference-atlas>.dc-container{height:100%;display:flex;flex-direction:column;min-height:0}.code-workspace,.dictionary-panel,.documents-panel{flex:1;min-height:0;overflow:hidden}.dictionary-panel{display:flex;flex-direction:column}.dictionary-panel .table-clip,.documents-panel{overflow-y:auto}.reference-pager{flex:none}}
 </style>
