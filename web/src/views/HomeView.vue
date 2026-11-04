@@ -76,12 +76,12 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { ArrowRight, ArrowUpRight, ChartNoAxesCombined, Database, Search, Sparkles } from 'lucide-vue-next'
 import { activityApi, assetApi, type SearchItem, type SearchSuggestion } from '@/api/client'
 import AssetIcon from '@/components/AssetIcon.vue'
 
-const router = useRouter(); const keyword = ref(''); const hot = ['贷款余额','企业风险','region_code','监管报送']
+const keyword = ref(''); const hot = ['贷款余额','企业风险','region_code','监管报送']
 const recent = ref<any[]>([])
 const favorites = ref<any[]>([])
 const suggestions = ref<SearchSuggestion[]>([])

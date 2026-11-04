@@ -22,3 +22,10 @@ test('field deep link resolves to its dataset and opens the in-context drawer',a
   await expect(page.getByRole('heading',{name:'字段详情'})).toBeVisible()
   await expect(page.getByText('loan_bal').first()).toBeVisible()
 })
+
+test('mobile top bar retains an actionable search entry',async({page})=>{
+  await page.setViewportSize({width:390,height:780})
+  await page.goto('/search')
+  await page.getByRole('button',{name:'打开全局资产搜索'}).click()
+  await expect(page.getByRole('dialog',{name:'快速查找数据资产'})).toBeVisible()
+})

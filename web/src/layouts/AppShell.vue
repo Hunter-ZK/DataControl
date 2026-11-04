@@ -45,7 +45,7 @@
           </nav>
         </div>
         <form v-if="route.name!=='home'" class="command" role="search" @submit.prevent="submitTopSearch">
-          <Search :size="17"/><input v-model="topQuery" aria-label="全局资产搜索" placeholder="搜索数据集、字段、指标、标准…"/>
+          <Search class="command-search-icon" :size="17"/><button type="button" class="command-mobile-action" aria-label="打开全局资产搜索" @click="commandQuery=topQuery;commandOpen=true;loadCommandSuggestions()"><Search :size="17"/></button><input v-model="topQuery" aria-label="全局资产搜索" placeholder="搜索数据集、字段、指标、标准…"/>
           <button type="button" class="command-shortcut" :title="isMac ? '⌘K 快速查找' : 'Ctrl+K 快速查找'" @click="commandQuery=topQuery;commandOpen=true;loadCommandSuggestions()"><kbd>{{isMac?'⌘K':'Ctrl+K'}}</kbd></button>
           <button type="submit" class="command-submit" aria-label="检索资产"><ArrowRight :size="16"/></button>
         </form>
@@ -322,4 +322,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', shortcut))
 @media(max-width:1080px) and (min-width:821px){.shell:not(.is-collapsed){grid-template-columns:208px minmax(0,1fr)}.shell:not(.is-collapsed) .brand-copy,.shell:not(.is-collapsed) .nav-item span,.shell:not(.is-collapsed) .account-label{display:block}.shell:not(.is-collapsed) .nav-item{justify-content:flex-start}}
 @media(max-width:820px){.shell,.shell.is-collapsed{display:block;height:auto;min-height:100vh;overflow:visible}.workspace{height:auto;min-height:100vh}.workspace>main{overflow:visible;min-height:calc(100vh - 52px)}.mobile-account{display:block}.topbar{height:52px}.top-left{max-width:none}.command{flex:1;min-width:0}.breadcrumbs .crumb{max-width:145px}}
 @media(max-width:560px){.breadcrumbs .crumb{max-width:115px}.command{flex:0 0 40px}.command input,.command-shortcut,.command-submit{display:none}}
+
+.command-mobile-action{display:none}
+@media(max-width:560px){.command-search-icon{display:none}.command-mobile-action{display:grid;place-items:center;background:transparent;border:0;color:var(--dc-primary);cursor:pointer;padding:3px}.command{padding:0 9px;justify-content:center}}
 </style>
