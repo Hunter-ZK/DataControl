@@ -24,7 +24,7 @@
               </div>
               <p v-html="item.body_hl || '点击查看资产定义、字段、口径及相关信息。'" />
             </div>
-            <div class="score"><small>相关度</small><b>{{Number(item.score || 0).toFixed(2)}}</b><ArrowRight :size="18"/></div>
+            <div class="score"><small>{{item.fallbackMatch?'关键词匹配':'相关度'}}</small><b>{{item.fallbackMatch?'匹配':Number(item.score || 0).toFixed(2)}}</b><ArrowRight :size="18"/></div>
           </article>
         </div>
         <div class="result-pager"><Pager v-model:page="page" :page-size="pageSize" :total="filtered.length" /></div>
