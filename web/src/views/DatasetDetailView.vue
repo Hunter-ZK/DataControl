@@ -52,8 +52,8 @@
             <Pager v-if="changes.length" v-model:page="changesPage" :page-size="changesPageSize" :total="changes.length"/>
           </el-tab-pane>
           <el-tab-pane label="血缘关系" name="relations">
-            <div class="relation-summary"><div><span>上游</span><strong>{{relations.upstream?.length||0}}</strong></div><ArrowRight/><div class="current-node"><span>当前资产</span><strong>{{data.layerCode}}</strong></div><ArrowRight/><div><span>下游</span><strong>{{relations.downstream?.length||0}</strong></div></div>
-            <div v-if="relationItems.length" ref="relationsEl" class="relation-list"><article v-for="x in visibleRelations" :key="`${x.srcAssetId}-${x.dstAssetId}`"><RouterLink :to="`/datasets/${x.srcAssetId}`"><b>{{x.srcName}}</b></RouterLink><ArrowRight :size="14"/><RouterLink :to="`/datasets/${x.dstAssetId}`"><b>{{x.dstName}}</b></RouterLink><span>{{x.taskName}}</span></article></div>
+            <div class="relation-summary"><div><span>上游</span><strong>{{relations.upstream.length || 0}}</strong></div><ArrowRight/><div class="current-node"><span>当前资产</span><strong>{{data.layerCode}}</strong></div><ArrowRight/><div><span>下游</span><strong>{{relations.downstream?.length||0}</strong></div></div>
+            <div v-if="relationItems.length" ref="relationsEl" class="relation-list"><article v-for="x in visibleRelations" :key="x.srcAssetId + '-' + x.dstAssetId"><RouterLink :to="'/datasets/' + x.srcAssetId"><b>{{x.srcName}}</b></RouterLink><ArrowRight :size="14"/><RouterLink :to="'/datasets/' + x.dstAssetId"><b>{{x.dstName}}</b></RouterLink><span>{{x.taskName}}</span></article></div>
             <div v-else class="dc-empty">暂无血缘关系。</div>
             <Pager v-if="relationItems.length" v-model:page="relationsPage" :page-size="relationsPageSize" :total="relationItems.length"/>
           </el-tab-pane>
