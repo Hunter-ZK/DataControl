@@ -107,6 +107,7 @@ import { detailBreadcrumbTitle } from '@/composables/detailBreadcrumb'
 import { assetTypeLabel } from '@/utils/labels'
 
 const router = useRouter()
+const route = useRoute()
 const mobileNavOpen=ref(false)
 const navCollapsed=ref(false)
 const isMac=typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
@@ -173,7 +174,6 @@ function chooseCommand(item:SearchSuggestion){
 function openCommandSearch(){commandOpen.value=false;topQuery.value=commandQuery.value.trim();router.push({name:'search',query:{q:commandQuery.value.trim()}})}
 function logout(){localStorage.removeItem('datacontrol_token');localStorage.removeItem('datacontrol_user');router.push({name:'login'})}
 
-const route = useRoute()
 const primary = [
   { to:'/',label:'首页',icon:CircleGauge },
   { to:'/catalog',label:'资产目录',icon:Database,assetType:'TABLE' },
