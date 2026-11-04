@@ -18,8 +18,8 @@
           <div class="hero-search">
             <Search :size="20"/>
             <input v-model="keyword" @input="updateSuggestions" @keydown.enter.prevent="submitSearch"
-              placeholder="搜索数据集、字段、指标，或描述你的问题…"
-              aria-label="数据资产检索与 DataAgent 统一入口"/>
+              placeholder="搜索数据集、字段、指标或标准…"
+              aria-label="首页数据资产搜索"/>
             <button class="search-primary" @click="submitSearch">检索资产 <ArrowRight :size="16"/></button>
           </div>
           <div v-if="suggestions.length && !assetResults.length" class="search-suggestions" aria-label="资产联想">

@@ -185,7 +185,7 @@ watch(()=>props.kind,()=>{keyword.value='';letter.value='';rows.value=[];selecte
 .reference-total strong{font-size:33px;color:#fff;line-height:1.2}
 .reference-total span{font-size:12px;color:#e4efff}
 .reference-toolbar{display:flex;align-items:center;gap:15px;padding:13px 17px;margin-bottom:18px}
-.reference-search{display:flex;align-items:center;gap:11px;flex:1;max-width:740px;height:48px;color:#4a82db;background:#f7fbff;border:1px solid #ccddf5;border-radius:9px;padding:6px 7px 6px 14px}
+.reference-search{display:flex;align-items:center;gap:11px;flex:1;max-width:740px;height:40px;color:#4a82db;background:#f7fbff;border:1px solid #ccddf5;border-radius:9px;padding:6px 7px 6px 14px}
 .reference-search input{flex:1;min-width:0;background:transparent;border:0;outline:0;font-size:14px;color:#1f3d65}
 .reference-search button{display:flex;align-items:center;gap:7px;border:0;border-radius:7px;color:#fff;background:#286be5;padding:8px 15px;font-size:13px;font-weight:710;cursor:pointer}
 .toolbar-desc{display:flex;justify-content:flex-end;gap:13px;align-items:center;flex:1;color:#7c92ac;font-size:12px}

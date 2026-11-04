@@ -89,7 +89,7 @@ const keyword=ref('')
 const rows=ref<DatasetBrief[]>([])
 const total=ref(0),page=ref(1),loading=ref(false)
 const catalogViewport=ref<HTMLElement|null>(null)
-const pageSize=useFitPageSize(catalogViewport,{rowHeight:44,reserved:174,min:5,max:14})
+const pageSize=useFitPageSize(catalogViewport,{rowHeight:44,reserved:120,min:5,max:14})
 const catalogTree=computed(()=>buildCatalogTree(catalogs.value))
 const allCatalogs=computed(()=>flattenCatalogs(catalogTree.value))
 const activeNode=computed(()=>allCatalogs.value.find(node=>node.code===selected.value))
@@ -229,4 +229,7 @@ onMounted(async()=>{try{catalogs.value=await assetApi.catalogs() as CatalogEntry
 @media(min-width:1280px) and (min-height:720px){.catalog-workspace{max-height:calc(100vh - 94px);overflow:hidden}.tree-pane{overflow:hidden;display:flex;flex-direction:column}.tree-scroll{min-height:0;overflow:auto}.catalog-main{overflow-y:auto}}
 
 @media(min-width:1280px) and (min-height:720px){.datasets-section{height:calc(100vh - 240px);display:flex;flex-direction:column;min-height:260px}.dataset-table{flex:1;min-height:0;overflow-y:auto}.pager{flex:none}}
+
+/* 44px compact rows only when there is enough desktop space. */
+@media(min-width:1280px) and (min-height:720px){.dataset-row{padding:6px 12px!important;min-height:44px!important;gap:8px}.dataset-info{display:flex;gap:10px;align-items:center}.dataset-info b{font-size:13px;flex:0 0 auto;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dataset-info code{font-size:12px;min-width:0}.dataset-info small{display:none}.datasets-header{padding:7px 11px}.datasets-header h3{font-size:16px}.layer-tabs{padding:4px 9px}.layer-tabs button{padding:5px 9px}.directory-heading{margin-bottom:8px}.directory-heading h2{font-size:18px}.directory-heading p{font-size:12px}.directory-badge{padding:6px 9px}.folder-card{min-height:62px;padding:9px}.folder-icon{height:34px;width:34px}.folder-card .folder-icon svg{width:19px;height:19px}.section-bar{margin-bottom:6px}}
 </style>

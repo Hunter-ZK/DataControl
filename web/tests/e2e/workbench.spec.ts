@@ -19,14 +19,13 @@ test('homepage search remains usable without duplicate Agent navigation', async 
     })
   })
   await page.goto('/')
-  const input = page.getByRole('textbox', { name: '数据资产检索与 DataAgent 统一入口' })
+  const input = page.getByRole('textbox', { name: '首页数据资产搜索' })
   await input.fill('贷款余额')
   await page.getByRole('button', { name: '检索资产' }).click()
   await expect(page.getByText('贷款余额汇总')).toBeVisible()
   await expect(page).toHaveURL(/\/$/)
-  await page.getByRole('button', { name: '向 DataAgent 提问' }).click()
-  // The Agent route is protected, so anonymous users are sent to login.
-  await expect(page).toHaveURL(/\/login\?redirect=/)
+  await expect(page.locator('.quick-capabilities')).toHaveCount(0)
+  await expect(page.locator('.sidebar .nav-item')).toHaveCount(6)
 })
 
 for (const width of [1440, 1024, 390]) {
