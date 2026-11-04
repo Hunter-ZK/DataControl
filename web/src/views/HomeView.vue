@@ -85,6 +85,9 @@ const previewGroups = computed(() => [
   { type: 'COLUMN', label: '字段' },
   { type: 'METRIC', label: '指标' },
   { type: 'CODE_TABLE', label: '码表' },
+  { type: 'DATA_STANDARD', label: '数据标准' },
+  { type: 'WORD_ROOT', label: '词根' },
+  { type: 'STAT_SYSTEM', label: '统计制度' },
 ].map((group) => ({ ...group, items: previewRows.value.filter((item) => item.asset_type === group.type) })).filter((group) => group.items.length))
 let searchTimer: number | undefined
 let searchSequence = 0

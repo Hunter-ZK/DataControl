@@ -57,6 +57,9 @@ const types = [
   { key: 'COLUMN', label: '字段' },
   { key: 'METRIC', label: '指标' },
   { key: 'CODE_TABLE', label: '码表' },
+  { key: 'DATA_STANDARD', label: '数据标准' },
+  { key: 'WORD_ROOT', label: '词根' },
+  { key: 'STAT_SYSTEM', label: '统计制度' },
 ]
 const filtered = computed(() => type.value === 'ALL' ? rows.value : rows.value.filter((row) => row.asset_type === type.value))
 const visibleRows = computed(() => {
@@ -90,6 +93,9 @@ function open(item: any) {
   else if (item.asset_type === 'COLUMN') router.push(`/fields/${item.asset_id}`)
   else if (item.asset_type === 'CODE_TABLE') router.push(`/code-tables/${item.technical_name}`)
   else if (item.asset_type === 'METRIC') router.push(`/metrics/${item.technical_name}`)
+  else if (item.asset_type === 'DATA_STANDARD') router.push(`/standards/${item.technical_name}`)
+  else if (item.asset_type === 'WORD_ROOT') router.push(`/word-roots/${item.technical_name}`)
+  else if (item.asset_type === 'STAT_SYSTEM') router.push(`/stat-systems/${item.technical_name}`)
 }
 watch(() => route.query.q, (value) => {
   if (typeof value === 'string' && value !== q.value) {
