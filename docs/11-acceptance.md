@@ -90,3 +90,5 @@ Not P2 gates:
 10. Dataset identity, lifecycle, definition and update metadata are not repeated in multiple panels; Asset ID is available under More Information.
 11. No backend endpoint, database schema or asset-data contract is changed for this UI refinement.
 12. `npm run type-check`, `npm test` and `npm run build` pass.
+
+13. Search results use only fields exposed by the existing search API. The current API does not return a body excerpt; no placeholder may be presented as a real matched-text snippet.

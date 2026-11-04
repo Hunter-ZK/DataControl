@@ -43,7 +43,8 @@ Priority order:
 - home search submits into `/search?q=...`
 - non-home global search opens a command-style preview and can submit to the full `/search` results page
 - search page contains result type tabs and results as the main work area
-- result cards expose asset type, business name, technical identifier, hit context and score
+- result cards expose asset type, title, technical identifier and relevance score; show a hit excerpt only if the current API returns it
+- the current P2 search API returns title highlighting but not a body excerpt, so the frontend must not fabricate a hit-context snippet; a true body excerpt requires a future API contract change
 - result destinations are real routes for dataset/field/metric/code-table assets
 - advanced ranking, server facets, typo correction and saved searches are P3 concerns
 
