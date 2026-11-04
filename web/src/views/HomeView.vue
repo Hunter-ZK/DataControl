@@ -50,26 +50,7 @@
           <div class="hot"><span>试试搜索</span><button v-for="x in hot" :key="x" @click="quick(x)">{{x}}</button></div>
         </div>
       </section>
-      <section class="quick-capabilities" aria-label="核心功能">
-        <RouterLink to="/catalog" class="capability">
-          <span class="cap-icon cap-blue"><Database :size="27"/></span>
-          <span><b>资产目录</b><small>按业务层级逐层浏览数据资产</small></span><ArrowUpRight :size="19"/>
-        </RouterLink>
-        <RouterLink to="/metrics" class="capability">
-          <span class="cap-icon cap-purple"><ChartNoAxesCombined :size="27"/></span>
-          <span><b>业务指标</b><small>指标字典、来源与统计口径</small></span><ArrowUpRight :size="19"/>
-        </RouterLink>
-        <RouterLink to="/code-tables" class="capability">
-          <span class="cap-icon cap-cyan"><BookOpenCheck :size="27"/></span>
-          <span><b>标准规范</b><small>码表、标准与字段词根</small></span><ArrowUpRight :size="19"/>
-        </RouterLink>
-        <RouterLink to="/agent" class="capability cap-agent">
-          <span class="cap-icon cap-violet"><Sparkles :size="27"/></span>
-          <span><b>DataAgent</b><small>问数、生成 SQL 和开发草案</small></span><ArrowUpRight :size="19"/>
-        </RouterLink>
-      </section>
-      <div class="workspace-heading">
-        <div><h2>继续你的工作</h2></div>
+      <div class="workspace-heading"><div><h2>继续你的工作</h2></div>
         <RouterLink to="/catalog">浏览资产目录 <ArrowUpRight :size="14"/></RouterLink>
       </div>
       <div class="workspace-grid">
@@ -84,40 +65,30 @@
           </div>
           <div v-else class="dc-empty">暂无浏览记录。使用上方搜索发现你的第一个资产。</div>
         </section>
-        <div class="workspace-side">
-          <section class="dc-card chat-panel">
-            <div class="panel-head"><div><h3>最近问数会话</h3><p>继续上次的数据分析</p></div><RouterLink to="/agent">全部会话</RouterLink></div>
-            <div v-if="recentChats.length" class="chat-list">
-              <RouterLink v-for="chat in recentChats" :key="chat.id" :to="{name:'agent',query:{conversationId:chat.id}}" class="recent-chat"><Sparkles :size="15"/><span>{{chat.title}}</span><ArrowUpRight :size="14"/></RouterLink>
-            </div>
-            <RouterLink v-else class="start-agent" to="/agent"><Sparkles :size="17"/>开启第一次智能问数<ArrowRight :size="15"/></RouterLink>
-          </section>
-          <section class="dc-card overview-panel">
-            <div class="panel-head"><div><h3>数据资产概览</h3><p>当前已收录的资产类型</p></div><RouterLink to="/overview">详情</RouterLink></div>
-            <div class="mini-stats">
-              <div><strong>{{format(overview.tableCount)}}</strong><span>数据集</span></div>
-              <div><strong>{{format(overview.columnCount)}}</strong><span>字段</span></div>
-              <div><strong>{{format(overview.metricCount)}}</strong><span>指标</span></div>
-              <div><strong>{{format(overview.codeTableCount)}}</strong><span>码表</span></div>
-            </div>
-          </section>
-        </div>
+        <section class="dc-card recent-panel favorite-panel">
+          <div class="panel-head"><div><h3>我的收藏</h3><p>继续查看常用数据集及其字段、指标口径</p></div><RouterLink to="/profile">查看全部 <ArrowUpRight :size="14"/></RouterLink></div>
+          <div v-if="favorites.length" class="asset-list">
+            <RouterLink v-for="item in favorites" :key="item.assetId" :to="`/datasets/${item.assetId}`" class="recent-item">
+              <AssetIcon type="TABLE" :size="19"/><span><b>{{item.bizName||item.assetId}}</b><code>{{item.tableName||item.assetId}}</code></span>
+              <span class="dc-chip">{{item.layerCode||'数据集'}}</span><ArrowRight :size="16"/>
+            </RouterLink>
+          </div><div v-else class="dc-empty">暂无收藏。可在数据集详情中收藏常用资产。</div>
+        </section>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { ArrowRight, ArrowUpRight, BookOpenCheck, ChartNoAxesCombined, Database, Search, Sparkles } from 'lucide-vue-next'
-import { activityApi, assetApi, agentApi, type SearchItem, type SearchSuggestion, type ServerAgentConversation } from '@/api/client'
+import { ArrowRight, ArrowUpRight, Database, Search, Sparkles } from 'lucide-vue-next'
+import { activityApi, assetApi, type SearchItem, type SearchSuggestion } from '@/api/client'
 import AssetIcon from '@/components/AssetIcon.vue'
 
 const router = useRouter(); const keyword = ref(''); const hot = ['贷款余额','企业风险','region_code','监管报送']
-const overview = reactive({ tableCount: 0, columnCount: 0, metricCount: 0, codeTableCount: 0 })
 const recent = ref<any[]>([])
-const recentChats = ref<ServerAgentConversation[]>([])
+const favorites = ref<any[]>([])
 const suggestions = ref<SearchSuggestion[]>([])
 const assetResults = ref<SearchItem[]>([])
 const resultsVisible = ref(false)
@@ -172,20 +143,16 @@ function askAgent() {
   else router.push({name:'agent'})
 }
 function quick(value:string){ keyword.value=value; submitSearch() }
-function format(v:number){ return Number(v||0).toLocaleString() }
 onMounted(async()=>{
-  try { Object.assign(overview, await assetApi.overview()) } catch {}
-  if (localStorage.getItem('datacontrol_token')) {
-    try { recentChats.value=(await agentApi.conversations()).slice(0, 4) } catch { /* optional */ }
-  }
-  try { recent.value = await activityApi.recent() as any[] } catch {
-    try { recent.value = (await assetApi.tables({limit:4}) as any[]).slice(0,4) } catch {}
-  }
+  if(!localStorage.getItem('datacontrol_token'))return
+  const [rec,fav]=await Promise.allSettled([activityApi.recent(),activityApi.favorites()])
+  if(rec.status==='fulfilled')recent.value=(rec.value as any[]).slice(0,5)
+  if(fav.status==='fulfilled')favorites.value=(fav.value as any[]).slice(0,5)
 })
 </script>
 
 <style scoped>
-.atlas-home{min-height:100%;padding-top:36px}
+.atlas-home{min-height:100%;padding-top:12px}
 .atlas-hero{padding:36px 42px 27px;background:linear-gradient(128deg,#fff 16%,#f4f8ff 100%);border:1px solid #dfebfa;border-radius:16px;box-shadow:0 12px 36px rgba(26,76,142,.035)}
 .hero-lead h1{margin:8px 0 6px;font-size:31px;line-height:1.35;letter-spacing:-.025em;font-weight:770;color:#172c4d}
 .hero-lead p{margin:0;color:var(--dc-text-2);font-size:14px}
@@ -309,4 +276,8 @@ onMounted(async()=>{
 @media(max-width:900px){.hero-art{display:none}.atlas-hero{padding:30px}.hero-lead h1{font-size:34px}}
 @media(max-width:620px){.atlas-hero{padding:25px 19px 22px;border-radius:16px}.hero-lead h1{font-size:27px}.hero-lead p{font-size:14px}.quick-capabilities{grid-template-columns:1fr 1fr;gap:9px}.capability{min-height:107px;align-items:flex-start;flex-direction:column;padding:14px;gap:9px}.cap-icon{width:45px;height:45px;min-width:45px}.capability b{font-size:15px}.capability small{font-size:12px}.capability>svg{display:none}}
 
+
+/* The original search hero is preserved; the duplicated module launcher row is removed. */
+.atlas-hero{padding:22px 28px 18px}.hero-content{margin-top:15px}.workspace-heading{margin-top:16px!important}.workspace-grid{align-items:start}.favorite-panel{min-height:220px}
+@media(min-width:1280px) and (min-height:720px){.atlas-home .hero-art{transform:scale(.82);transform-origin:right top}}
 </style>

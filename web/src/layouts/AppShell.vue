@@ -3,7 +3,7 @@
     <aside class="sidebar">
       <RouterLink class="brand" to="/">
         <span class="brand-mark"><Layers3 :size="21" :stroke-width="2.2"/></span>
-        <span class="brand-copy"><b>DataControl</b><small>数据资产与智能工作台</small></span>
+        <span class="brand-copy"><b>数据资产平台</b></span>
       </RouterLink>
 
       <button class="collapse-nav" :aria-label="navCollapsed ? '展开侧边栏' : '折叠侧边栏'" :title="navCollapsed ? '展开导航' : '收起导航'" @click="navCollapsed=!navCollapsed"><PanelLeftClose :size="16"/></button>
@@ -11,7 +11,7 @@
         <div v-for="group in navGroups" :key="group.title" class="nav-group">
           <div class="nav-section">{{ group.title }}</div>
           <RouterLink v-for="item in group.items" :key="item.to" :to="item.to"
-            class="nav-item" :title="item.label">
+            class="nav-item" :class="{'is-section-active':isNavSectionActive(item.to)}" :title="item.label">
             <AssetIcon v-if="'assetType' in item && item.assetType" :type="String(item.assetType)" :size="21" mode="inline"/>
             <component :is="item.icon" v-else :size="21" :stroke-width="1.9"/>
             <span>{{ item.label }}</span>
@@ -20,9 +20,14 @@
       </nav>
 
       <div class="sidebar-foot">
-        <span class="status-dot" :class="{offline:serviceAvailable===false}" />
-        <div><b>{{serviceAvailable===false?'服务异常':'本地数据服务'}}</b>
-          <small>{{serviceAvailable===false?'请检查服务日志':'DataControl'}}</small></div>
+        <el-dropdown trigger="click" class="account-menu">
+          <button class="account-trigger" aria-label="用户菜单"><span class="avatar">{{userInitial}}</span><span class="account-label">个人账户</span></button>
+          <template #dropdown><el-dropdown-menu>
+            <el-dropdown-item @click="router.push('/profile')">个人中心</el-dropdown-item>
+            <el-dropdown-item v-if="isAdmin" @click="router.push('/admin')">管理员工作台</el-dropdown-item>
+            <el-dropdown-item divided @click="logout">退出登录</el-dropdown-item>
+          </el-dropdown-menu></template>
+        </el-dropdown>
       </div>
     </aside>
 
@@ -31,20 +36,28 @@
         <div class="top-left">
           <button class="icon-button mobile-menu" aria-label="展开导航" @click="mobileNavOpen=true"><Menu :size="18"/></button>
           <button v-if="route.name !== 'home'" class="icon-button" @click="router.back()"><ArrowLeft :size="18" /></button>
-          <AssetIcon :type="breadcrumbType" :size="17" mode="inline"/>
-          <span class="crumb">{{ route.meta.title || '工作台' }}</span>
+          <nav class="breadcrumbs" aria-label="当前位置">
+            <template v-for="(item,index) in breadcrumbs" :key="item.to+index">
+              <ChevronRight v-if="index" :size="13" class="breadcrumb-separator"/>
+              <RouterLink v-if="index<breadcrumbs.length-1" :to="item.to">{{item.label}}</RouterLink>
+              <span v-else class="crumb">{{item.label}}</span>
+            </template>
+          </nav>
         </div>
-        <button class="command" aria-label="打开全局资产搜索" @click="commandOpen=true">
-          <Search :size="17" /><span>搜索数据集、字段、指标、标准…</span><kbd>{{ isMac ? '⌘ K' : 'Ctrl K' }}</kbd>
-        </button>
+        <form v-if="route.name!=='home'" class="command" role="search" @submit.prevent="submitTopSearch">
+          <Search :size="17"/><input v-model="topQuery" aria-label="全局资产搜索" placeholder="搜索数据集、字段、指标、标准…"/>
+          <button type="button" class="command-shortcut" :title="isMac ? '⌘K 快速查找' : 'Ctrl+K 快速查找'" @click="commandQuery=topQuery;commandOpen=true;loadCommandSuggestions()"><kbd>{{isMac?'⌘K':'Ctrl+K'}}</kbd></button>
+          <button type="submit" class="command-submit" aria-label="检索资产"><ArrowRight :size="16"/></button>
+        </form>
         <div class="top-actions">
-          <RouterLink to="/agent" class="soft-action"><Sparkles :size="17" />智能问数</RouterLink>
+          <span v-if="serviceAvailable===false" class="service-alert" role="alert">服务异常</span>
           <a class="icon-button help-link" title="使用说明" aria-label="使用说明" href="https://github.com/Hunter-ZK/DataControl/blob/main/README.md" target="_blank" rel="noopener noreferrer"><CircleHelp :size="17"/></a>
-          <el-dropdown>
+          <el-dropdown class="mobile-account">
             <button class="avatar user-trigger" aria-label="用户菜单">{{userInitial}}</button>
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item @click="router.push('/profile')">个人中心</el-dropdown-item>
+                <el-dropdown-item v-if="isAdmin" @click="router.push('/admin')">管理员工作台</el-dropdown-item>
                 <el-dropdown-item @click="logout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -54,7 +67,7 @@
       <main><RouterView /></main>
       <AssetAgentDrawer/>
     </div>
-    <el-drawer v-model="mobileNavOpen" title="DataControl 导航" direction="ltr" size="min(300px,85vw)">
+    <el-drawer v-model="mobileNavOpen" title="数据资产平台导航" direction="ltr" size="min(300px,85vw)">
       <div class="mobile-links">
         <RouterLink v-for="item in mobileLinks" :key="item.to" :to="item.to" @click="mobileNavOpen=false">
           <AssetIcon v-if="'assetType' in item && item.assetType" :type="String(item.assetType)" :size="18" mode="inline"/>
@@ -75,7 +88,7 @@
       </div>
       <div class="command-results">
         <button v-for="item in commandSuggestions" :key="item.assetType+item.assetId"
-          @click="chooseCommand(item)"><AssetIcon :type="item.assetType" :size="16" mode="inline"/><b>{{item.title}}</b><code>{{item.technicalName}}</code><small>{{item.assetType}}</small></button>
+          @click="chooseCommand(item)"><AssetIcon :type="item.assetType" :size="16" mode="inline"/><b>{{item.title}}</b><code>{{item.technicalName}}</code><small>{{assetTypeLabel(item.assetType)}}</small></button>
         <button v-if="commandQuery.trim()" @click="openCommandSearch">查看完整检索结果：{{commandQuery}}</button>
       </div>
     </el-dialog>
@@ -83,24 +96,47 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { activeAssetOperations } from '@/composables/assetOperations'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, BarChart3, BookOpenCheck, Boxes, CircleGauge, CircleHelp, Database, FileText, Hash, Layers3, Menu, PanelLeftClose, Search, Settings2, Sparkles, UserRound } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, BarChart3, BookOpenCheck, ChevronRight, CircleGauge, CircleHelp, Database, FileText, Hash, Layers3, Menu, PanelLeftClose, Search, Settings2, Sparkles } from 'lucide-vue-next'
 import { assetApi, type SearchSuggestion } from '@/api/client'
 import AssetIcon from '@/components/AssetIcon.vue'
 import AssetAgentDrawer from '@/components/AssetAgentDrawer.vue'
+import { detailBreadcrumbTitle } from '@/composables/detailBreadcrumb'
+import { assetTypeLabel } from '@/utils/labels'
 
 const router = useRouter()
 const mobileNavOpen=ref(false)
 const navCollapsed=ref(false)
 const isMac=typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
-const breadcrumbType=computed(():string => ({
-  catalog:'TABLE',dataset:'TABLE',field:'COLUMN',search:'TABLE',
-  codeTables:'CODE_TABLE',codeTable:'CODE_TABLE',standards:'STANDARD',standard:'STANDARD',
-  wordRoots:'WORD_ROOT',wordRoot:'WORD_ROOT',metrics:'METRIC',metric:'METRIC',
-  statSystems:'STAT_SYSTEM',statSystem:'STAT_SYSTEM',
-} as Record<string,string>)[String(route.name)]||'CATALOG')
+const topQuery=ref('')
+const breadcrumbs=computed(():{label:string;to:string}[]=>{
+  const n=String(route.name||'')
+  const current={label:String(route.meta.title||'工作台'),to:route.fullPath}
+  if(n==='home')return [{label:'首页',to:'/'}]
+  const bases:Record<string,{label:string;to:string}>={
+    dataset:{label:'资产目录',to:'/catalog'},field:{label:'资产目录',to:'/catalog'},
+    standard:{label:'数据标准',to:'/standards'},codeTable:{label:'码表',to:'/code-tables'},
+    metric:{label:'指标',to:'/metrics'},statSystem:{label:'统计制度',to:'/stat-systems'},
+    wordRoot:{label:'词根索引',to:'/word-roots'},
+  }
+  const base=bases[n]
+  if(base)return [base,{label:detailBreadcrumbTitle.value||String(route.params.id||route.params.no||route.params.code||route.params.root||current.label),to:route.fullPath}]
+  if(n==='overview')return [{label:'资产目录',to:'/catalog'},current]
+  if(n==='namingWorkbench')return [{label:'词根索引',to:'/word-roots'},current]
+  if(n==='search')return [{label:'首页',to:'/'},current]
+  if(n==='codeTables')return [{label:'数据标准',to:'/standards'},current]
+  if(n==='statSystems')return [{label:'指标与制度',to:'/metrics'},current]
+  return [current]
+})
+watch(()=>route.query.q,v=>{if(route.name==='search')topQuery.value=String(v||'')},{immediate:true})
+function submitTopSearch(){
+  const q=topQuery.value.trim()
+  if(!q)return
+  if(route.name==='search' && String(route.query.q||'')===q){router.replace({name:'search',query:{q,refresh:String(Date.now())}});return}
+  router.push({name:'search',query:{q}})
+}
 const commandOpen=ref(false)
 const commandQuery=ref('')
 const commandSuggestions=ref<SearchSuggestion[]>([])
@@ -134,40 +170,35 @@ function chooseCommand(item:SearchSuggestion){
   if(!name){router.push({name:'search',query:{q:code}});return}
   router.push({name,params:{[key[item.assetType]]:item.assetType==='TABLE'||item.assetType==='COLUMN'?item.assetId:code}})
 }
-function openCommandSearch(){commandOpen.value=false;router.push({name:'search',query:{q:commandQuery.value.trim()}})}
+function openCommandSearch(){commandOpen.value=false;topQuery.value=commandQuery.value.trim();router.push({name:'search',query:{q:commandQuery.value.trim()}})}
 function logout(){localStorage.removeItem('datacontrol_token');localStorage.removeItem('datacontrol_user');router.push({name:'login'})}
 
 const route = useRoute()
 const primary = [
-  { to: '/', label: '首页', icon: CircleGauge },
-  { to: '/catalog', label: '资产目录', icon: Database, assetType: 'TABLE' },
-  { to: '/search', label: '资产检索', icon: Search },
-  { to: '/code-tables', label: '标准码表', icon: Boxes, assetType: 'CODE_TABLE' },
-  { to: '/word-roots', label: '词根索引', icon: Hash, assetType: 'WORD_ROOT' },
-  { to: '/metrics', label: '业务指标', icon: BookOpenCheck, assetType: 'METRIC' },
-  { to: '/agent', label: '智能问数', icon: Sparkles },
-  { to: '/workbench/naming', label: '字段规范化命名', icon: FileText },
-  { to: '/standards', label: '数据标准', icon: BookOpenCheck, assetType: 'STANDARD' },
-  { to: '/stat-systems', label: '统计制度', icon: FileText, assetType: 'STAT_SYSTEM' },
+  { to:'/',label:'首页',icon:CircleGauge },
+  { to:'/catalog',label:'资产目录',icon:Database,assetType:'TABLE' },
+  { to:'/standards',label:'数据标准',icon:BookOpenCheck,assetType:'STANDARD' },
+  { to:'/word-roots',label:'词根索引',icon:Hash,assetType:'WORD_ROOT' },
+  { to:'/metrics',label:'指标与制度',icon:BarChart3,assetType:'METRIC' },
+  { to:'/agent',label:'智能问数',icon:Sparkles },
 ]
-const secondary = [
-  { to: '/overview', label: '数据概览', icon: BarChart3 },
-  { to: '/profile', label: '个人中心', icon: UserRound },
+const secondary=[
+  {to:'/overview',label:'数据概览',icon:BarChart3},
+  {to:'/workbench/naming',label:'字段规范化命名',icon:FileText},
+  {to:'/profile',label:'个人中心',icon:CircleGauge},
 ]
-const isAdmin = ref(false)
-const adminNavItem = { to: '/admin', label: '管理员工作台', icon: Settings2 }
-const mobileLinks = computed(() => [
-  ...primary,
-  ...secondary,
-  ...(isAdmin.value ? [adminNavItem] : []),
-])
-const navGroups = computed(() => [
-  { title: '工作空间', items: [primary[0], primary[6], primary[7]] },
-  { title: '数据发现', items: [primary[2], primary[1]] },
-  { title: '数据理解', items: [primary[5], primary[8], primary[3], primary[9], primary[4]] },
-  { title: '其他', items: secondary },
-  ...(isAdmin.value ? [{ title: '管理与调试', items: [adminNavItem] }] : []),
-])
+const isAdmin=ref(false)
+const adminNavItem={to:'/admin',label:'管理员工作台',icon:Settings2}
+const mobileLinks=computed(()=>[...primary,...secondary,...(isAdmin.value?[adminNavItem]:[])])
+const navGroups=computed(()=>[{title:'主导航',items:primary}])
+function isNavSectionActive(path:string){
+  const n=String(route.name||'')
+  if(path==='/standards')return ['standards','standard','codeTables','codeTable'].includes(n)
+  if(path==='/metrics')return ['metrics','metric','statSystems','statSystem'].includes(n)
+  if(path==='/catalog')return ['catalog','dataset','field','overview'].includes(n)
+  if(path==='/word-roots')return ['wordRoots','wordRoot','namingWorkbench'].includes(n)
+  return false
+}
 
 function shortcut(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
@@ -268,4 +299,27 @@ onBeforeUnmount(() => window.removeEventListener('keydown', shortcut))
 .sidebar-foot{background:rgba(240,246,255,.67);border-radius:10px}
 
 .nav{overflow-y:auto;scrollbar-width:thin;scrollbar-color:#d0dff4 transparent;min-height:0}.sidebar{min-height:0}.mobile-links a{font-size:14px}.command-results button{font-size:14px}.command-results code{font-size:12px}
+
+/* Compact, fixed application chrome. Original cards, icons and color system remain intact. */
+.shell{height:100vh;overflow:hidden;grid-template-columns:208px minmax(0,1fr)}
+.workspace{height:100vh;min-height:0;display:flex;flex-direction:column}
+.workspace>main{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}
+.topbar{height:52px;flex:0 0 52px;padding:0 20px}
+.brand{height:54px}.brand-copy b{font-size:16px}
+.sidebar{height:100vh}.sidebar-foot{margin-top:auto;display:block;padding:10px 4px;background:transparent}
+.account-menu{display:block}.account-trigger{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;cursor:pointer;padding:7px;color:var(--dc-text);text-align:left;border-radius:9px}
+.account-trigger:hover{background:var(--dc-primary-soft)}.account-label{font-size:13px;font-weight:650}
+.mobile-account{display:none}.breadcrumbs{display:flex;align-items:center;gap:6px;min-width:0;font-size:13px;white-space:nowrap}
+.breadcrumbs a{color:var(--dc-text-2)}.breadcrumbs a:hover{color:var(--dc-primary)}.breadcrumbs .crumb{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px}
+.breadcrumb-separator{flex:none;color:var(--dc-text-3)}.top-left{min-width:0;max-width:42%;flex:1}
+.command{flex:0 1 410px;width:auto;height:34px;margin-left:auto;gap:7px;padding:0 9px}
+.command input{min-width:0;flex:1;border:0;background:transparent;outline:none;color:var(--dc-text);font-size:13px}
+.command input::placeholder{color:var(--dc-text-3)}.command-shortcut,.command-submit{background:transparent;border:0;display:grid;place-items:center;cursor:pointer;color:var(--dc-primary)}
+.command-shortcut kbd{font-size:11px}.service-alert{color:#a02930;font-size:12px;font-weight:700}
+.nav-item.is-section-active:not(.router-link-exact-active){background:#edf4ff;color:#1f59d6;font-weight:700}
+.shell.is-collapsed{grid-template-columns:56px minmax(0,1fr)}.shell.is-collapsed .account-label{display:none}
+.shell.is-collapsed .sidebar{padding-left:4px;padding-right:4px}.shell.is-collapsed .brand-mark{width:34px;height:34px}
+@media(max-width:1080px) and (min-width:821px){.shell:not(.is-collapsed){grid-template-columns:208px minmax(0,1fr)}.shell:not(.is-collapsed) .brand-copy,.shell:not(.is-collapsed) .nav-item span,.shell:not(.is-collapsed) .account-label{display:block}.shell:not(.is-collapsed) .nav-item{justify-content:flex-start}}
+@media(max-width:820px){.shell,.shell.is-collapsed{display:block;height:auto;min-height:100vh;overflow:visible}.workspace{height:auto;min-height:100vh}.workspace>main{overflow:visible;min-height:calc(100vh - 52px)}.mobile-account{display:block}.topbar{height:52px}.top-left{max-width:none}.command{flex:1;min-width:0}.breadcrumbs .crumb{max-width:145px}}
+@media(max-width:560px){.breadcrumbs .crumb{max-width:115px}.command{flex:0 0 40px}.command input,.command-shortcut,.command-submit{display:none}}
 </style>

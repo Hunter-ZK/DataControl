@@ -69,6 +69,7 @@
 
 <script setup lang="ts">
 import { statusLabel } from '@/utils/labels'
+import { detailBreadcrumbTitle } from '@/composables/detailBreadcrumb'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowUpRight, CircleCheck, Clock3, Code2, GitFork, ListTree, PanelRightOpen, TriangleAlert, X } from 'lucide-vue-next'
@@ -121,6 +122,7 @@ watch(()=>route.params.id,async(value)=>{
   const result=await assetApi.table(id)
   if(String(route.params.id)!==id)return
   data.value=result
+  detailBreadcrumbTitle.value=String(result.bizName||result.tableName||id)
   await Promise.allSettled([
     assetApi.completeColumns(id).then(result=>{if(String(route.params.id)===id && result.complete && result.total===result.items.length){
       columns.value=result.items;exportColumns.value=result.items;columnsLoaded.value=true

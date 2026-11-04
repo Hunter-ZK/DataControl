@@ -21,7 +21,7 @@
   --dc-shadow-sm: 0 4px 16px rgba(31, 76, 151, 0.075);
   --dc-shadow-md: 0 16px 42px rgba(26, 69, 141, 0.13);
   --dc-container: 1450px;
-  --dc-sidebar: 228px;
+  --dc-sidebar: 208px;
   --dc-agent: #2563eb;
   --dc-agent-soft: #eef4ff;
   --dc-font-xs: 13px;
@@ -31,7 +31,7 @@
   --dc-font-title: 22px;
   --dc-font-display: 30px;
   --dc-space-unit: 4px;
-  --dc-topbar: 64px;
+  --dc-topbar: 52px;
   --dc-mono: "SFMono-Regular", "JetBrains Mono", Consolas, "Liberation Mono", monospace;
   --el-color-primary: #2563eb;
   --el-border-color: #e3eaf4;
