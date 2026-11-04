@@ -34,7 +34,7 @@ export const assetApi = {
   changes: (id: string) => get(`/tables/${id}/changes`),
   commonSql: (id: string) => get(`/tables/${id}/common-sql`),
   relations: (id: string) => get(`/relations/tables/${id}`),
-  reference: (endpoint: string, keyword?: string) => get(endpoint, { params: keyword ? { keyword } : undefined }),
+  reference: (endpoint: string, keyword?: string, extraParams?: Record<string, unknown>) => get(endpoint, { params: { ...extraParams, ...(keyword ? { keyword } : {}) } }),
 }
 
 export const authApi = {

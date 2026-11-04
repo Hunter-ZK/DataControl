@@ -61,7 +61,7 @@ const visibleRows = computed(() => {
   const start = (page.value - 1) * pageSize.value
   return filtered.value.slice(start, start + pageSize.value)
 })
-const summary = computed(() => q.value ? `“${q.value}” · ${filtered.value.length.toLocaleString()} 条结果` : '请输入关键词开始检索')
+const summary = computed(() => q.value ? `“${q.value}” · 当前返回 ${filtered.value.length.toLocaleString()} 条` : '请输入关键词开始检索')
 
 function count(key: string) {
   return key === 'ALL' ? rows.value.length : rows.value.filter((row) => row.asset_type === key).length

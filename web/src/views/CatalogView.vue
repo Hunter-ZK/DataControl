@@ -24,13 +24,12 @@
         </button>
       </aside>
       <section class="dc-card asset-list">
-        <div class="list-head"><b>{{filtered.length.toLocaleString()}} 个数据集</b><span>按业务目录和数仓层级筛选</span></div>
+        <div class="list-head"><b>当前载入 {{filtered.length.toLocaleString()}} 个数据集</b><span>按业务目录和数仓层级筛选</span></div>
         <div ref="rowsEl" class="asset-rows">
           <RouterLink v-for="item in visibleRows" :key="item.assetId" :to="`/datasets/${item.assetId}`" class="asset-row">
             <div class="asset-main">
               <div class="asset-title"><LayerTag :layer="item.layerCode" /><b>{{item.bizName}}</b></div>
               <code class="dc-tech">{{item.tableName}}</code>
-              <p>{{item.bizDefinition}}</p>
             </div>
             <div class="asset-meta"><span>{{item.techOwner||'未登记'}}</span><span>{{item.updateFreq||'—'}}</span><ArrowRight :size="17"/></div>
           </RouterLink>

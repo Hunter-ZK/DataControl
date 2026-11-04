@@ -188,6 +188,10 @@ async function loadDetail(row: any) {
     selectedData.value = await api.get(`/code-tables/${encodeURIComponent(key)}`)
     return
   }
+  if (props.kind === 'stat-systems') {
+    selectedData.value = rows.value.find((item) => String(keyOf(item)) === key) || row
+    return
+  }
   const result = await assetApi.reference(`/${props.kind}`, key) as any[]
   selectedData.value = result.find((item: any) => String(keyOf(item)) === key) || row
 }
@@ -203,7 +207,17 @@ async function select(row: any, updateRoute = true) {
 }
 async function load() {
   page.value = 1
-  rows.value = await assetApi.reference(`/${props.kind}`, keyword.value || undefined) as any[]
+  const result = await assetApi.reference(
+    `/${props.kind}`,
+    props.kind === 'stat-systems' ? undefined : (keyword.value || undefined),
+    props.kind === 'code-tables' ? { limit: 500 } : undefined,
+  ) as any[]
+  if (props.kind === 'stat-systems' && keyword.value.trim()) {
+    const query = keyword.value.trim().toLowerCase()
+    rows.value = result.filter((item) => `${item.code} ${item.name} ${item.issuer || ''} ${item.documentNo || ''} ${item.version || ''}`.toLowerCase().includes(query))
+  } else {
+    rows.value = result
+  }
   const requested = String(route.query.selected || '')
   const matched = requested ? rows.value.find((item) => String(keyOf(item)) === requested) : null
   const row = matched || rows.value[0]
