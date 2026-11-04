@@ -28,7 +28,7 @@
       </aside>
     </div>
     <div v-else class="dc-empty">正在加载数据集详情…</div>
-    <el-drawer v-model="fieldDrawerOpen" :title="selectedField?.cnName || selectedField?.columnName || '字段详情'" size="420px">
+    <el-drawer v-model="fieldDrawerOpen" :title="selectedField?.cnName || selectedField?.columnName || '字段详情'" size="min(420px, 100vw)">
       <div v-if="selectedField" class="field-drawer-detail">
         <div><span>字段名称</span><code class="dc-tech">{{selectedField.columnName}}</code></div>
         <div><span>业务定义</span><p>{{selectedField.bizDefinition||'暂无业务定义。'}}</p></div>
